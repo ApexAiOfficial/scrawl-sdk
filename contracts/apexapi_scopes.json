@@ -1,0 +1,579 @@
+{
+  "apexapi_routes": [
+    {
+      "auth": "admin_token",
+      "method": "POST",
+      "path": "/v1/admin/api-keys",
+      "scopes_any_of": []
+    },
+    {
+      "auth": "admin_token",
+      "method": "GET",
+      "path": "/v1/admin/metrics",
+      "scopes_any_of": []
+    },
+    {
+      "auth": "api_key",
+      "method": "GET",
+      "path": "/v1/ai/providers",
+      "scopes_any_of": [
+        "ai:configure"
+      ]
+    },
+    {
+      "auth": "api_key",
+      "method": "DELETE",
+      "path": "/v1/ai/providers/{profile}",
+      "scopes_any_of": [
+        "ai:configure"
+      ]
+    },
+    {
+      "auth": "api_key",
+      "method": "PUT",
+      "path": "/v1/ai/providers/{profile}",
+      "scopes_any_of": [
+        "ai:configure"
+      ]
+    },
+    {
+      "auth": "api_key",
+      "method": "POST",
+      "path": "/v1/ai/providers/{profile}/default",
+      "scopes_any_of": [
+        "ai:configure"
+      ]
+    },
+    {
+      "auth": "api_key",
+      "method": "POST",
+      "path": "/v1/ai/providers/{profile}/test",
+      "scopes_any_of": [
+        "ai:configure"
+      ]
+    },
+    {
+      "auth": "api_key",
+      "method": "GET",
+      "path": "/v1/ai/usage",
+      "scopes_any_of": [
+        "ai:configure"
+      ]
+    },
+    {
+      "auth": "api_key",
+      "method": "GET",
+      "path": "/v1/artifacts/{job_id}",
+      "scopes_any_of": [
+        "artifacts:read"
+      ]
+    },
+    {
+      "auth": "api_key",
+      "method": "GET",
+      "path": "/v1/artifacts/{job_id}/{filename}",
+      "scopes_any_of": [
+        "artifacts:read"
+      ]
+    },
+    {
+      "auth": "api_key",
+      "method": "POST",
+      "path": "/v1/ask",
+      "scopes_any_of": [
+        "ai:use"
+      ]
+    },
+    {
+      "auth": "api_key",
+      "method": "POST",
+      "path": "/v1/assets",
+      "scopes_any_of": [
+        "scrape:write"
+      ]
+    },
+    {
+      "auth": "api_key",
+      "method": "POST",
+      "path": "/v1/assets/quote",
+      "scopes_any_of": [
+        "scrape:write"
+      ]
+    },
+    {
+      "auth": "api_key",
+      "method": "GET",
+      "path": "/v1/assets/{job_id}",
+      "scopes_any_of": [
+        "artifacts:read"
+      ]
+    },
+    {
+      "auth": "api_key",
+      "method": "GET",
+      "path": "/v1/assets/{job_id}/files/{asset_id}",
+      "scopes_any_of": [
+        "artifacts:read"
+      ]
+    },
+    {
+      "auth": "api_key",
+      "method": "GET",
+      "path": "/v1/commands",
+      "scopes_any_of": [
+        "commands:read"
+      ]
+    },
+    {
+      "auth": "api_key",
+      "method": "POST",
+      "path": "/v1/crawls",
+      "scopes_any_of": [
+        "scrape:write"
+      ]
+    },
+    {
+      "auth": "api_key",
+      "method": "GET",
+      "path": "/v1/credits/balance",
+      "scopes_any_of": [
+        "credits:read"
+      ]
+    },
+    {
+      "auth": "api_key",
+      "method": "GET",
+      "path": "/v1/datasets",
+      "scopes_any_of": [
+        "artifacts:read"
+      ]
+    },
+    {
+      "auth": "api_key",
+      "method": "GET",
+      "path": "/v1/datasets/{dataset_id}",
+      "scopes_any_of": [
+        "artifacts:read"
+      ]
+    },
+    {
+      "auth": "api_key",
+      "method": "POST",
+      "path": "/v1/datasets/{dataset_id}/active-version",
+      "scopes_any_of": [
+        "scrape:write"
+      ]
+    },
+    {
+      "auth": "api_key",
+      "method": "GET",
+      "path": "/v1/datasets/{dataset_id}/diff",
+      "scopes_any_of": [
+        "artifacts:read"
+      ]
+    },
+    {
+      "auth": "api_key",
+      "method": "POST",
+      "path": "/v1/datasets/{dataset_id}/extract",
+      "scopes_any_of": [
+        "ai:use"
+      ]
+    },
+    {
+      "auth": "api_key",
+      "method": "GET",
+      "path": "/v1/datasets/{dataset_id}/fields",
+      "scopes_any_of": [
+        "artifacts:read"
+      ]
+    },
+    {
+      "auth": "api_key",
+      "method": "POST",
+      "path": "/v1/datasets/{dataset_id}/query",
+      "scopes_any_of": [
+        "artifacts:read"
+      ]
+    },
+    {
+      "auth": "api_key",
+      "method": "DELETE",
+      "path": "/v1/datasets/{dataset_id}/records/{record_id}/quarantine",
+      "scopes_any_of": [
+        "scrape:write"
+      ]
+    },
+    {
+      "auth": "api_key",
+      "method": "PUT",
+      "path": "/v1/datasets/{dataset_id}/records/{record_id}/quarantine",
+      "scopes_any_of": [
+        "scrape:write"
+      ]
+    },
+    {
+      "auth": "api_key",
+      "method": "GET",
+      "path": "/v1/datasets/{dataset_id}/versions",
+      "scopes_any_of": [
+        "artifacts:read"
+      ]
+    },
+    {
+      "auth": "api_key",
+      "method": "GET",
+      "path": "/v1/documents/{document_id}",
+      "scopes_any_of": [
+        "artifacts:read"
+      ]
+    },
+    {
+      "auth": "api_key",
+      "method": "POST",
+      "path": "/v1/extract",
+      "scopes_any_of": [
+        "ai:use"
+      ]
+    },
+    {
+      "auth": "none",
+      "method": "GET",
+      "path": "/v1/health",
+      "scopes_any_of": []
+    },
+    {
+      "auth": "api_key",
+      "method": "GET",
+      "path": "/v1/jobs",
+      "scopes_any_of": [
+        "jobs:read"
+      ]
+    },
+    {
+      "auth": "api_key",
+      "method": "GET",
+      "path": "/v1/jobs/{job_id}",
+      "scopes_any_of": [
+        "jobs:read"
+      ]
+    },
+    {
+      "auth": "api_key",
+      "method": "POST",
+      "path": "/v1/jobs/{job_id}/cancel",
+      "scopes_any_of": [
+        "scrape:write",
+        "ai:use"
+      ]
+    },
+    {
+      "auth": "api_key",
+      "method": "POST",
+      "path": "/v1/map",
+      "scopes_any_of": [
+        "scrape:write"
+      ]
+    },
+    {
+      "auth": "api_key",
+      "method": "GET",
+      "path": "/v1/results/{job_id}",
+      "scopes_any_of": [
+        "jobs:read"
+      ]
+    },
+    {
+      "auth": "api_key",
+      "method": "POST",
+      "path": "/v1/scrape",
+      "scopes_any_of": [
+        "scrape:write"
+      ]
+    },
+    {
+      "auth": "api_key",
+      "method": "POST",
+      "path": "/v1/scrape/batch",
+      "scopes_any_of": [
+        "scrape:write"
+      ]
+    },
+    {
+      "auth": "api_key",
+      "method": "GET",
+      "path": "/v1/scrape/batch/{batch_id}",
+      "scopes_any_of": [
+        "artifacts:read"
+      ]
+    },
+    {
+      "auth": "api_key",
+      "method": "POST",
+      "path": "/v1/scrape/check",
+      "scopes_any_of": [
+        "scrape:write"
+      ]
+    },
+    {
+      "auth": "api_key",
+      "method": "POST",
+      "path": "/v1/scrape/crawl",
+      "scopes_any_of": [
+        "scrape:write"
+      ]
+    },
+    {
+      "auth": "api_key",
+      "method": "POST",
+      "path": "/v1/scrape/fetch",
+      "scopes_any_of": [
+        "scrape:write"
+      ]
+    },
+    {
+      "auth": "api_key",
+      "method": "POST",
+      "path": "/v1/scrape/parse",
+      "scopes_any_of": [
+        "scrape:write"
+      ]
+    },
+    {
+      "auth": "api_key",
+      "method": "POST",
+      "path": "/v1/scrape/view",
+      "scopes_any_of": [
+        "scrape:write"
+      ]
+    },
+    {
+      "auth": "api_key",
+      "method": "GET",
+      "path": "/v1/scrape/{job_id}/content",
+      "scopes_any_of": [
+        "artifacts:read"
+      ]
+    },
+    {
+      "auth": "api_key",
+      "method": "GET",
+      "path": "/v1/scrapy/list",
+      "scopes_any_of": [
+        "scrape:write"
+      ]
+    },
+    {
+      "auth": "api_key",
+      "method": "GET",
+      "path": "/v1/scrapy/settings",
+      "scopes_any_of": [
+        "scrape:write"
+      ]
+    },
+    {
+      "auth": "api_key",
+      "method": "GET",
+      "path": "/v1/scrapy/version",
+      "scopes_any_of": [
+        "scrape:write"
+      ]
+    },
+    {
+      "auth": "api_key",
+      "method": "POST",
+      "path": "/v1/search",
+      "scopes_any_of": [
+        "artifacts:read"
+      ]
+    }
+  ],
+  "default_key_scopes": [
+    "scrape:write",
+    "jobs:read",
+    "artifacts:read",
+    "credits:read"
+  ],
+  "mcp": {
+    "listen_scope": "artifacts:read",
+    "resources_scope": "artifacts:read",
+    "tools": [
+      {
+        "name": "apex_scrapy_activate_dataset_version",
+        "scope": "scrape:write"
+      },
+      {
+        "name": "apex_scrapy_ai_status",
+        "scope": "artifacts:read"
+      },
+      {
+        "name": "apex_scrapy_ask",
+        "scope": "ai:use"
+      },
+      {
+        "name": "apex_scrapy_asset_result",
+        "scope": "artifacts:read"
+      },
+      {
+        "name": "apex_scrapy_batch_scrape",
+        "scope": "scrape:write"
+      },
+      {
+        "name": "apex_scrapy_batch_status",
+        "scope": "artifacts:read"
+      },
+      {
+        "name": "apex_scrapy_cancel_job",
+        "scope": "scrape:write"
+      },
+      {
+        "name": "apex_scrapy_check_project",
+        "scope": "scrape:write"
+      },
+      {
+        "name": "apex_scrapy_credit_balance",
+        "scope": "credits:read"
+      },
+      {
+        "name": "apex_scrapy_diff_dataset_versions",
+        "scope": "artifacts:read"
+      },
+      {
+        "name": "apex_scrapy_extract",
+        "scope": "ai:use"
+      },
+      {
+        "name": "apex_scrapy_extract_assets",
+        "scope": "scrape:write"
+      },
+      {
+        "name": "apex_scrapy_extract_dataset",
+        "scope": "ai:use"
+      },
+      {
+        "name": "apex_scrapy_get_dataset",
+        "scope": "artifacts:read"
+      },
+      {
+        "name": "apex_scrapy_get_job",
+        "scope": "jobs:read"
+      },
+      {
+        "name": "apex_scrapy_list_artifacts",
+        "scope": "artifacts:read"
+      },
+      {
+        "name": "apex_scrapy_list_capabilities",
+        "scope": null
+      },
+      {
+        "name": "apex_scrapy_list_dataset_fields",
+        "scope": "artifacts:read"
+      },
+      {
+        "name": "apex_scrapy_list_datasets",
+        "scope": "artifacts:read"
+      },
+      {
+        "name": "apex_scrapy_list_jobs",
+        "scope": "jobs:read"
+      },
+      {
+        "name": "apex_scrapy_list_spiders",
+        "scope": "scrape:write"
+      },
+      {
+        "name": "apex_scrapy_map_url",
+        "scope": "scrape:write"
+      },
+      {
+        "name": "apex_scrapy_query_dataset",
+        "scope": "artifacts:read"
+      },
+      {
+        "name": "apex_scrapy_query_dataset_version",
+        "scope": "artifacts:read"
+      },
+      {
+        "name": "apex_scrapy_quote_assets",
+        "scope": "scrape:write"
+      },
+      {
+        "name": "apex_scrapy_read_artifact",
+        "scope": "artifacts:read"
+      },
+      {
+        "name": "apex_scrapy_scrape_result",
+        "scope": "artifacts:read"
+      },
+      {
+        "name": "apex_scrapy_scrape_url",
+        "scope": "scrape:write"
+      },
+      {
+        "name": "apex_scrapy_set_record_quarantine",
+        "scope": "scrape:write"
+      },
+      {
+        "name": "apex_scrapy_start_crawl",
+        "scope": "scrape:write"
+      },
+      {
+        "name": "apex_scrapy_status",
+        "scope": null
+      },
+      {
+        "name": "apex_scrapy_version",
+        "scope": "scrape:write"
+      },
+      {
+        "name": "fetch",
+        "scope": "artifacts:read"
+      },
+      {
+        "name": "search",
+        "scope": "artifacts:read"
+      }
+    ]
+  },
+  "rule": "A key holds a scope when it names it or holds '*'. A route needs one of scopes_any_of when auth is api_key; admin_token routes need the operator's admin token instead, and none routes need no credential. An MCP tool with a null scope needs only a key.",
+  "schema_version": 1,
+  "scopes": [
+    {
+      "default": true,
+      "description": "Start and quote jobs (Scrapy commands, scrape, map, batch, crawl and asset extraction), change datasets (activate a version, quarantine a record) and cancel jobs.",
+      "name": "scrape:write"
+    },
+    {
+      "default": true,
+      "description": "List the caller's jobs and read a job's status and JSON result.",
+      "name": "jobs:read"
+    },
+    {
+      "default": true,
+      "description": "Read job artifacts, scrape, batch and asset results and files, datasets, records, documents and search.",
+      "name": "artifacts:read"
+    },
+    {
+      "default": true,
+      "description": "Read the account's credit balance (or the self-hosted unmetered status).",
+      "name": "credits:read"
+    },
+    {
+      "default": false,
+      "description": "Read which Scrapy commands ApexAPI exposes.",
+      "name": "commands:read"
+    },
+    {
+      "default": false,
+      "description": "Add, test, remove and choose the caller's own AI provider profiles, and read their usage.",
+      "name": "ai:configure"
+    },
+    {
+      "default": false,
+      "description": "Run AI extraction and questions with the caller's own AI provider, spending that provider's credit (also the json scrape format and cancelling the caller's AI extraction jobs).",
+      "name": "ai:use"
+    }
+  ],
+  "wildcard": "*"
+}

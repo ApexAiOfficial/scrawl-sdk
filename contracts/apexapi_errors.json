@@ -1,0 +1,478 @@
+{
+  "errors": [
+    {
+      "code": "account_not_active",
+      "description": "The key's hosted account is suspended, banned, or has not accepted the Trust Pledge.",
+      "http_status": 403,
+      "retryable": false,
+      "surfaces": [
+        "apexapi",
+        "mcp"
+      ]
+    },
+    {
+      "code": "ai_auth",
+      "description": "Your AI provider rejected the key, or the key may not use this model.",
+      "http_status": 502,
+      "retryable": false,
+      "surfaces": [
+        "apexapi",
+        "mcp",
+        "result"
+      ]
+    },
+    {
+      "code": "ai_bad_request",
+      "description": "Your AI provider refused the request, for example an unknown model.",
+      "http_status": 502,
+      "retryable": false,
+      "surfaces": [
+        "apexapi",
+        "mcp",
+        "result"
+      ]
+    },
+    {
+      "code": "ai_context_overflow",
+      "description": "The input is too large for the model's context window.",
+      "http_status": 502,
+      "retryable": false,
+      "surfaces": [
+        "apexapi",
+        "mcp",
+        "result"
+      ]
+    },
+    {
+      "code": "ai_endpoint_forbidden",
+      "description": "The AI profile's base URL is not allowed by the endpoint policy.",
+      "http_status": 502,
+      "retryable": false,
+      "surfaces": [
+        "apexapi",
+        "mcp",
+        "result"
+      ]
+    },
+    {
+      "code": "ai_malformed_output",
+      "description": "The model's answer was not the JSON that was asked for, even after one repair.",
+      "http_status": 502,
+      "retryable": false,
+      "surfaces": [
+        "apexapi",
+        "mcp",
+        "result"
+      ]
+    },
+    {
+      "code": "ai_provider_error",
+      "description": "Your AI provider failed for a reason without a more specific AI failure code.",
+      "http_status": 502,
+      "retryable": false,
+      "surfaces": [
+        "apexapi",
+        "mcp",
+        "result"
+      ]
+    },
+    {
+      "code": "ai_quota",
+      "description": "Your AI provider account cannot pay for the call.",
+      "http_status": 502,
+      "retryable": false,
+      "surfaces": [
+        "apexapi",
+        "mcp",
+        "result"
+      ]
+    },
+    {
+      "code": "ai_rate_limited",
+      "description": "Your AI provider rate-limited the call.",
+      "http_status": 502,
+      "retryable": true,
+      "surfaces": [
+        "apexapi",
+        "mcp",
+        "result"
+      ]
+    },
+    {
+      "code": "ai_refused",
+      "description": "Your AI provider refused to answer (a content filter or safety refusal).",
+      "http_status": 502,
+      "retryable": false,
+      "surfaces": [
+        "apexapi",
+        "mcp",
+        "result"
+      ]
+    },
+    {
+      "code": "ai_timeout",
+      "description": "Your AI provider did not answer in time.",
+      "http_status": 502,
+      "retryable": true,
+      "surfaces": [
+        "apexapi",
+        "mcp",
+        "result"
+      ]
+    },
+    {
+      "code": "ai_unavailable",
+      "description": "Your AI provider is unavailable: an outage or a connection failure.",
+      "http_status": 502,
+      "retryable": true,
+      "surfaces": [
+        "apexapi",
+        "mcp",
+        "result"
+      ]
+    },
+    {
+      "code": "bad_request",
+      "description": "The request was refused as it stands, for example a refused job or an invalid artifact file name.",
+      "http_status": 400,
+      "retryable": false,
+      "surfaces": [
+        "apexapi"
+      ]
+    },
+    {
+      "code": "browser_unavailable",
+      "description": "This deployment cannot render pages in a browser; use the static engine.",
+      "http_status": 503,
+      "retryable": false,
+      "surfaces": [
+        "apexapi",
+        "mcp"
+      ]
+    },
+    {
+      "code": "budget_exceeded",
+      "description": "The job's estimate is above the request's max_credits; nothing was reserved.",
+      "http_status": 422,
+      "retryable": false,
+      "surfaces": [
+        "apexapi",
+        "mcp"
+      ]
+    },
+    {
+      "code": "conflict",
+      "description": "The request conflicts with one still in progress (the same Idempotency-Key) or with a job that has not finished.",
+      "http_status": 409,
+      "retryable": true,
+      "surfaces": [
+        "apexapi",
+        "mcp"
+      ]
+    },
+    {
+      "code": "dispatch_refused",
+      "description": "A policy gate refused the job before it started, for example a crawl target that is not allowed.",
+      "http_status": 400,
+      "retryable": false,
+      "surfaces": [
+        "apexapi",
+        "mcp"
+      ]
+    },
+    {
+      "code": "egress_required",
+      "description": "The job needs a validated proxy and the caller has none; nothing was sent.",
+      "http_status": 400,
+      "retryable": false,
+      "surfaces": [
+        "apexapi",
+        "mcp"
+      ]
+    },
+    {
+      "code": "egress_unavailable",
+      "description": "The job's proxy could not be used, so the page was not fetched.",
+      "http_status": null,
+      "retryable": true,
+      "surfaces": [
+        "result"
+      ]
+    },
+    {
+      "code": "error",
+      "description": "An error without a more specific code.",
+      "http_status": 400,
+      "retryable": false,
+      "surfaces": [
+        "apexapi"
+      ]
+    },
+    {
+      "code": "fetch_failed",
+      "description": "The page could not be fetched: a network error, a timeout or an error response.",
+      "http_status": null,
+      "retryable": true,
+      "surfaces": [
+        "result"
+      ]
+    },
+    {
+      "code": "forbidden",
+      "description": "The key is valid but may not do this: a missing scope, a disabled endpoint or command, or a key not bound to a hosted account.",
+      "http_status": 403,
+      "retryable": false,
+      "surfaces": [
+        "apexapi",
+        "mcp"
+      ]
+    },
+    {
+      "code": "insufficient_credits",
+      "description": "The account does not have the credits this job needs.",
+      "http_status": 402,
+      "retryable": false,
+      "surfaces": [
+        "apexapi",
+        "mcp"
+      ]
+    },
+    {
+      "code": "internal",
+      "description": "An MCP tool failed unexpectedly; the details are only in the server log.",
+      "http_status": null,
+      "retryable": true,
+      "surfaces": [
+        "mcp"
+      ]
+    },
+    {
+      "code": "internal_error",
+      "description": "An unexpected failure; retry once, and quote the request ID when reporting it.",
+      "http_status": 500,
+      "retryable": true,
+      "surfaces": [
+        "apexapi",
+        "result"
+      ]
+    },
+    {
+      "code": "interrupted",
+      "description": "The job stopped before it finished, for example on a service restart.",
+      "http_status": null,
+      "retryable": true,
+      "surfaces": [
+        "result"
+      ]
+    },
+    {
+      "code": "invalid_artifact_name",
+      "description": "An artifact must be named by a single file name from the job's artifact list.",
+      "http_status": 422,
+      "retryable": false,
+      "surfaces": [
+        "apexapi",
+        "mcp"
+      ]
+    },
+    {
+      "code": "invalid_request",
+      "description": "The request is malformed or outside a documented bound; field errors never echo the submitted values.",
+      "http_status": 422,
+      "retryable": false,
+      "surfaces": [
+        "apexapi",
+        "mcp"
+      ]
+    },
+    {
+      "code": "invalid_token",
+      "description": "MCP over HTTP: the bearer key was not accepted.",
+      "http_status": 401,
+      "retryable": false,
+      "surfaces": [
+        "mcp"
+      ]
+    },
+    {
+      "code": "job_timeout",
+      "description": "The job did not finish within its time limit.",
+      "http_status": null,
+      "retryable": true,
+      "surfaces": [
+        "result"
+      ]
+    },
+    {
+      "code": "key_revoked",
+      "description": "The key of an open listen stream was revoked; use an active key.",
+      "http_status": null,
+      "retryable": false,
+      "surfaces": [
+        "mcp"
+      ]
+    },
+    {
+      "code": "listen_expired",
+      "description": "A listen stream reached its lifetime; listen again.",
+      "http_status": null,
+      "retryable": true,
+      "surfaces": [
+        "mcp"
+      ]
+    },
+    {
+      "code": "method_not_allowed",
+      "description": "The route does not accept this HTTP method.",
+      "http_status": 405,
+      "retryable": false,
+      "surfaces": [
+        "apexapi"
+      ]
+    },
+    {
+      "code": "not_found",
+      "description": "The resource does not exist or is not the caller's (the two are never distinguished), or there is no such route.",
+      "http_status": 404,
+      "retryable": false,
+      "surfaces": [
+        "apexapi",
+        "mcp"
+      ]
+    },
+    {
+      "code": "payload_too_large",
+      "description": "The request body is larger than the route accepts.",
+      "http_status": 413,
+      "retryable": false,
+      "surfaces": [
+        "apexapi"
+      ]
+    },
+    {
+      "code": "preflight_denied",
+      "description": "The destination policy refused the page before any fetch.",
+      "http_status": null,
+      "retryable": false,
+      "surfaces": [
+        "result"
+      ]
+    },
+    {
+      "code": "rate_limited",
+      "description": "Too many requests for this account; wait Retry-After seconds, then retry.",
+      "http_status": 429,
+      "retryable": true,
+      "surfaces": [
+        "apexapi",
+        "mcp"
+      ]
+    },
+    {
+      "code": "render_interrupted",
+      "description": "A scrape's JSON step was interrupted; scrape the URL again, or extract from the job.",
+      "http_status": null,
+      "retryable": true,
+      "surfaces": [
+        "result"
+      ]
+    },
+    {
+      "code": "settlement_failed",
+      "description": "The job's charge could not be settled or confirmed; its failure_reason says whether anything was charged. Check it before sending the request again.",
+      "http_status": null,
+      "retryable": false,
+      "surfaces": [
+        "result"
+      ]
+    },
+    {
+      "code": "submission_failed",
+      "description": "The first request with this Idempotency-Key failed after it may have started work; list your jobs, then retry with a new key.",
+      "http_status": 500,
+      "retryable": false,
+      "surfaces": [
+        "apexapi"
+      ]
+    },
+    {
+      "code": "temporarily_unavailable",
+      "description": "MCP over HTTP: the key store is unavailable; retry after Retry-After seconds.",
+      "http_status": 503,
+      "retryable": true,
+      "surfaces": [
+        "mcp"
+      ]
+    },
+    {
+      "code": "too_many_active_jobs",
+      "description": "The caller already has the maximum number of running or queued jobs, or the browser renderer is busy; retry after Retry-After seconds.",
+      "http_status": 429,
+      "retryable": true,
+      "surfaces": [
+        "apexapi",
+        "mcp"
+      ]
+    },
+    {
+      "code": "too_many_streams",
+      "description": "The caller already holds the maximum number of open listen streams; close one first.",
+      "http_status": null,
+      "retryable": true,
+      "surfaces": [
+        "mcp"
+      ]
+    },
+    {
+      "code": "unauthorized",
+      "description": "No credential was sent, or the API key or admin token was not accepted.",
+      "http_status": 401,
+      "retryable": false,
+      "surfaces": [
+        "apexapi",
+        "mcp"
+      ]
+    },
+    {
+      "code": "unavailable",
+      "description": "A feature or service the request needs is turned off or not running on this deployment.",
+      "http_status": 503,
+      "retryable": true,
+      "surfaces": [
+        "apexapi",
+        "mcp"
+      ]
+    },
+    {
+      "code": "unsafe_artifact_path",
+      "description": "The artifact name resolves outside its job's files.",
+      "http_status": 422,
+      "retryable": false,
+      "surfaces": [
+        "apexapi",
+        "mcp"
+      ]
+    },
+    {
+      "code": "unsupported_media_type",
+      "description": "The request body's content type is not accepted.",
+      "http_status": 415,
+      "retryable": false,
+      "surfaces": [
+        "apexapi"
+      ]
+    }
+  ],
+  "fields": {
+    "code": "The stable machine-readable code; match on it, never on the message.",
+    "http_status": "The HTTP status that carries the code on ApexAPI or MCP HTTP; null when it is only an MCP tool error or a failed result's error_code.",
+    "retryable": "Whether the same request can succeed if sent again later unchanged; honour Retry-After when the response has it.",
+    "surfaces": "Where the code appears (see surfaces)."
+  },
+  "schema_version": 1,
+  "surfaces": {
+    "apexapi": "An ApexAPI error response: the envelope {\"error\": {\"code\", \"message\", \"request_id\"}}, or {\"detail\", \"code\"} for authentication, scope, request-schema and route failures.",
+    "mcp": "An MCP error: a tool or resource error whose text starts with [code], a JSON-RPC error whose data.code is the code, or, over MCP HTTP, a {\"error\", \"error_description\"} body.",
+    "result": "The error_code of a failed scrape or asset result (the request itself succeeded). A failed result may also carry a request-error code met while the result was rendered."
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "name": "@apexaiofficial/scrawl",
+  "version": "0.1.0",
+  "description": "Official Scrawl SDK: URL in, clean Markdown or structured JSON out - plus site maps, batches, crawls into versioned datasets and cited answers.",
+  "license": "Apache-2.0",
+  "author": "ApexAiOfficial <support@apexaiofficial.com>",
+  "homepage": "https://github.com/ApexAiOfficial/scrawl-sdk/tree/main/typescript#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ApexAiOfficial/scrawl-sdk.git",
+    "directory": "typescript"
+  },
+  "bugs": {
+    "url": "https://github.com/ApexAiOfficial/scrawl-sdk/issues"
+  },
+  "keywords": ["scrawl", "scraping", "web-scraping", "crawler", "markdown", "datasets", "sdk"],
+  "type": "module",
+  "main": "./src/index.js",
+  "types": "./src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts",
+      "import": "./src/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": ["src", "README.md", "LICENSE", "NOTICE"],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "scripts": {
+    "test": "node --test",
+    "typecheck": "npx --yes -p typescript@5.9.3 tsc -p test/types"
+  }
+}

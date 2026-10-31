@@ -1,0 +1,856 @@
+{
+  "$comment": "One table for both SDKs and the CLI: every ApexAPI operation in contracts/apexapi_openapi.json is covered (the Python method, the TypeScript method, the CLI command, and what a call with every option set sends) or excluded with a reason. Checked by tools/check_contracts.py from both test suites, and by the backend's CI in 'compat' mode. error_codes lists every code the SDKs know (ErrorCode): each code of contracts/apexapi_errors.json with the catalogue's HTTP status and retryable flag (the checker compares them), plus SDK-only codes marked \"source\": \"sdk\". The SDKs never retry automatically on a code whose retryable flag is false.",
+  "format": 1,
+  "operations": {
+    "POST /v1/admin/api-keys": {
+      "excluded": "Operator route: API keys are issued by whoever runs the Scrawl server, with its admin token, never from a client SDK."
+    },
+    "GET /v1/admin/metrics": {
+      "excluded": "Operator route: server metrics for the operator's monitoring, behind the admin token."
+    },
+    "GET /v1/ai/providers": {
+      "python": "list_ai_providers",
+      "typescript": "listAiProviders",
+      "cli": "ai providers list",
+      "sends": {
+        "auth": true,
+        "idempotency_key": false,
+        "query": [],
+        "body": null,
+        "enums": {}
+      }
+    },
+    "DELETE /v1/ai/providers/{profile}": {
+      "python": "delete_ai_provider",
+      "typescript": "deleteAiProvider",
+      "cli": "ai providers remove",
+      "sends": {
+        "auth": true,
+        "idempotency_key": false,
+        "query": [],
+        "body": null,
+        "enums": {}
+      }
+    },
+    "PUT /v1/ai/providers/{profile}": {
+      "python": "set_ai_provider",
+      "typescript": "setAiProvider",
+      "cli": "ai providers set",
+      "sends": {
+        "auth": true,
+        "idempotency_key": false,
+        "query": [],
+        "body": [
+          "provider",
+          "api_key",
+          "model",
+          "base_url"
+        ],
+        "enums": {}
+      }
+    },
+    "POST /v1/ai/providers/{profile}/default": {
+      "python": "set_default_ai_provider",
+      "typescript": "setDefaultAiProvider",
+      "cli": "ai providers default",
+      "sends": {
+        "auth": true,
+        "idempotency_key": false,
+        "query": [],
+        "body": null,
+        "enums": {}
+      }
+    },
+    "POST /v1/ai/providers/{profile}/test": {
+      "python": "test_ai_provider",
+      "typescript": "testAiProvider",
+      "cli": "ai providers test",
+      "sends": {
+        "auth": true,
+        "idempotency_key": false,
+        "query": [],
+        "body": null,
+        "enums": {}
+      }
+    },
+    "GET /v1/ai/usage": {
+      "python": "ai_usage",
+      "typescript": "aiUsage",
+      "cli": "ai providers usage",
+      "sends": {
+        "auth": true,
+        "idempotency_key": false,
+        "query": [
+          "days"
+        ],
+        "body": null,
+        "enums": {}
+      }
+    },
+    "GET /v1/artifacts/{job_id}": {
+      "python": "list_artifacts",
+      "typescript": "listArtifacts",
+      "cli": "artifacts list",
+      "sends": {
+        "auth": true,
+        "idempotency_key": false,
+        "query": [],
+        "body": null,
+        "enums": {}
+      }
+    },
+    "GET /v1/artifacts/{job_id}/{filename}": {
+      "python": "download_artifact",
+      "typescript": "downloadArtifact",
+      "cli": "artifacts download",
+      "sends": {
+        "auth": true,
+        "idempotency_key": false,
+        "query": [
+          "format"
+        ],
+        "body": null,
+        "enums": {
+          "format": [
+            "raw",
+            "markdown"
+          ]
+        }
+      }
+    },
+    "POST /v1/ask": {
+      "python": "ask",
+      "typescript": "ask",
+      "cli": "ask",
+      "sends": {
+        "auth": true,
+        "idempotency_key": false,
+        "query": [],
+        "body": [
+          "question",
+          "dataset_id",
+          "profile"
+        ],
+        "enums": {}
+      }
+    },
+    "POST /v1/assets": {
+      "python": "extract_assets",
+      "typescript": "extractAssets",
+      "cli": "assets",
+      "sends": {
+        "auth": true,
+        "idempotency_key": true,
+        "query": [],
+        "body": [
+          "url",
+          "classes",
+          "max_items",
+          "max_bytes",
+          "max_credits"
+        ],
+        "enums": {
+          "classes": [
+            "images",
+            "video",
+            "audio",
+            "documents",
+            "data",
+            "web_assets"
+          ]
+        }
+      }
+    },
+    "POST /v1/assets/quote": {
+      "python": "quote_assets",
+      "typescript": "quoteAssets",
+      "cli": "assets-quote",
+      "sends": {
+        "auth": true,
+        "idempotency_key": false,
+        "query": [],
+        "body": [
+          "url",
+          "classes",
+          "max_items",
+          "max_bytes",
+          "max_credits"
+        ],
+        "enums": {
+          "classes": [
+            "images",
+            "video",
+            "audio",
+            "documents",
+            "data",
+            "web_assets"
+          ]
+        }
+      }
+    },
+    "GET /v1/assets/{job_id}": {
+      "python": "get_assets",
+      "typescript": "getAssets",
+      "cli": "assets-result",
+      "sends": {
+        "auth": true,
+        "idempotency_key": false,
+        "query": [
+          "view",
+          "limit",
+          "cursor",
+          "wait_seconds"
+        ],
+        "body": null,
+        "enums": {
+          "view": [
+            "assets",
+            "skipped"
+          ]
+        }
+      }
+    },
+    "GET /v1/assets/{job_id}/files/{asset_id}": {
+      "python": "download_asset",
+      "typescript": "downloadAsset",
+      "cli": "assets-result --out",
+      "sends": {
+        "auth": true,
+        "idempotency_key": false,
+        "query": [],
+        "body": null,
+        "enums": {}
+      }
+    },
+    "GET /v1/commands": {
+      "excluded": "Legacy command manifest of the job API; the SDKs' typed methods replace it."
+    },
+    "POST /v1/crawls": {
+      "python": "crawl",
+      "typescript": "crawl",
+      "cli": "crawl",
+      "sends": {
+        "auth": true,
+        "idempotency_key": true,
+        "query": [],
+        "body": [
+          "crawl_target",
+          "export_format",
+          "max_items",
+          "max_seconds"
+        ],
+        "enums": {
+          "export_format": [
+            "jsonlines",
+            "json",
+            "csv"
+          ]
+        }
+      }
+    },
+    "GET /v1/credits/balance": {
+      "python": "credit_balance",
+      "typescript": "creditBalance",
+      "cli": "balance",
+      "sends": {
+        "auth": true,
+        "idempotency_key": false,
+        "query": [],
+        "body": null,
+        "enums": {}
+      }
+    },
+    "GET /v1/datasets": {
+      "python": "list_datasets",
+      "typescript": "listDatasets",
+      "cli": "datasets list",
+      "sends": {
+        "auth": true,
+        "idempotency_key": false,
+        "query": [
+          "limit",
+          "cursor"
+        ],
+        "body": null,
+        "enums": {}
+      }
+    },
+    "GET /v1/datasets/{dataset_id}": {
+      "python": "get_dataset",
+      "typescript": "getDataset",
+      "cli": "datasets get",
+      "sends": {
+        "auth": true,
+        "idempotency_key": false,
+        "query": [],
+        "body": null,
+        "enums": {}
+      }
+    },
+    "POST /v1/datasets/{dataset_id}/active-version": {
+      "python": "activate_version",
+      "typescript": "activateVersion",
+      "cli": "datasets activate",
+      "sends": {
+        "auth": true,
+        "idempotency_key": false,
+        "query": [],
+        "body": [
+          "version_id"
+        ],
+        "enums": {}
+      }
+    },
+    "GET /v1/datasets/{dataset_id}/diff": {
+      "python": "diff_versions",
+      "typescript": "diffVersions",
+      "cli": "datasets diff",
+      "sends": {
+        "auth": true,
+        "idempotency_key": false,
+        "query": [
+          "from",
+          "to",
+          "limit",
+          "cursor"
+        ],
+        "body": null,
+        "enums": {}
+      }
+    },
+    "POST /v1/datasets/{dataset_id}/extract": {
+      "python": "extract_dataset",
+      "typescript": "extractDataset",
+      "cli": "datasets extract",
+      "sends": {
+        "auth": true,
+        "idempotency_key": true,
+        "query": [],
+        "body": [
+          "schema",
+          "instruction",
+          "profile",
+          "version_id",
+          "max_records"
+        ],
+        "enums": {}
+      }
+    },
+    "GET /v1/datasets/{dataset_id}/fields": {
+      "python": "dataset_fields",
+      "typescript": "datasetFields",
+      "cli": "datasets fields",
+      "sends": {
+        "auth": true,
+        "idempotency_key": false,
+        "query": [
+          "version"
+        ],
+        "body": null,
+        "enums": {}
+      }
+    },
+    "POST /v1/datasets/{dataset_id}/query": {
+      "python": "query_dataset",
+      "typescript": "queryDataset",
+      "cli": "datasets query",
+      "sends": {
+        "auth": true,
+        "idempotency_key": false,
+        "query": [],
+        "body": [
+          "filters",
+          "version_id",
+          "limit",
+          "cursor"
+        ],
+        "enums": {}
+      }
+    },
+    "DELETE /v1/datasets/{dataset_id}/records/{record_id}/quarantine": {
+      "python": "release_record",
+      "typescript": "releaseRecord",
+      "cli": "datasets release",
+      "sends": {
+        "auth": true,
+        "idempotency_key": false,
+        "query": [],
+        "body": null,
+        "enums": {}
+      }
+    },
+    "PUT /v1/datasets/{dataset_id}/records/{record_id}/quarantine": {
+      "python": "quarantine_record",
+      "typescript": "quarantineRecord",
+      "cli": "datasets quarantine",
+      "sends": {
+        "auth": true,
+        "idempotency_key": false,
+        "query": [],
+        "body": [
+          "reason"
+        ],
+        "enums": {}
+      }
+    },
+    "GET /v1/datasets/{dataset_id}/versions": {
+      "python": "list_versions",
+      "typescript": "listVersions",
+      "cli": "datasets versions",
+      "sends": {
+        "auth": true,
+        "idempotency_key": false,
+        "query": [
+          "limit",
+          "cursor",
+          "status"
+        ],
+        "body": null,
+        "enums": {}
+      }
+    },
+    "GET /v1/documents/{document_id}": {
+      "python": "get_document",
+      "typescript": "getDocument",
+      "cli": "document",
+      "sends": {
+        "auth": true,
+        "idempotency_key": false,
+        "query": [],
+        "body": null,
+        "enums": {}
+      }
+    },
+    "POST /v1/extract": {
+      "python": "extract",
+      "typescript": "extract",
+      "cli": "extract",
+      "sends": {
+        "auth": true,
+        "idempotency_key": false,
+        "query": [],
+        "body": [
+          "job_id",
+          "artifact",
+          "schema",
+          "instruction",
+          "profile"
+        ],
+        "enums": {}
+      }
+    },
+    "GET /v1/health": {
+      "python": "health",
+      "typescript": "health",
+      "cli": "doctor",
+      "sends": {
+        "auth": false,
+        "idempotency_key": false,
+        "query": [],
+        "body": null,
+        "enums": {}
+      }
+    },
+    "GET /v1/jobs": {
+      "python": "list_jobs",
+      "typescript": "listJobs",
+      "cli": "jobs",
+      "sends": {
+        "auth": true,
+        "idempotency_key": false,
+        "query": [
+          "limit",
+          "status",
+          "cursor"
+        ],
+        "body": null,
+        "enums": {}
+      }
+    },
+    "GET /v1/jobs/{job_id}": {
+      "python": "get_job",
+      "typescript": "getJob",
+      "cli": "job",
+      "sends": {
+        "auth": true,
+        "idempotency_key": false,
+        "query": [
+          "wait_seconds"
+        ],
+        "body": null,
+        "enums": {}
+      }
+    },
+    "POST /v1/jobs/{job_id}/cancel": {
+      "python": "cancel_job",
+      "typescript": "cancelJob",
+      "cli": "cancel",
+      "sends": {
+        "auth": true,
+        "idempotency_key": false,
+        "query": [],
+        "body": null,
+        "enums": {}
+      }
+    },
+    "POST /v1/map": {
+      "python": "map",
+      "typescript": "map",
+      "cli": "map",
+      "sends": {
+        "auth": true,
+        "idempotency_key": true,
+        "query": [],
+        "body": [
+          "url",
+          "limit",
+          "wait_seconds",
+          "engine",
+          "wait_for_ms"
+        ],
+        "enums": {
+          "engine": [
+            "static",
+            "browser"
+          ]
+        }
+      }
+    },
+    "GET /v1/results/{job_id}": {
+      "excluded": "Legacy job API, superseded by scrape_result, get_job and the artifacts routes."
+    },
+    "POST /v1/scrape": {
+      "python": "scrape",
+      "typescript": "scrape",
+      "cli": "scrape",
+      "sends": {
+        "auth": true,
+        "idempotency_key": true,
+        "query": [],
+        "body": [
+          "url",
+          "formats",
+          "schema",
+          "instruction",
+          "profile",
+          "wait_seconds",
+          "engine",
+          "wait_for_ms"
+        ],
+        "enums": {
+          "formats": [
+            "markdown",
+            "links",
+            "html",
+            "json"
+          ],
+          "engine": [
+            "static",
+            "browser"
+          ]
+        }
+      }
+    },
+    "POST /v1/scrape/batch": {
+      "python": "batch_scrape",
+      "typescript": "batchScrape",
+      "cli": "batch",
+      "sends": {
+        "auth": true,
+        "idempotency_key": true,
+        "query": [],
+        "body": [
+          "urls",
+          "formats",
+          "schema",
+          "instruction",
+          "profile",
+          "engine",
+          "wait_for_ms"
+        ],
+        "enums": {
+          "formats": [
+            "markdown",
+            "links",
+            "html",
+            "json"
+          ],
+          "engine": [
+            "static",
+            "browser"
+          ]
+        }
+      }
+    },
+    "GET /v1/scrape/batch/{batch_id}": {
+      "python": "batch_status",
+      "typescript": "batchStatus",
+      "cli": "batch-status",
+      "sends": {
+        "auth": true,
+        "idempotency_key": false,
+        "query": [
+          "wait_seconds"
+        ],
+        "body": null,
+        "enums": {}
+      }
+    },
+    "POST /v1/scrape/check": {
+      "excluded": "Legacy job API, superseded by scrape, map, batch_scrape and crawl; not part of the SDK surface."
+    },
+    "POST /v1/scrape/crawl": {
+      "excluded": "Legacy job API, superseded by scrape, map, batch_scrape and crawl; not part of the SDK surface."
+    },
+    "POST /v1/scrape/fetch": {
+      "excluded": "Legacy job API, superseded by scrape, map, batch_scrape and crawl; not part of the SDK surface."
+    },
+    "POST /v1/scrape/parse": {
+      "excluded": "Legacy job API, superseded by scrape, map, batch_scrape and crawl; not part of the SDK surface."
+    },
+    "POST /v1/scrape/view": {
+      "excluded": "Legacy job API, superseded by scrape, map, batch_scrape and crawl; not part of the SDK surface."
+    },
+    "GET /v1/scrape/{job_id}/content": {
+      "python": "scrape_result",
+      "typescript": "scrapeResult",
+      "cli": "result",
+      "sends": {
+        "auth": true,
+        "idempotency_key": false,
+        "query": [
+          "wait_seconds",
+          "formats"
+        ],
+        "body": null,
+        "enums": {
+          "formats": [
+            "markdown",
+            "links",
+            "html"
+          ]
+        }
+      }
+    },
+    "GET /v1/scrapy/list": {
+      "excluded": "Legacy engine introspection for operators; not part of the SDK surface."
+    },
+    "GET /v1/scrapy/settings": {
+      "excluded": "Legacy engine introspection for operators; not part of the SDK surface."
+    },
+    "GET /v1/scrapy/version": {
+      "excluded": "Legacy engine introspection for operators; not part of the SDK surface."
+    },
+    "POST /v1/search": {
+      "python": "search",
+      "typescript": "search",
+      "cli": "search",
+      "sends": {
+        "auth": true,
+        "idempotency_key": false,
+        "query": [],
+        "body": [
+          "query",
+          "limit"
+        ],
+        "enums": {}
+      }
+    }
+  },
+  "error_codes": {
+    "bad_request": {
+      "status": 400,
+      "retryable": false
+    },
+    "dispatch_refused": {
+      "status": 400,
+      "retryable": false
+    },
+    "egress_required": {
+      "status": 400,
+      "retryable": false
+    },
+    "error": {
+      "status": 400,
+      "retryable": false
+    },
+    "invalid_token": {
+      "status": 401,
+      "retryable": false
+    },
+    "unauthorized": {
+      "status": 401,
+      "retryable": false
+    },
+    "insufficient_credits": {
+      "status": 402,
+      "retryable": false
+    },
+    "account_not_active": {
+      "status": 403,
+      "retryable": false
+    },
+    "forbidden": {
+      "status": 403,
+      "retryable": false
+    },
+    "not_found": {
+      "status": 404,
+      "retryable": false
+    },
+    "method_not_allowed": {
+      "status": 405,
+      "retryable": false
+    },
+    "conflict": {
+      "status": 409,
+      "retryable": true
+    },
+    "payload_too_large": {
+      "status": 413,
+      "retryable": false
+    },
+    "unsupported_media_type": {
+      "status": 415,
+      "retryable": false
+    },
+    "budget_exceeded": {
+      "status": 422,
+      "retryable": false
+    },
+    "invalid_artifact_name": {
+      "status": 422,
+      "retryable": false
+    },
+    "invalid_request": {
+      "status": 422,
+      "retryable": false
+    },
+    "unsafe_artifact_path": {
+      "status": 422,
+      "retryable": false
+    },
+    "rate_limited": {
+      "status": 429,
+      "retryable": true
+    },
+    "too_many_active_jobs": {
+      "status": 429,
+      "retryable": true
+    },
+    "internal_error": {
+      "status": 500,
+      "retryable": true
+    },
+    "submission_failed": {
+      "status": 500,
+      "retryable": false
+    },
+    "ai_auth": {
+      "status": 502,
+      "retryable": false
+    },
+    "ai_bad_request": {
+      "status": 502,
+      "retryable": false
+    },
+    "ai_context_overflow": {
+      "status": 502,
+      "retryable": false
+    },
+    "ai_endpoint_forbidden": {
+      "status": 502,
+      "retryable": false
+    },
+    "ai_malformed_output": {
+      "status": 502,
+      "retryable": false
+    },
+    "ai_provider_error": {
+      "status": 502,
+      "retryable": false
+    },
+    "ai_quota": {
+      "status": 502,
+      "retryable": false
+    },
+    "ai_rate_limited": {
+      "status": 502,
+      "retryable": true
+    },
+    "ai_refused": {
+      "status": 502,
+      "retryable": false
+    },
+    "ai_timeout": {
+      "status": 502,
+      "retryable": true
+    },
+    "ai_unavailable": {
+      "status": 502,
+      "retryable": true
+    },
+    "browser_unavailable": {
+      "status": 503,
+      "retryable": false
+    },
+    "temporarily_unavailable": {
+      "status": 503,
+      "retryable": true
+    },
+    "unavailable": {
+      "status": 503,
+      "retryable": true
+    },
+    "egress_unavailable": {
+      "status": null,
+      "retryable": true
+    },
+    "fetch_failed": {
+      "status": null,
+      "retryable": true
+    },
+    "internal": {
+      "status": null,
+      "retryable": true
+    },
+    "interrupted": {
+      "status": null,
+      "retryable": true
+    },
+    "job_timeout": {
+      "status": null,
+      "retryable": true
+    },
+    "key_revoked": {
+      "status": null,
+      "retryable": false
+    },
+    "listen_expired": {
+      "status": null,
+      "retryable": true
+    },
+    "preflight_denied": {
+      "status": null,
+      "retryable": false
+    },
+    "render_interrupted": {
+      "status": null,
+      "retryable": true
+    },
+    "settlement_failed": {
+      "status": null,
+      "retryable": false
+    },
+    "too_many_streams": {
+      "status": null,
+      "retryable": true
+    },
+    "render_not_supported": {
+      "status": null,
+      "retryable": false,
+      "source": "sdk",
+      "summary": "Raised by the SDKs, not the API: you asked for engine=browser, but the finished result came from another engine."
+    }
+  }
+}

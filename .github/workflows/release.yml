@@ -1,0 +1,170 @@
+name: Release
+
+# py-vX.Y.Z releases the Python package, ts-vX.Y.Z the npm package. Both build, run the full CI first, and attach
+# the build to a GitHub Release. Publishing to PyPI or npm runs only when the repository variable ENABLE_PYPI or
+# ENABLE_NPM is "true" (PyPI: trusted publishing in the "pypi" environment; npm: the "npm" environment, with
+# provenance, using trusted publishing or an NPM_TOKEN secret). GitHub-hosted runners only.
+on:
+  push:
+    tags: ["py-v*", "ts-v*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  python-build:
+    if: startsWith(github.ref_name, 'py-v')
+    needs: ci
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: The tag matches the package version
+        run: |
+          tag="${GITHUB_REF_NAME#py-v}"
+          declared="$(sed -n 's/^version = "\(.*\)"$/\1/p' python/pyproject.toml)"
+          if [ "$tag" != "$declared" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match python/pyproject.toml version $declared"
+            exit 1
+          fi
+      - name: Build the sdist and wheel
+        run: |
+          python -m pip install "build>=1.2"
+          python -m build python --outdir dist
+      - name: Install the wheel in a clean environment and run it
+        run: |
+          python -m venv /tmp/smoke
+          /tmp/smoke/bin/python -m pip install dist/*.whl
+          /tmp/smoke/bin/scrawl --version
+      - uses: actions/upload-artifact@v4
+        with:
+          name: python-dist
+          path: dist/
+          if-no-files-found: error
+
+  python-release:
+    needs: python-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: python-dist
+          path: dist/
+      - name: Attach to a GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --verify-tag \
+            --title "Python SDK ${GITHUB_REF_NAME#py-v}" \
+            --notes "scrawl-sdk ${GITHUB_REF_NAME#py-v}: see CHANGELOG.md for what changed."
+
+  pypi-publish:
+    if: vars.ENABLE_PYPI == 'true'
+    needs: [python-build, python-release]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: python-dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/
+
+  ts-build:
+    if: startsWith(github.ref_name, 'ts-v')
+    needs: ci
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: The tag matches the package version
+        run: |
+          tag="${GITHUB_REF_NAME#ts-v}"
+          declared="$(node -p 'require("./typescript/package.json").version')"
+          if [ "$tag" != "$declared" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match typescript/package.json version $declared"
+            exit 1
+          fi
+      - name: Pack
+        run: |
+          mkdir -p dist
+          cd typescript && npm pack --pack-destination ../dist
+      - name: Install the tarball in a clean project and import it
+        run: |
+          mkdir -p /tmp/smoke && cd /tmp/smoke && npm init -y >/dev/null
+          npm install "$GITHUB_WORKSPACE"/dist/*.tgz
+          node --input-type=module -e 'import { VERSION, CONTRACT_DIGEST } from "@apexaiofficial/scrawl"; console.log(VERSION, CONTRACT_DIGEST)'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: npm-dist
+          path: dist/
+          if-no-files-found: error
+
+  ts-release:
+    needs: ts-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: npm-dist
+          path: dist/
+      - name: Attach to a GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --verify-tag \
+            --title "TypeScript SDK ${GITHUB_REF_NAME#ts-v}" \
+            --notes "@apexaiofficial/scrawl ${GITHUB_REF_NAME#ts-v}: see CHANGELOG.md for what changed."
+
+  npm-publish:
+    if: vars.ENABLE_NPM == 'true'
+    needs: [ts-build, ts-release]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          registry-url: "https://registry.npmjs.org"
+      - name: An npm that supports trusted publishing
+        run: npm install -g "npm@^11.5.1"
+      - uses: actions/download-artifact@v4
+        with:
+          name: npm-dist
+          path: dist/
+      - name: Publish with provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish dist/*.tgz --access public --provenance

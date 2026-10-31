@@ -1,0 +1,106 @@
+name: CI
+
+# GitHub-hosted runners only: this is a public repository and must never run on self-hosted machines.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contracts:
+    name: Contracts and docs
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Every operation covered or excluded; declarations match the contract
+        run: python tools/check_contracts.py coverage
+      - name: Vendored contracts match MANIFEST.json
+        run: python tools/check_contracts.py manifest
+      - name: This SDK version is compatible with the vendored contract
+        run: python tools/check_contracts.py compat
+      - name: docs/errors.md is generated and current
+        run: python tools/gen_error_docs.py --check
+
+  python:
+    name: Python ${{ matrix.python }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install
+        run: python -m pip install -e "python[test]"
+      - name: Tests (the live suite is skipped without SCRAWL_LIVE_* settings)
+        run: python -m pytest python/tests
+
+  python-package:
+    name: Python package
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build the sdist and wheel
+        run: |
+          python -m pip install "build>=1.2"
+          python -m build python --outdir dist
+      - name: Install the wheel in a clean environment and run it
+        run: |
+          python -m venv /tmp/smoke
+          /tmp/smoke/bin/python -m pip install dist/*.whl
+          cd /tmp && /tmp/smoke/bin/python -c "import scrawl; print(scrawl.__version__, scrawl.__contract__)"
+          /tmp/smoke/bin/scrawl --version
+
+  typescript:
+    name: Node ${{ matrix.node }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ["20", "22"]
+    defaults:
+      run:
+        working-directory: typescript
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - uses: actions/setup-python@v5          # the shared contract checker and the fake API are Python
+        with:
+          python-version: "3.12"
+      - name: Tests (the live suite is skipped without SCRAWL_LIVE_* settings)
+        run: node --test
+      - name: Type declarations
+        run: npx --yes -p typescript@5.9.3 tsc -p test/types
+      - name: Package contents
+        run: npm pack --dry-run

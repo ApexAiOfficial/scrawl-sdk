@@ -1,0 +1,53 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "scrawl-sdk"
+version = "0.1.0"
+description = "Official Python SDK and CLI for Scrawl: URL to Markdown or structured JSON, site maps, batches, crawls into versioned datasets"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
+authors = [{ name = "ApexAiOfficial", email = "support@apexaiofficial.com" }]
+keywords = ["scrawl", "scraping", "web-scraping", "crawler", "markdown", "datasets", "sdk", "cli"]
+dependencies = ["httpx>=0.27,<1"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Internet :: WWW/HTTP :: Indexing/Search",
+    "Topic :: Software Development :: Libraries",
+    "Typing :: Typed",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=8", "pytest-asyncio>=0.24"]
+
+[project.urls]
+Homepage = "https://github.com/ApexAiOfficial/scrawl-sdk"
+Documentation = "https://github.com/ApexAiOfficial/scrawl-sdk/tree/main/docs"
+Issues = "https://github.com/ApexAiOfficial/scrawl-sdk/issues"
+Changelog = "https://github.com/ApexAiOfficial/scrawl-sdk/blob/main/CHANGELOG.md"
+
+[project.scripts]
+scrawl = "scrawl.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+scrawl = ["py.typed"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+markers = ["live: needs a real Scrawl server (SCRAWL_LIVE_BASE_URL and SCRAWL_LIVE_API_KEY); skipped otherwise"]
