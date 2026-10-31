@@ -740,7 +740,7 @@
     },
     "internal_error": {
       "status": 500,
-      "retryable": true
+      "retryable": false
     },
     "submission_failed": {
       "status": 500,
@@ -800,7 +800,7 @@
     },
     "unavailable": {
       "status": 503,
-      "retryable": true
+      "retryable": false
     },
     "egress_unavailable": {
       "status": null,
@@ -812,7 +812,7 @@
     },
     "internal": {
       "status": null,
-      "retryable": true
+      "retryable": false
     },
     "interrupted": {
       "status": null,

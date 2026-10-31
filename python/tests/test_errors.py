@@ -113,7 +113,8 @@ def test_error_code_is_every_catalogue_code_plus_the_sdk_only_ones() -> None:
 def test_the_retry_table_is_the_catalogues_retryable_flag() -> None:
     expected = {code: entry["retryable"] for code, entry in CATALOGUE.items()} | {code: False for code in SDK_ONLY}
     assert dict(_errors.RETRYABLE) == expected
-    assert _errors.RETRYABLE["submission_failed"] is False and _errors.RETRYABLE["settlement_failed"] is False
+    for code in ("submission_failed", "settlement_failed", "internal_error", "internal", "unavailable"):
+        assert _errors.RETRYABLE[code] is False, code
     with pytest.raises(TypeError):
         _errors.RETRYABLE["submission_failed"] = True                    # type: ignore[index]
     assert _errors.never_retry("submission_failed") and _errors.never_retry(ErrorCode.SETTLEMENT_FAILED)

@@ -278,14 +278,16 @@ test("Scrawl's own 5xx on a keyed submit is final; a proxy's 5xx is retried; GET
   assert.equal((await viaProxy.scrape("https://e.example")).status, "completed");
   assert.equal(proxyFetch.calls.length, 2);
 
-  const { client: reader, fetch: readerFetch } = makeClient([{ status: 503, body: { error: { code: "unavailable", message: "x" } } }, DONE]);
+  // A GET retries Scrawl's own 5xx when its code is retryable or unknown.
+  const { client: reader, fetch: readerFetch } = makeClient([{ status: 503, body: { error: { code: "a_code_added_later",
+    message: "x" } } }, DONE]);
   await reader.getJob("j1");
   assert.equal(readerFetch.calls.length, 2);
 });
 
 test("a code the catalogue marks not retryable is never retried, whatever the status", async () => {
-  // A resend after submission_failed or settlement_failed may charge twice.
-  for (const code of ["submission_failed", "settlement_failed"]) {
+  // A resend after these may charge twice or start a second job.
+  for (const code of ["submission_failed", "settlement_failed", "internal_error", "unavailable"]) {
     for (const status of [409, 429, 500, 502, 503, 504]) {
       for (const body of [{ error: { code, message: "list your jobs first" } }, { detail: "x", code }]) {
         for (const call of [(c) => c.getJob("j1"), (c) => c.scrape("https://e.example")]) {
@@ -302,14 +304,36 @@ test("a code the catalogue marks not retryable is never retried, whatever the st
 });
 
 test("GETs retry a 5xx only when its code is retryable or unknown", async () => {
-  for (const [code, status, attempts] of [["ai_auth", 502, 1], ["browser_unavailable", 503, 1], ["ai_timeout", 502, 2],
-    ["unavailable", 503, 2], ["a_code_added_later", 503, 2]]) {
+  for (const [code, status, attempts] of [["ai_auth", 502, 1], ["browser_unavailable", 503, 1], ["unavailable", 503, 1],
+    ["internal_error", 500, 1], ["ai_timeout", 502, 2], ["a_code_added_later", 503, 2]]) {
     const { client, fetch } = makeClient([{ status, body: { error: { code, message: "x" } } }, DONE]);
     const outcome = await client.getJob("j1").catch((exc) => exc);
     if (attempts === 1) assert.ok(outcome instanceof ServerError, `${code}: ${outcome}`);
     else assert.equal(outcome.status, "completed", code);
     assert.equal(fetch.calls.length, attempts, code);
   }
+});
+
+test("a 503 without a known code retries only where the status rule allows", async () => {
+  // No code (a proxy's page, an empty body) or a code this SDK does not know: the status rule decides.
+  for (const body of ["<html>Service Unavailable</html>", "", { detail: "Service Unavailable" }]) {
+    const get = makeClient([{ status: 503, body }, DONE]);
+    assert.equal((await get.client.getJob("j1")).status, "completed");
+    assert.equal(get.fetch.calls.length, 2, `GET ${JSON.stringify(body)}`);
+    const keyed = makeClient([{ status: 503, body }, DONE]);
+    assert.equal((await keyed.client.scrape("https://e.example")).status, "completed");
+    assert.equal(keyed.fetch.calls.length, 2, `keyed submit ${JSON.stringify(body)}`);
+    const plain = makeClient([{ status: 503, body }, DONE]);
+    assert.ok((await plain.client.extract("j1", { instruction: "x" }).catch((exc) => exc)) instanceof ServerError);
+    assert.equal(plain.fetch.calls.length, 1, `plain POST ${JSON.stringify(body)}`);
+  }
+  const later = { status: 503, body: { error: { code: "a_code_added_later", message: "x" } } };
+  const get = makeClient([later, DONE]);
+  assert.equal((await get.client.getJob("j1")).status, "completed");
+  assert.equal(get.fetch.calls.length, 2);
+  const keyed = makeClient([later, DONE]);
+  assert.ok((await keyed.client.scrape("https://e.example").catch((exc) => exc)) instanceof ServerError);
+  assert.equal(keyed.fetch.calls.length, 1, "Scrawl's own 5xx on a keyed submit stays final");
 });
 
 test("a failed body read keeps the HTTP status (no retry of 4xx, Retry-After honoured)", async () => {

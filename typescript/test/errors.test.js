@@ -71,8 +71,9 @@ test("the retry table is the catalogue's retryable flag, read-only", () => {
   const expected = Object.fromEntries([...CATALOGUE.errors.map((entry) => [entry.code, entry.retryable]),
     ...SDK_ONLY.map((code) => [code, false])]);
   assert.deepEqual({ ...RETRYABLE }, expected);
-  assert.equal(RETRYABLE.submission_failed, false);
-  assert.equal(RETRYABLE.settlement_failed, false);
+  for (const code of ["submission_failed", "settlement_failed", "internal_error", "internal", "unavailable"]) {
+    assert.equal(RETRYABLE[code], false, code);
+  }
   assert.ok(Object.isFrozen(RETRYABLE));
   assert.ok(neverRetry("submission_failed") && neverRetry(ErrorCode.SETTLEMENT_FAILED));
   for (const code of ["rate_limited", "a_code_added_later", "constructor", "toString", null, undefined]) {

@@ -19,7 +19,8 @@ from scrawl import (
 
 url = sys.argv[1]
 # GETs and submits that start work retry 429, 502/503/504 and network errors with backoff (Retry-After
-# honoured). Submits carry an Idempotency-Key, so a retry never starts a second job.
+# honoured), never an error code marked not retryable (docs/errors.md). Submits carry an Idempotency-Key, so a
+# retry never starts a second job.
 with Scrawl(max_retries=3, timeout=90) as client:
     key = uuid.uuid4().hex                                         # your own key: safe to resend after a crash
     first = client.scrape(url, idempotency_key=key)

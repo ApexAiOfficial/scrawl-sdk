@@ -7,8 +7,9 @@ import {
 } from "@apexaiofficial/scrawl";
 
 const url = process.argv[2];
-// GETs and submits that start work retry 429, 502/503/504 and network errors with backoff (Retry-After honoured).
-// Submits carry an Idempotency-Key, so a retry never starts a second job.
+// GETs and submits that start work retry 429, 502/503/504 and network errors with backoff (Retry-After honoured),
+// never an error code marked not retryable (docs/errors.md). Submits carry an Idempotency-Key, so a retry never
+// starts a second job.
 const client = new Scrawl({ maxRetries: 3, timeoutMs: 90_000 });
 
 const key = randomUUID();                                         // your own key: safe to resend after a crash

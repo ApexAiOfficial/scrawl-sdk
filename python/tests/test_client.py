@@ -225,16 +225,16 @@ def test_scrawls_own_5xx_on_a_keyed_submit_is_final_but_a_proxys_is_retried(monk
     client, sent, _ = _scripted([httpx.Response(502, text="<html>Bad Gateway</html>"), DONE], monkeypatch)
     assert client.scrape("https://e.example").status == "completed" and len(sent) == 2
 
-    unavailable = httpx.Response(503, json={"error": {"code": "unavailable", "message": "x"}})
-    client, sent, _ = _scripted([unavailable, DONE], monkeypatch)
-    client.get_job("j1")
+    later = httpx.Response(503, json={"error": {"code": "a_code_added_later", "message": "x"}})
+    client, sent, _ = _scripted([later, DONE], monkeypatch)
+    client.get_job("j1")                                      # a GET retries Scrawl's own 5xx with a retryable code
     assert len(sent) == 2
 
 
 @pytest.mark.parametrize("status", [409, 429, 500, 502, 503, 504])
-@pytest.mark.parametrize("code", ["submission_failed", "settlement_failed"])
+@pytest.mark.parametrize("code", ["submission_failed", "settlement_failed", "internal_error", "unavailable"])
 def test_a_code_the_catalogue_marks_not_retryable_is_never_retried(code: str, status: int, monkeypatch) -> None:
-    """A resend after submission_failed or settlement_failed may charge twice: whatever the status, never resend."""
+    """A resend after these may charge twice or start a second job: whatever the status, never resend."""
     for shape in ({"error": {"code": code, "message": "list your jobs first"}}, {"detail": "x", "code": code}):
         for call in (lambda c: c.get_job("j1"), lambda c: c.scrape("https://e.example")):
             client, sent, slept = _scripted([httpx.Response(status, json=shape), DONE], monkeypatch)
@@ -244,8 +244,8 @@ def test_a_code_the_catalogue_marks_not_retryable_is_never_retried(code: str, st
 
 
 def test_gets_retry_a_5xx_only_when_its_code_is_retryable_or_unknown(monkeypatch) -> None:
-    for code, status, attempts in (("ai_auth", 502, 1), ("browser_unavailable", 503, 1), ("ai_timeout", 502, 2),
-                                   ("unavailable", 503, 2), ("a_code_added_later", 503, 2)):
+    for code, status, attempts in (("ai_auth", 502, 1), ("browser_unavailable", 503, 1), ("unavailable", 503, 1),
+                                   ("internal_error", 500, 1), ("ai_timeout", 502, 2), ("a_code_added_later", 503, 2)):
         client, sent, _ = _scripted([httpx.Response(status, json={"error": {"code": code, "message": "x"}}), DONE],
                                     monkeypatch)
         if attempts == 1:
@@ -254,6 +254,28 @@ def test_gets_retry_a_5xx_only_when_its_code_is_retryable_or_unknown(monkeypatch
         else:
             assert client.get_job("j1").status == "completed"
         assert len(sent) == attempts, code
+
+
+def test_a_503_without_a_known_code_retries_only_where_the_status_rule_allows(monkeypatch) -> None:
+    """No code (a proxy's page, an empty body) or a code this SDK does not know: the status rule decides."""
+    no_code = [lambda: httpx.Response(503, text="<html>Service Unavailable</html>"), lambda: httpx.Response(503),
+               lambda: httpx.Response(503, json={"detail": "Service Unavailable"})]
+    for reply in no_code:
+        client, sent, _ = _scripted([reply(), DONE], monkeypatch)
+        assert client.get_job("j1").status == "completed" and len(sent) == 2            # a GET retries
+        client, sent, _ = _scripted([reply(), DONE], monkeypatch)
+        assert client.scrape("https://e.example").status == "completed" and len(sent) == 2   # a keyed submit too
+        client, sent, _ = _scripted([reply(), DONE], monkeypatch)
+        with pytest.raises(ServerError):
+            client.extract("j1", instruction="x")                                         # a plain POST never
+        assert len(sent) == 1
+    later = {"error": {"code": "a_code_added_later", "message": "x"}}
+    client, sent, _ = _scripted([httpx.Response(503, json=later), DONE], monkeypatch)
+    assert client.get_job("j1").status == "completed" and len(sent) == 2
+    client, sent, _ = _scripted([httpx.Response(503, json=later), DONE], monkeypatch)
+    with pytest.raises(ServerError):
+        client.scrape("https://e.example")                       # Scrawl's own 5xx on a keyed submit stays final
+    assert len(sent) == 1
 
 
 async def test_the_async_client_never_retries_a_non_retryable_code_either(monkeypatch) -> None:
@@ -267,6 +289,11 @@ async def test_the_async_client_never_retries_a_non_retryable_code_either(monkey
             with pytest.raises(ScrawlError) as caught:
                 await client.scrape("https://e.example")
         assert caught.value.code == "submission_failed" and len(rec.requests) == 1
+    rec = Recorder(httpx.Response(503, json={"error": {"code": "unavailable", "message": "x"}}))
+    async with make_async_client(rec) as client:
+        with pytest.raises(ServerError):
+            await client.get_job("j1")
+    assert len(rec.requests) == 1
 
 
 def test_server_side_waits_finish_inside_the_request_timeout(monkeypatch) -> None:
