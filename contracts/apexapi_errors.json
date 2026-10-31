@@ -239,18 +239,18 @@
     },
     {
       "code": "internal",
-      "description": "An MCP tool failed unexpectedly; the details are only in the server log.",
+      "description": "An MCP tool failed unexpectedly, possibly after it started work; the details are only in the server log.",
       "http_status": null,
-      "retryable": true,
+      "retryable": false,
       "surfaces": [
         "mcp"
       ]
     },
     {
       "code": "internal_error",
-      "description": "An unexpected failure; retry once, and quote the request ID when reporting it.",
+      "description": "An unexpected failure, possibly after work started: list your jobs before sending a job request again. Quote the request ID when reporting it.",
       "http_status": 500,
-      "retryable": true,
+      "retryable": false,
       "surfaces": [
         "apexapi",
         "result"
@@ -435,9 +435,9 @@
     },
     {
       "code": "unavailable",
-      "description": "A feature or service the request needs is turned off or not running on this deployment.",
+      "description": "A feature or service the request needs is turned off, not configured or not running on this deployment; try again later only if the message says to.",
       "http_status": 503,
-      "retryable": true,
+      "retryable": false,
       "surfaces": [
         "apexapi",
         "mcp"

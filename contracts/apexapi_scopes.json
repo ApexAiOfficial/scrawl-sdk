@@ -536,7 +536,7 @@
       }
     ]
   },
-  "rule": "A key holds a scope when it names it or holds '*'. A route needs one of scopes_any_of when auth is api_key; admin_token routes need the operator's admin token instead, and none routes need no credential. An MCP tool with a null scope needs only a key.",
+  "rule": "A key holds a scope when it names it or holds '*'. A route needs one of scopes_any_of when auth is api_key; admin_token routes need the operator's admin token instead, and none routes need no credential. Two requests need more than their route or tool lists: the json scrape format needs ai:use (ApexAPI and MCP), and cancelling a job through ApexAPI needs the scope that starts that kind of job (ai:use for an AI extraction job, else scrape:write). An MCP tool with a null scope needs only a key.",
   "schema_version": 1,
   "scopes": [
     {
