@@ -44,11 +44,13 @@ The SDKs retry for you, with backoff that honours `Retry-After` (`max_retries`/`
   proxy's 502/503/504. A 5xx in Scrawl's own error format is final: the key now records that outcome.
   When a retry meets the first attempt still running (409), the SDK waits for its stored response.
 - **Other POSTs** and other 4xx are never retried.
-- **A code marked not retryable is never retried**, whatever its status: the error is raised (or rejected)
-  at once. Above all, `submission_failed` and `settlement_failed` are never resent for you, because a resend
-  may charge twice: list your jobs (or read the job's `failure_reason`) first, then retry with a new
-  `Idempotency-Key` only if the work did not happen. A code marked retryable is retried only where the rules
-  above allow it; a code this SDK version does not know yet follows the rules above.
+- **A code marked not retryable is never retried**, whatever its status, on a GET or a submit: the error is
+  raised (or rejected) at once. That includes `submission_failed` and `settlement_failed`, after which a
+  resend may charge twice, and `internal_error` (500) and `unavailable` (503), after which the first request
+  may already have started work: list your jobs (or read the job's `failure_reason`) first, then send it
+  again with a new `Idempotency-Key` only if the work did not happen. A response that carries no code (a
+  proxy's page, an empty body) or a code this SDK version does not know yet follows the rules above, and a
+  code marked retryable is retried only where they allow it.
 
 ## Codes
 
@@ -85,7 +87,7 @@ Generated from the vendored error catalogue (`contracts/apexapi_errors.json`) an
 | `unsafe_artifact_path` | 422 | no | API, MCP | `ValidationError` | `ErrorCode.UNSAFE_ARTIFACT_PATH` | The artifact name resolves outside its job's files. |
 | `rate_limited` | 429 | yes | API, MCP | `RateLimitError` | `ErrorCode.RATE_LIMITED` | Too many requests for this account; wait Retry-After seconds, then retry. |
 | `too_many_active_jobs` | 429 | yes | API, MCP | `RateLimitError` | `ErrorCode.TOO_MANY_ACTIVE_JOBS` | The caller already has the maximum number of running or queued jobs, or the browser renderer is busy; retry after Retry-After seconds. |
-| `internal_error` | 500 | yes | API, result | `ServerError` | `ErrorCode.INTERNAL_ERROR` | An unexpected failure; retry once, and quote the request ID when reporting it. |
+| `internal_error` | 500 | no | API, result | `ServerError` | `ErrorCode.INTERNAL_ERROR` | An unexpected failure, possibly after work started: list your jobs before sending a job request again. Quote the request ID when reporting it. |
 | `submission_failed` | 500 | no | API | `ServerError` | `ErrorCode.SUBMISSION_FAILED` | The first request with this Idempotency-Key failed after it may have started work; list your jobs, then retry with a new key. |
 | `ai_auth` | 502 | no | API, MCP, result | `ServerError` | `ErrorCode.AI_AUTH` | Your AI provider rejected the key, or the key may not use this model. |
 | `ai_bad_request` | 502 | no | API, MCP, result | `ServerError` | `ErrorCode.AI_BAD_REQUEST` | Your AI provider refused the request, for example an unknown model. |
@@ -100,10 +102,10 @@ Generated from the vendored error catalogue (`contracts/apexapi_errors.json`) an
 | `ai_unavailable` | 502 | yes | API, MCP, result | `ServerError` | `ErrorCode.AI_UNAVAILABLE` | Your AI provider is unavailable: an outage or a connection failure. |
 | `browser_unavailable` | 503 | no | API, MCP | `ServerError` | `ErrorCode.BROWSER_UNAVAILABLE` | This deployment cannot render pages in a browser; use the static engine. |
 | `temporarily_unavailable` | 503 | yes | MCP | - | `ErrorCode.TEMPORARILY_UNAVAILABLE` | MCP over HTTP: the key store is unavailable; retry after Retry-After seconds. |
-| `unavailable` | 503 | yes | API, MCP | `ServerError` | `ErrorCode.UNAVAILABLE` | A feature or service the request needs is turned off or not running on this deployment. |
+| `unavailable` | 503 | no | API, MCP | `ServerError` | `ErrorCode.UNAVAILABLE` | A feature or service the request needs is turned off, not configured or not running on this deployment; try again later only if the message says to. |
 | `egress_unavailable` | none | yes | result | - | `ErrorCode.EGRESS_UNAVAILABLE` | The job's proxy could not be used, so the page was not fetched. |
 | `fetch_failed` | none | yes | result | - | `ErrorCode.FETCH_FAILED` | The page could not be fetched: a network error, a timeout or an error response. |
-| `internal` | none | yes | MCP | - | `ErrorCode.INTERNAL` | An MCP tool failed unexpectedly; the details are only in the server log. |
+| `internal` | none | no | MCP | - | `ErrorCode.INTERNAL` | An MCP tool failed unexpectedly, possibly after it started work; the details are only in the server log. |
 | `interrupted` | none | yes | result | - | `ErrorCode.INTERRUPTED` | The job stopped before it finished, for example on a service restart. |
 | `job_timeout` | none | yes | result | - | `ErrorCode.JOB_TIMEOUT` | The job did not finish within its time limit. |
 | `key_revoked` | none | no | MCP | - | `ErrorCode.KEY_REVOKED` | The key of an open listen stream was revoked; use an active key. |

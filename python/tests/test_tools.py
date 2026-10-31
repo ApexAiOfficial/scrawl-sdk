@@ -274,7 +274,7 @@ def test_the_errors_doc_shows_status_retryability_and_the_catalogue_description(
 
 def test_the_errors_doc_marks_the_codes_never_retried_for_you() -> None:
     doc = (REPO / "docs" / "errors.md").read_text(encoding="utf-8")
-    for code in ("settlement_failed", "submission_failed"):
+    for code in ("settlement_failed", "submission_failed", "internal_error", "unavailable"):
         (row,) = [line for line in doc.splitlines() if line.startswith(f"| `{code}` |")]
         assert row.split(" | ")[2] == "no", row
     (row,) = [line for line in doc.splitlines() if line.startswith("| `rate_limited` |")]

@@ -8,7 +8,7 @@ entry says which one it covers.
 ## Unreleased: Python 0.1.0 and TypeScript 0.1.0
 
 First public version of both SDKs and the CLI, built against contract digest
-`sha256:3f5b1592aac9064106b03d2fa55ddbcf943058f773512afa1f768ddb85460dcb` (ApexAPI 0.8.0).
+`sha256:0891fc76af9dc410312deca74c985aa42d7fce8ae593e2d9c4e7f1aec4e82163` (ApexAPI 0.8.0).
 
 ### Added
 - Python (`scrawl`) and TypeScript clients for every public ApexAPI operation: scrape, map, batch, crawl,
@@ -18,7 +18,8 @@ First public version of both SDKs and the CLI, built against contract digest
 - Helpers: `wait_for_scrape`, `wait_for_batch`, `wait_for_assets`, `wait_for_job` (and their camelCase
   TypeScript forms) using server-side waits; `paginate` for every cursor-paged list.
 - Safe retries with automatic `Idempotency-Key`s, never on an error code the backend's catalogue marks not
-  retryable (`submission_failed`, `settlement_failed`...); base-URL rules that keep the API key off plain HTTP.
+  retryable (`submission_failed`, `settlement_failed`, `internal_error`, `unavailable`...); base-URL rules that
+  keep the API key off plain HTTP.
 - Browser rendering options (`engine`, `wait_for_ms`) with a downgrade guard (`render_not_supported`), for
   servers that enable it.
 - Typed errors in both SDKs, including `BadRequestError` (400) and `ConfigurationError`; `ErrorCode` constants
