@@ -111,6 +111,9 @@ class _Endpoints:
                idempotency_key: str | None = None) -> Any:
         """Scrape one URL. ``status`` is ``completed``, ``pending`` (poll ``scrape_result``) or ``failed``.
 
+        ``"json"`` in ``formats`` extracts with your own AI provider (``schema``, ``instruction``, ``profile``) and
+        needs a key with the ``ai:use`` scope as well as ``scrape:write``.
+
         ``engine="browser"`` renders the page in a sandboxed browser first (only where the server enables it), waiting
         ``wait_for_ms`` more after it settles. A finished result from a server that did not render it raises
         ``ScrawlError(code="render_not_supported")``.
@@ -147,6 +150,7 @@ class _Endpoints:
                      wait_for_ms: int | None = None, idempotency_key: str | None = None) -> Any:
         """Start a batch of up to 20 URLs; poll ``batch_status`` (or use ``wait_for_batch``).
 
+        ``"json"`` in ``formats`` needs the ``ai:use`` scope as well as ``scrape:write``, as for ``scrape``.
         ``engine="browser"`` renders every URL in a browser first, one at a time.
         """
         body = _clean({"urls": list(urls), "formats": formats or ["markdown"], "schema": schema,
@@ -216,7 +220,10 @@ class _Endpoints:
                                                                       "cursor": cursor})))
 
     def cancel_job(self, job_id: str) -> Any:
-        """Cancel a pending or running job (another process's job: ``cancelled`` false, requested)."""
+        """Cancel a pending or running job (another process's job: ``cancelled`` false, requested).
+
+        Needs the scope that starts that kind of job: ``ai:use`` for a dataset extraction, else ``scrape:write``.
+        """
         return self._call(_Request("POST", f"/v1/jobs/{_seg(job_id)}/cancel"))
 
     def list_artifacts(self, job_id: str) -> Any:

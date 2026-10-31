@@ -80,7 +80,7 @@ product = client.scrape(
 print(product.json, product.ai)                  # the data, plus provider, model and tokens used
 ```
 
-The key needs the `ai:use` scope (and `ai:configure` to manage profiles).
+The key needs the `ai:use` scope as well as `scrape:write` (and `ai:configure` to manage profiles).
 
 ## 5. Map, batch, crawl, ask
 

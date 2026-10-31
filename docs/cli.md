@@ -37,6 +37,10 @@ scrawl batch-status batch_123 --browser                             # the batch 
 scrawl extract job_123 --instruction "the product name"             # JSON from a finished job's artifact
 ```
 
+JSON output (`--format json`, or `--instruction` / `--schema` on `scrape`) runs on your own AI provider: the key
+needs `ai:use` as well as `scrape:write`. `cancel` needs the scope that starts that kind of job (see
+[scopes](authentication.md#scopes)).
+
 `--browser` keeps the downgrade guard: a finished result, or a finished batch item, that another engine
 rendered (a server that predates the browser engine) is an error (`render_not_supported`, exit 5); `batch`
 still prints the batch first, so its id is not lost.

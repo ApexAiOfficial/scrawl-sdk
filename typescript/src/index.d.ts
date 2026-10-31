@@ -322,6 +322,7 @@ export interface QuarantineResult extends ApiObject {
 }
 
 export interface ScrapeOptions {
+  /** Default `["markdown"]`. `"json"` uses YOUR AI provider and needs the `ai:use` scope as well as `scrape:write`. */
   formats?: ScrapeFormat[];
   /** JSON Schema for `formats: ["json"]` (uses YOUR configured AI provider). */
   schema?: JsonSchema;
@@ -478,6 +479,7 @@ export declare class Scrawl {
   crawl(crawlTarget: string, options?: { exportFormat?: ExportFormat; maxItems?: number; maxSeconds?: number; idempotencyKey?: string }): Promise<CrawlLaunch>;
   getJob(jobId: string, options?: { waitSeconds?: number }): Promise<Job>;
   listJobs(options?: { limit?: number; status?: string; cursor?: string }): Promise<{ jobs: Job[]; next_cursor?: string | null } & ApiObject>;
+  /** Needs the scope that starts that kind of job: `ai:use` for a dataset extraction, else `scrape:write`. */
   cancelJob(jobId: string): Promise<CancelResult>;
   listArtifacts(jobId: string): Promise<ArtifactList>;
   /** One artifact's bytes, buffered in memory (`format: "markdown"` converts HTML). */

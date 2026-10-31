@@ -11,7 +11,7 @@ gates keep the server and the SDKs from drifting apart.
 | --- | --- |
 | `apexapi_openapi.json` | The OpenAPI 3.1 document of the HTTP API |
 | `apexapi_errors.json` | The error catalogue: every error code with its HTTP status, whether it is retryable, its description and where it appears |
-| `apexapi_scopes.json` | The API key scopes and the scope each route and MCP tool needs (for reference) |
+| `apexapi_scopes.json` | The API key scopes, the scope each route and MCP tool needs, and the requests that need more (for reference: [authentication](authentication.md#scopes) documents them, and no gate reads this file) |
 | `mcp_tools.json`, `mcp_resources.json` | The server's MCP tools and resources (for reference; the SDKs do not use MCP) |
 | `MANIFEST.json` | SHA-256 and size of every file, the backend version it came from, and the **contract digest** |
 

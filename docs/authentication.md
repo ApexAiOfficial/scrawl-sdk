@@ -44,14 +44,21 @@ unless the operator chooses otherwise; the AI scopes are never on by default.
 
 | Scope | Lets the key |
 | --- | --- |
-| `scrape:write` | scrape, map, batch, crawl, extract assets, cancel jobs, activate versions, quarantine records |
+| `scrape:write` | scrape, map, batch, crawl, extract assets, cancel jobs (other than AI extraction jobs), activate versions, quarantine records |
 | `jobs:read` | read jobs and list them |
 | `artifacts:read` | read results, artifacts, assets, datasets, versions, diffs, fields, queries, search, documents |
 | `credits:read` | read the credit balance |
 | `ai:configure` | manage your AI provider profiles and read your AI usage |
-| `ai:use` | JSON scrapes, `extract`, `ask` and dataset extraction with your own AI provider |
+| `ai:use` | JSON scrapes and batches (together with `scrape:write`), `extract`, `ask` and dataset extraction with your own AI provider, and cancelling dataset extraction jobs |
 
-A missing scope is a 403 `PermissionDeniedError` with code `forbidden`.
+Two requests need more than the scope of their route:
+
+- A scrape or batch that asks for the `json` format needs `ai:use` as well as `scrape:write`.
+- Cancelling a job needs the scope that starts that kind of job: `ai:use` for an AI extraction job (a
+  dataset extraction), `scrape:write` for any other.
+
+A missing scope is a 403 `PermissionDeniedError` with code `forbidden`. The server's own scope table is
+[`contracts/apexapi_scopes.json`](../contracts/apexapi_scopes.json).
 
 ## Your AI provider key (bring-your-own AI)
 
