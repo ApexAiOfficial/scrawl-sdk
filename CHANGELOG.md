@@ -5,7 +5,7 @@ versions follow [Semantic Versioning](https://semver.org/) (before 1.0, a minor 
 The Python package (`scrawl-sdk`) and the npm package (`@apexaiofficial/scrawl`) are released separately; each
 entry says which one it covers.
 
-## Unreleased: Python 0.1.0 and TypeScript 0.1.0
+## Python 0.1.0 and TypeScript 0.1.0 (2026-10-31)
 
 First public version of both SDKs and the CLI, built against contract digest
 `sha256:0891fc76af9dc410312deca74c985aa42d7fce8ae593e2d9c4e7f1aec4e82163` (ApexAPI 0.8.0).
