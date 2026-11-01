@@ -683,7 +683,7 @@
       "openWorldHint": true,
       "readOnlyHint": false
     },
-    "description": "Scrape up to 20 URLs as gated jobs (4 at a time); poll apex_scrapy_batch_status with the batch_id. engine=browser renders every URL in a sandboxed browser first (self-hosted, when enabled), one at a time.",
+    "description": "Scrape up to 20 URLs as gated jobs (4 at a time); poll apex_scrapy_batch_status with the batch_id. engine=browser renders every URL in a sandboxed browser first (on a dedicated deployment, when enabled), one at a time.",
     "inputSchema": {
       "properties": {
         "engine": {
@@ -1563,7 +1563,7 @@
       "openWorldHint": false,
       "readOnlyHint": true
     },
-    "description": "Return the identity's credits: hosted account balance, or unmetered on self-hosted.",
+    "description": "Return the identity's credits: hosted account balance, or unmetered on a dedicated deployment.",
     "inputSchema": {
       "properties": {},
       "title": "apex_scrapy_credit_balanceArguments",
@@ -1571,7 +1571,7 @@
     },
     "name": "apex_scrapy_credit_balance",
     "outputSchema": {
-      "description": "The identity's credit position (hosted ledger, or self-hosted unmetered).",
+      "description": "The identity's credit position (hosted ledger, or unmetered on a dedicated deployment).",
       "properties": {
         "account_id": {
           "anyOf": [
@@ -3088,7 +3088,7 @@
       "openWorldHint": false,
       "readOnlyHint": true
     },
-    "description": "List self-hosted spiders or hosted catalog crawl targets visible to this identity.",
+    "description": "List a dedicated deployment's spiders or hosted catalog crawl targets visible to this identity.",
     "inputSchema": {
       "properties": {},
       "title": "apex_scrapy_list_spidersArguments",
@@ -3180,7 +3180,7 @@
       "openWorldHint": true,
       "readOnlyHint": false
     },
-    "description": "List a site's URLs: same-host links of the start page plus its sitemap.xml, through the egress gate. engine=browser renders the start page in a sandboxed browser first (self-hosted, when enabled); the sitemap is always fetched statically.",
+    "description": "List a site's URLs: same-host links of the start page plus its sitemap.xml, through the egress gate. engine=browser renders the start page in a sandboxed browser first (on a dedicated deployment, when enabled); the sitemap is always fetched statically.",
     "inputSchema": {
       "properties": {
         "engine": {
@@ -4213,7 +4213,7 @@
       "openWorldHint": true,
       "readOnlyHint": false
     },
-    "description": "Scrape one public URL through the egress gate: markdown (default), links, html, or json (schema/instruction, your AI profile). Pending after wait_seconds: call apex_scrapy_scrape_result with the job_id. engine=browser renders the page in a sandboxed browser first (self-hosted, when the operator enables it), with an optional passive wait_for_ms; the result's engine says which engine ran.",
+    "description": "Scrape one public URL through the egress gate: markdown (default), links, html, or json (schema/instruction, your AI profile). Pending after wait_seconds: call apex_scrapy_scrape_result with the job_id. engine=browser renders the page in a sandboxed browser first (on a dedicated deployment, when enabled), with an optional passive wait_for_ms; the result's engine says which engine ran.",
     "inputSchema": {
       "properties": {
         "engine": {

@@ -5,6 +5,15 @@ versions follow [Semantic Versioning](https://semver.org/) (before 1.0, a minor 
 The Python package (`scrawl-sdk`) and the npm package (`@apexaiofficial/scrawl`) are released separately; each
 entry says which one it covers.
 
+## Unreleased
+
+### Changed
+- Contracts re-synced to digest `sha256:36eed387f186c86e011df22ad9817507b299aedcbca4e2242b9a78b11f6b7e58`:
+  description wording only. Scrawl's descriptions now call the deployment ApexAi runs for one customer a
+  "dedicated deployment".
+  No operation, schema, scope, error code or SDK behaviour changed; `scrawl.__contract__` and the
+  TypeScript `CONTRACT_DIGEST` record the new digest.
+
 ## Python 0.1.0 and TypeScript 0.1.0 (2026-10-31)
 
 First public version of both SDKs and the CLI, built against contract digest
