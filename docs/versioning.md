@@ -13,8 +13,8 @@ independently, but they cover the same operations: both are tested against the s
 contract bundle.
 
 Every release records the contract it was built against: `scrawl.__contract__` / `CONTRACT_DIGEST` hold the
-digest of `contracts/MANIFEST.json`, and `CHANGELOG.md` names it for each release. A server is compatible with
-an SDK release when that release's `tools/check_contracts.py compat` passes against the server's OpenAPI
+digest of `contracts/MANIFEST.json`, and `CHANGELOG.md` names it for each release. A version of the API is
+compatible with an SDK release when that release's `tools/check_contracts.py compat` passes against its OpenAPI
 document (see [compatibility](compatibility.md)).
 
 ## What counts as a change

@@ -5,15 +5,15 @@
 // twice. Other POSTs are never retried, and neither is any response whose error code the backend's error
 // catalogue marks not retryable (RETRYABLE in errors.js). Responses are the API's JSON as-is (snake_case fields).
 //
-// The base URL comes from the option or SCRAWL_BASE_URL; without either, the client talks to a Scrawl server
-// on this machine (http://127.0.0.1:8088). There is no built-in remote default.
+// The base URL comes from the option or SCRAWL_BASE_URL; without either, the client uses a loopback address
+// (http://127.0.0.1:8088). There is no built-in remote default.
 
 import {
   APIConnectionError, APITimeoutError, ConfigurationError, ErrorCode, ScrawlError, codeOf, errorFor, neverRetry,
 } from "./errors.js";
 import { VERSION } from "./version.js";
 
-export const DEFAULT_BASE_URL = "http://127.0.0.1:8088"; // a server on this machine; remote ones need SCRAWL_BASE_URL
+export const DEFAULT_BASE_URL = "http://127.0.0.1:8088"; // loopback; set SCRAWL_BASE_URL to your Scrawl endpoint
 const RETRY_STATUSES = new Set([429, 502, 503, 504]);
 const LIST_KEYS = ["datasets", "versions", "jobs", "entries", "records", "results", "items", "assets", "skipped"];
 const ASSETS_ACTIVE = new Set(["pending", "running"]);
@@ -335,7 +335,7 @@ export class Scrawl {
   }
 
   // -- account ------------------------------------------------------------------------------------
-  /** Your credits (hosted) or unmetered (self-hosted). */
+  /** Your credit balance, or an unmetered status. */
   async creditBalance() {
     return this._call({ method: "GET", path: "/v1/credits/balance" });
   }

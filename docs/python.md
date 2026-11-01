@@ -82,10 +82,10 @@ it (422 `budget_exceeded`); a key without usable egress gets 400 `egress_require
 ## Browser rendering
 
 `engine="browser"` (on `scrape`, `map` and `batch_scrape`) renders the page in a sandboxed browser first,
-waiting `wait_for_ms` more after it settles. It is available only on servers that enable it; elsewhere the
-API answers 503 `browser_unavailable`. If a server that predates the browser engine returns a finished result
-rendered by another engine, the SDK raises `ScrawlError(code="render_not_supported")` instead of handing you a
-static page; pass `engine="browser"` to `scrape_result` / `wait_for_scrape` to keep that guard when you follow
+waiting `wait_for_ms` more after it settles. It is available only where ApexAi has enabled it; elsewhere
+the API answers 503 `browser_unavailable`. If a Scrawl version that predates the browser engine returns a
+finished result rendered by another engine, the SDK raises `ScrawlError(code="render_not_supported")` instead
+of handing you a static page; pass `engine="browser"` to `scrape_result` / `wait_for_scrape` to keep that guard when you follow
 up a pending job. The guard covers `scrape`, `map` and `scrape_result`; a batch's items are not checked by the
 SDK, so after `batch_scrape(..., engine="browser")` compare each finished item's `result.engine` with
 `"browser"` (the CLI's `batch --browser` and `batch-status --browser` do).

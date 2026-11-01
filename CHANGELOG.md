@@ -21,7 +21,7 @@ First public version of both SDKs and the CLI, built against contract digest
   retryable (`submission_failed`, `settlement_failed`, `internal_error`, `unavailable`...); base-URL rules that
   keep the API key off plain HTTP.
 - Browser rendering options (`engine`, `wait_for_ms`) with a downgrade guard (`render_not_supported`), for
-  servers that enable it.
+  use where browser rendering is enabled.
 - Typed errors in both SDKs, including `BadRequestError` (400) and `ConfigurationError`; `ErrorCode` constants
   for every code in the backend's error catalogue; the request id is read from the `X-Request-ID` header or the
   error body.

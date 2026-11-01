@@ -606,7 +606,7 @@ def _doctor_checks(client: Scrawl, add: Any, checks: list[dict[str, str]], args:
     base = client.base_url
     parts = urlsplit(base)
     source = "SCRAWL_BASE_URL" if os.environ.get("SCRAWL_BASE_URL") else \
-        "default: a server on this machine; set SCRAWL_BASE_URL for a remote one"
+        "default: a loopback address; set SCRAWL_BASE_URL to your Scrawl endpoint"
     add("base_url", "ok", f"{base} ({source})")
     if parts.scheme == "https":
         tls = ("ok", "https: the server certificate is verified")

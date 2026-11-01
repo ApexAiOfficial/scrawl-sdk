@@ -2,7 +2,7 @@
 // documented fields are typed and any field the API adds later is still readable through the index signature.
 
 export declare const VERSION: string;
-/** `http://127.0.0.1:8088`: a Scrawl server on this machine. Remote servers need `baseUrl` or SCRAWL_BASE_URL. */
+/** `http://127.0.0.1:8088`, a loopback address. Set `baseUrl` or SCRAWL_BASE_URL to your Scrawl endpoint. */
 export declare const DEFAULT_BASE_URL: string;
 /** The digest of the contract bundle (contracts/MANIFEST.json) this SDK version was built against. */
 export declare const CONTRACT_DIGEST: string;
@@ -18,7 +18,7 @@ interface ApiObject {
 export interface ScrawlOptions {
   /** An ApexAPI key. Default: `process.env.SCRAWL_API_KEY` (required at the first authenticated call). */
   apiKey?: string;
-  /** Default: `process.env.SCRAWL_BASE_URL`, else `http://127.0.0.1:8088` (a server on this machine). */
+  /** Default: `process.env.SCRAWL_BASE_URL`, else `http://127.0.0.1:8088` (a loopback address). */
   baseUrl?: string;
   /** Per-request timeout. Default 90 000 ms (server-side waits are up to 60 s). */
   timeoutMs?: number;

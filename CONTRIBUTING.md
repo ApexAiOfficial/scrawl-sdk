@@ -20,7 +20,7 @@ python tools/gen_error_docs.py --check
 ```
 
 The live suites (`python/tests/live`, `typescript/test/live`) are skipped unless `SCRAWL_LIVE_BASE_URL` and
-`SCRAWL_LIVE_API_KEY` point at a Scrawl server; see [docs/compatibility.md](docs/compatibility.md).
+`SCRAWL_LIVE_API_KEY` point at a live Scrawl endpoint; see [docs/compatibility.md](docs/compatibility.md).
 
 ## Rules of the road
 
@@ -28,7 +28,7 @@ The live suites (`python/tests/live`, `typescript/test/live`) are skipped unless
   they never contain server logic or rely on undocumented behaviour.
 - **Both SDKs move together.** A new operation needs a method in each SDK, a CLI command, an entry in
   `coverage.json`, a live test and the contract tests' `CALLS` tables; the tests fail until all of them exist.
-- **Contracts change only through `tools/sync_contracts.py`** with a bundle exported by the server. Hand edits
+- **Contracts change only through `tools/sync_contracts.py`** with a bundle exported by Scrawl. Hand edits
   fail the manifest check.
 - **Error codes live in `coverage.json`.** Add a code there and to both `ErrorCode`s, then run
   `python tools/gen_error_docs.py`.
