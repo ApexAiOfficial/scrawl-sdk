@@ -3,10 +3,10 @@
   "format": 1,
   "operations": {
     "POST /v1/admin/api-keys": {
-      "excluded": "Operator route: API keys are issued by whoever runs the Scrawl server, with its admin token, never from a client SDK."
+      "excluded": "Administrative route: ApexAi issues API keys with its admin token, never from a client SDK."
     },
     "GET /v1/admin/metrics": {
-      "excluded": "Operator route: server metrics for the operator's monitoring, behind the admin token."
+      "excluded": "Administrative route: service metrics for ApexAi's own monitoring, behind the admin token."
     },
     "GET /v1/ai/providers": {
       "python": "list_ai_providers",
@@ -633,13 +633,13 @@
       }
     },
     "GET /v1/scrapy/list": {
-      "excluded": "Legacy engine introspection for operators; not part of the SDK surface."
+      "excluded": "Legacy engine introspection for ApexAi's own operations; not part of the SDK surface."
     },
     "GET /v1/scrapy/settings": {
-      "excluded": "Legacy engine introspection for operators; not part of the SDK surface."
+      "excluded": "Legacy engine introspection for ApexAi's own operations; not part of the SDK surface."
     },
     "GET /v1/scrapy/version": {
-      "excluded": "Legacy engine introspection for operators; not part of the SDK surface."
+      "excluded": "Legacy engine introspection for ApexAi's own operations; not part of the SDK surface."
     },
     "POST /v1/search": {
       "python": "search",

@@ -2,7 +2,7 @@
 
 `npm install @apexaiofficial/scrawl` (once published; until then `npm install ./typescript` from a clone).
 Plain ESM over the global `fetch` with complete type declarations and **no runtime dependencies**: Node 20+,
-Deno, Bun and modern browsers. In a browser, never ship an API key to end users: call Scrawl from your server.
+Deno, Bun and modern browsers. In a browser, never ship an API key to end users: call Scrawl from your backend.
 
 ```js
 import { Scrawl } from "@apexaiofficial/scrawl";
@@ -55,7 +55,7 @@ for (const citation of answer.citations) console.log(citation.tag, citation.url)
 ## Browser rendering
 
 `engine: "browser"` (on `scrape`, `map` and `batchScrape`) renders the page in a sandboxed browser first,
-waiting `waitForMs` more after it settles; only servers that enable it accept it (elsewhere: 503
+waiting `waitForMs` more after it settles; it is accepted only where ApexAi has enabled it (elsewhere: 503
 `browser_unavailable`). A finished result from another engine rejects with `code: "render_not_supported"`;
 pass `engine: "browser"` to `scrapeResult` / `waitForScrape` to keep that guard on a pending job. The guard
 covers `scrape`, `map` and `scrapeResult`; a batch's items are not checked by the SDK, so after

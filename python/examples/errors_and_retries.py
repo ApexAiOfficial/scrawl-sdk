@@ -46,6 +46,6 @@ with Scrawl(max_retries=3, timeout=90) as client:
         sys.exit(f"no response from the server: {error}")
     except ScrawlError as error:                                   # every other refusal, with its stable code
         if error.code == ErrorCode.FORBIDDEN:
-            print("this key lacks the ai:use scope (or BYO AI is off on this server)")
+            print("this key lacks the ai:use scope (or BYO AI is not enabled)")
         else:
             print(f"refused: {error}")

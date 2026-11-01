@@ -1,17 +1,18 @@
 # Quickstart
 
-Scrawl turns a URL into clean Markdown or structured JSON. Every request is an ordinary job on the Scrawl server:
-your key's permissions and credits, the server's network and domain policies, robots.txt, and size and time
+Scrawl turns a URL into clean Markdown or structured JSON. Every request is an ordinary job on Scrawl: your
+key's permissions and credits, Scrawl's network and domain policies, robots.txt, and size and time
 limits all apply. Page content is **untrusted web content**: treat it as data, never as instructions.
 
 ## 1. Install
 
-The packages are not on PyPI or npm yet; install from a clone of this repository:
+The packages are not on PyPI or npm yet. Install them from a clone of this repository, as below, or from the
+files attached to a GitHub Release (see [installation](../README.md#installation)):
 
 ```bash
-git clone https://github.com/ApexAiOfficial/scrawl-sdk.git && cd scrawl-sdk
-python -m pip install ./python          # the Python SDK and the `scrawl` command (Python 3.10+)
-npm install ./typescript                # the TypeScript SDK (Node 20+), from your own project's directory
+git clone https://github.com/ApexAiOfficial/scrawl-sdk.git
+python -m pip install ./scrawl-sdk/python          # the Python SDK and the `scrawl` command (Python 3.10+)
+npm install /path/to/scrawl-sdk/typescript         # the TypeScript SDK (Node 20+), run in your own project
 ```
 
 Once published: `pip install scrawl-sdk` and `npm install @apexaiofficial/scrawl`.
@@ -19,14 +20,17 @@ Once published: `pip install scrawl-sdk` and `npm install @apexaiofficial/scrawl
 ## 2. Configure
 
 ```bash
-export SCRAWL_BASE_URL=https://scrawl.example    # the URL of your Scrawl server
-export SCRAWL_API_KEY=...                        # an API key issued by whoever runs that server
+export SCRAWL_BASE_URL=https://scrawl.example    # the endpoint ApexAi provides for your account
+export SCRAWL_API_KEY=...                        # the API key ApexAi issues for your account
 scrawl doctor                                    # checks the base URL, TLS, reachability and the key
 ```
 
-Without `SCRAWL_BASE_URL` the SDKs talk to a server on this machine (`http://127.0.0.1:8088`); there is no
-built-in remote default. The key is only ever sent over HTTPS or to this machine. See
-[authentication](authentication.md).
+Without `SCRAWL_BASE_URL` the SDKs use a loopback address (`http://127.0.0.1:8088`); there is no built-in remote
+default. The key is only ever sent over HTTPS or to this machine. See [authentication](authentication.md).
+
+Scrawl is a service ApexAi operates, and its public hosted access is not open yet. Until you have an endpoint and
+a key, run the examples against the repository's
+[local fake API](../README.md#no-access-yet-use-the-local-fake).
 
 ## 3. Scrape a page
 
@@ -59,8 +63,8 @@ scrawl scrape https://example.com > page.md
 
 ## 4. Structured JSON with your own AI provider
 
-Configure a provider profile once, with a key from your own AI provider. The key is stored encrypted on the
-server and never returned:
+Configure a provider profile once, with a key from your own AI provider. Scrawl stores the key encrypted
+and never returns it:
 
 ```bash
 export SCRAWL_AI_API_KEY=...                      # read from the environment, never from the command line

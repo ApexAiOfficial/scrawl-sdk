@@ -33,7 +33,7 @@ try {
     console.log(`your AI provider failed: ${error.code}`);       // fix the profile, then retry
   } else if (error instanceof APIConnectionError) throw new Error(`no response from the server: ${error.message}`);
   else if (error instanceof ScrawlError && error.code === ErrorCode.FORBIDDEN) {
-    console.log("this key lacks the ai:use scope (or BYO AI is off on this server)");
+    console.log("this key lacks the ai:use scope (or BYO AI is not enabled)");
   } else if (error instanceof ScrawlError) console.log(`refused: ${error}`);
   else throw error;
 }

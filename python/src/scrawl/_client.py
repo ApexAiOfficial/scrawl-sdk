@@ -6,8 +6,8 @@ asset extraction) carry an ``Idempotency-Key`` — generated unless you pass one
 error or a 429/5xx never starts the work twice. Other POSTs are never retried, and neither is any response
 whose error code the backend's error catalogue marks not retryable (``_errors.RETRYABLE``).
 
-The base URL comes from the argument or ``SCRAWL_BASE_URL``; without either, the client talks to a
-Scrawl server on this machine (``http://127.0.0.1:8088``). There is no built-in remote default.
+The base URL comes from the argument or ``SCRAWL_BASE_URL``; without either, the client uses a
+loopback address (``http://127.0.0.1:8088``). There is no built-in remote default.
 """
 
 from __future__ import annotations
@@ -38,7 +38,7 @@ from ._errors import (
 from ._objects import ScrawlObject, wrap
 from ._version import __version__
 
-DEFAULT_BASE_URL = "http://127.0.0.1:8088"      # a Scrawl server on this machine; remote servers need SCRAWL_BASE_URL
+DEFAULT_BASE_URL = "http://127.0.0.1:8088"      # loopback; set SCRAWL_BASE_URL to your Scrawl endpoint
 RETRY_STATUSES = frozenset({429, 502, 503, 504})
 _LIST_KEYS = ("datasets", "versions", "jobs", "entries", "records", "results", "items", "assets", "skipped")
 _ASSETS_ACTIVE = frozenset({"pending", "running"})
@@ -328,7 +328,7 @@ class _Endpoints:
 
     # -- account ------------------------------------------------------------------------------------
     def credit_balance(self) -> Any:
-        """Your credits (hosted) or unmetered (self-hosted)."""
+        """Your credit balance, or an unmetered status."""
         return self._call(_Request("GET", "/v1/credits/balance"))
 
     def health(self) -> Any:

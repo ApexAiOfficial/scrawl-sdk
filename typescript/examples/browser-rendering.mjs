@@ -1,9 +1,9 @@
 // Render a JavaScript-heavy page in a sandboxed browser first, falling back to the static fetcher:
 // `node examples/browser-rendering.mjs https://example.com/app`
 //
-// Browser rendering is available only where the server enables it. Elsewhere the API refuses with 503
-// browser_unavailable, and a server that predates the browser engine is caught by the SDK's downgrade guard
-// (render_not_supported) instead of silently returning a static page.
+// Browser rendering is available only where it is enabled. Elsewhere the API refuses with 503
+// browser_unavailable, and a Scrawl version that predates the browser engine is caught by the SDK's downgrade
+// guard (render_not_supported) instead of silently returning a static page.
 import { ErrorCode, Scrawl, ScrawlError } from "@apexaiofficial/scrawl";
 
 const url = process.argv[2];

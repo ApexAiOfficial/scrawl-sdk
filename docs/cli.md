@@ -1,7 +1,8 @@
 # The `scrawl` command
 
-Installed with the Python SDK (`pip install scrawl-sdk`, or `pip install ./python` from a clone). It reads the
-server and key only from the environment, so commands are safe to paste and to give to an agent:
+Installed with the Python SDK. It is not on PyPI yet: install it from a GitHub Release or a clone (see
+[installation](../README.md#installation)); once published, `pip install scrawl-sdk`. It reads the endpoint and key
+only from the environment, so commands are safe to paste and to give to an agent:
 
 ```bash
 export SCRAWL_BASE_URL=https://scrawl.example
@@ -27,7 +28,7 @@ scrawl scrape https://example.com                                  # Markdown to
 scrawl scrape https://example.com --format links --format html
 scrawl scrape https://example.com/item --instruction "name and price"   # JSON with your AI provider
 scrawl scrape https://example.com/item --schema product.schema.json --profile main
-scrawl scrape https://example.com/app --browser --wait-for 500    # only where the server enables it
+scrawl scrape https://example.com/app --browser --wait-for 500    # only where browser rendering is enabled
 scrawl result job_123 --wait 60                                     # a pending scrape's result
 scrawl result job_123 --browser                                     # keep the browser downgrade guard
 scrawl map https://example.com --limit 200                          # one URL per line
@@ -42,7 +43,7 @@ needs `ai:use` as well as `scrape:write`. `cancel` needs the scope that starts t
 [scopes](authentication.md#scopes)).
 
 `--browser` keeps the downgrade guard: a finished result, or a finished batch item, that another engine
-rendered (a server that predates the browser engine) is an error (`render_not_supported`, exit 5); `batch`
+rendered (a Scrawl version that predates the browser engine) is an error (`render_not_supported`, exit 5); `batch`
 still prints the batch first, so its id is not lost.
 
 ## Crawls, jobs, artifacts
@@ -97,7 +98,7 @@ scrawl ai providers usage --days 7
 scrawl ai providers remove main
 ```
 
-`--provider` is one the server supports (for example `openai`, `anthropic`, `deepseek`, or `custom` with
+`--provider` is one Scrawl supports (for example `openai`, `anthropic`, `deepseek`, or `custom` with
 `--base-url` for an OpenAI-compatible endpoint); `--model NAME` picks a model. The provider key is never a
 command-line argument, and an unrecognised argument is never echoed back.
 

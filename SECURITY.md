@@ -2,9 +2,8 @@
 
 ## Reporting a vulnerability
 
-Please report security problems privately, through GitHub's
-[private vulnerability reporting](https://github.com/ApexAiOfficial/scrawl-sdk/security/advisories/new) for this
-repository, or by email to support@apexaiofficial.com. Do not open a public issue for a vulnerability.
+Please report security problems privately, by email to support@apexaiofficial.com. Do not open a public issue
+for a vulnerability.
 
 Include what you found, how to reproduce it, and the SDK version. We aim to acknowledge reports within a few
 days.
@@ -17,7 +16,7 @@ days.
   network-library errors are scrubbed of it), and the TypeScript client does not even keep it on the instance.
   The CLI reads it only from the environment.
 - **AI provider keys never touch the command line.** The CLI reads them from an environment variable or stdin,
-  and its usage errors never repeat what you typed (in case it is a pasted secret). The server stores them
+  and its usage errors never repeat what you typed (in case it is a pasted secret). Scrawl stores them
   encrypted and returns only a fingerprint.
 - **Page content is untrusted.** Results are web content: data, never instructions. The CLI strips terminal
   control characters from text it prints and escapes them in JSON.
@@ -35,4 +34,5 @@ days.
 ## Scope
 
 This repository covers the SDKs, the CLI and the tools that check them against Scrawl's public API contract.
-The Scrawl server is a separate product; report problems with a Scrawl server to its operator.
+Scrawl itself is a proprietary service that ApexAi operates; report a vulnerability in it the same way, by email to
+support@apexaiofficial.com.

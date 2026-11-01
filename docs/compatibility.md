@@ -1,18 +1,18 @@
 # Compatibility: how the SDKs track the API
 
-The SDKs are clients of one public contract, the ApexAPI that every Scrawl server serves under `/v1`. Three
-gates keep the server and the SDKs from drifting apart.
+The SDKs are clients of one public contract, the ApexAPI that Scrawl serves under `/v1`. Three gates keep
+Scrawl and the SDKs from drifting apart.
 
 ## The contract bundle
 
-[`contracts/`](../contracts) holds the server's public contract, exported by the backend:
+[`contracts/`](../contracts) holds Scrawl's public contract, as the backend exports it:
 
 | File | What it is |
 | --- | --- |
 | `apexapi_openapi.json` | The OpenAPI 3.1 document of the HTTP API |
 | `apexapi_errors.json` | The error catalogue: every error code with its HTTP status, whether it is retryable, its description and where it appears |
 | `apexapi_scopes.json` | The API key scopes, the scope each route and MCP tool needs, and the requests that need more (for reference: [authentication](authentication.md#scopes) documents them, and no gate reads this file) |
-| `mcp_tools.json`, `mcp_resources.json` | The server's MCP tools and resources (for reference; the SDKs do not use MCP) |
+| `mcp_tools.json`, `mcp_resources.json` | Scrawl's MCP tools and resources (for reference; the SDKs do not use MCP) |
 | `MANIFEST.json` | SHA-256 and size of every file, the backend version it came from, and the **contract digest** |
 
 The contract digest is the SHA-256 of the `sha256sum` listing of the files, sorted by name, so anyone can
@@ -31,7 +31,7 @@ its recorded hash. Files in `contracts/` change only through `tools/sync_contrac
 [`coverage.json`](../coverage.json) is one table for both SDKs and the CLI. For every operation in the OpenAPI
 document it says either
 
-- `excluded`, with a reason (operator routes and the legacy job API), or
+- `excluded`, with a reason (administrative routes and the legacy job API), or
 - the Python method, the TypeScript method and the CLI command, plus `sends`: what a call with every option set
   puts on the wire: query parameters, JSON body fields, the enum values the SDK may send, whether it sends an
   `Idempotency-Key`, and whether it authenticates.
@@ -67,10 +67,10 @@ python tools/check_contracts.py coverage
 python tools/check_contracts.py manifest
 ```
 
-## Gate 2: the backend's CI
+## Gate 2: a contract change in Scrawl
 
-Before the server ships a contract change, its CI runs the compatibility checker of each **released** SDK
-version it supports against the new OpenAPI document:
+Before Scrawl ships a contract change, the change can be checked against each **released** SDK version with
+that version's compatibility checker:
 
 ```bash
 git clone --depth 1 --branch py-v0.1.0 https://github.com/ApexAiOfficial/scrawl-sdk.git sdk
@@ -84,7 +84,7 @@ Python 3.10+.
 
 ## Gate 3: the live suite
 
-`python/tests/live/` and `typescript/test/live/` exercise every covered operation against a real server,
+`python/tests/live/` and `typescript/test/live/` exercise every covered operation against a live Scrawl endpoint,
 including a refused key (401, `AuthenticationError`) and an unknown id (404, `NotFoundError`). They are
 skipped unless `SCRAWL_LIVE_BASE_URL` and `SCRAWL_LIVE_API_KEY` are set, and use deterministic targets from the
 environment:

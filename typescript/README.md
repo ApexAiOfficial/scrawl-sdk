@@ -4,7 +4,7 @@ Official client for [Scrawl](https://github.com/ApexAiOfficial/scrawl-sdk): URL 
 JSON out, plus site maps, batches, crawls into versioned datasets, typed dataset queries and cited answers.
 
 Plain ESM over the global `fetch`, complete TypeScript declarations, **no runtime dependencies**. Node 20+,
-Deno, Bun and modern browsers (never ship an API key to a browser: call Scrawl from your server). Licensed
+Deno, Bun and modern browsers (never ship an API key to a browser: call Scrawl from your backend). Licensed
 under Apache-2.0.
 
 ## Install
@@ -16,12 +16,13 @@ npm install @apexaiofficial/scrawl     # once published; until then: npm install
 ## Configure
 
 ```bash
-export SCRAWL_BASE_URL=https://scrawl.example    # your Scrawl server (default: one on this machine)
-export SCRAWL_API_KEY=...                        # an API key issued by whoever runs it
+export SCRAWL_BASE_URL=https://scrawl.example    # the endpoint ApexAi provides for your account
+export SCRAWL_API_KEY=...                        # the API key ApexAi issues for your account
 ```
 
 Or pass `new Scrawl({ apiKey, baseUrl })`. The key is only ever sent over HTTPS or to this machine, and it is
-never stored on the client instance, so logging a client cannot print it.
+never stored on the client instance, so logging a client cannot print it. Scrawl is a service ApexAi operates,
+and its public hosted access is not open yet.
 
 ## Use
 
