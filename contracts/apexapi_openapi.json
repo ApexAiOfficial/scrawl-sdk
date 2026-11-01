@@ -1211,7 +1211,7 @@
         "properties": {
           "engine": {
             "default": "static",
-            "description": "For every URL. static (default): one gated fetch. browser: render the page in a sandboxed browser first (self-hosted, when the operator enables it; otherwise 503 browser_unavailable)",
+            "description": "For every URL. static (default): one gated fetch. browser: render the page in a sandboxed browser first (on a dedicated deployment, when enabled; otherwise 503 browser_unavailable)",
             "enum": [
               "static",
               "browser"
@@ -1385,7 +1385,7 @@
         "type": "object"
       },
       "CheckJobRequest": {
-        "description": "Scrapy check job request.\n\n``catalog_name`` is required in hosted SaaS mode and ignored in self-hosted\ncompatibility mode.",
+        "description": "Scrapy check job request.\n\n``catalog_name`` is required in hosted SaaS mode and ignored on a dedicated\ndeployment.",
         "properties": {
           "catalog_name": {
             "anyOf": [
@@ -1428,7 +1428,7 @@
         "type": "object"
       },
       "CrawlRequest": {
-        "description": "A bounded crawl of an existing spider (self-hosted) or catalog target (hosted).",
+        "description": "A bounded crawl of an existing spider (dedicated deployment) or catalog target (hosted).",
         "properties": {
           "crawl_target": {
             "maxLength": 128,
@@ -2621,7 +2621,7 @@
         "properties": {
           "engine": {
             "default": "static",
-            "description": "For the start page (a sitemap is always static). static (default): one gated fetch. browser: render the page in a sandboxed browser first (self-hosted, when the operator enables it; otherwise 503 browser_unavailable)",
+            "description": "For the start page (a sitemap is always static). static (default): one gated fetch. browser: render the page in a sandboxed browser first (on a dedicated deployment, when enabled; otherwise 503 browser_unavailable)",
             "enum": [
               "static",
               "browser"
@@ -2902,7 +2902,7 @@
         "properties": {
           "engine": {
             "default": "static",
-            "description": "static (default): one gated fetch. browser: render the page in a sandboxed browser first (self-hosted, when the operator enables it; otherwise 503 browser_unavailable)",
+            "description": "static (default): one gated fetch. browser: render the page in a sandboxed browser first (on a dedicated deployment, when enabled; otherwise 503 browser_unavailable)",
             "enum": [
               "static",
               "browser"
@@ -4865,7 +4865,7 @@
     },
     "/v1/credits/balance": {
       "get": {
-        "description": "Return hosted ledger balance or self-hosted unmetered status.",
+        "description": "Return hosted ledger balance or a dedicated deployment's unmetered status.",
         "operationId": "credits_balance_v1_credits_balance_get",
         "responses": {
           "200": {

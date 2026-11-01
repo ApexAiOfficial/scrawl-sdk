@@ -556,7 +556,7 @@
     },
     {
       "default": true,
-      "description": "Read the account's credit balance (or the self-hosted unmetered status).",
+      "description": "Read the account's credit balance (or a dedicated deployment's unmetered status).",
       "name": "credits:read"
     },
     {
