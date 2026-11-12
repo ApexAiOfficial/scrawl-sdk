@@ -22,7 +22,17 @@ Once published: `pip install scrawl-sdk` and `npm install @apexaiofficial/scrawl
 ```bash
 export SCRAWL_BASE_URL=https://scrawl.example    # the endpoint ApexAi provides for your account
 export SCRAWL_API_KEY=...                        # the API key ApexAi issues for your account
-scrawl doctor                                    # checks the base URL, TLS, reachability and the key
+scrawl doctor                                    # checks the base URL, TLS, reachability, the key and your proxy
+```
+
+Every job leaves through your own proxy, and nothing is fetched until it has passed a test (until then a job is
+refused with `egress_required`). Register it once per key; the credentials are stored encrypted and never
+returned, and the endpoint must be a public address:
+
+```bash
+read -rs SCRAWL_PROXY_URL && export SCRAWL_PROXY_URL   # scheme://user:pass@host:port, typed without echo
+scrawl proxy set --label "my provider"                 # reads SCRAWL_PROXY_URL: never a command-line argument
+scrawl proxy test                                      # "ok": true unlocks scraping (exit 1 if it fails)
 ```
 
 Without `SCRAWL_BASE_URL` the SDKs use a loopback address (`http://127.0.0.1:8088`); there is no built-in remote

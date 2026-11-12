@@ -73,7 +73,7 @@ Before Scrawl ships a contract change, the change can be checked against each **
 that version's compatibility checker:
 
 ```bash
-git clone --depth 1 --branch py-v0.1.0 https://github.com/ApexAiOfficial/scrawl-sdk.git sdk
+git clone --depth 1 --branch py-v0.1.1 https://github.com/ApexAiOfficial/scrawl-sdk.git sdk
 python sdk/tools/check_contracts.py compat --openapi path/to/new/apexapi_openapi.json
 ```
 

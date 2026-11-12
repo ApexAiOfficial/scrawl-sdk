@@ -208,6 +208,31 @@ export class Scrawl {
     return this._call({ method: "GET", path: "/v1/ai/usage", params: { days } });
   }
 
+  // -- your proxy: every job needs one that has passed a test -------------------------------------
+  /** Your proxy and whether it is usable; NotFoundError when none is registered. */
+  async getProxy() {
+    return this._call({ method: "GET", path: "/v1/proxy" });
+  }
+
+  /**
+   * Register or replace your proxy: `url` (scheme://[user:pass@]host:port) or scheme, host and port. The
+   * credentials are stored encrypted and never returned. Scraping stays locked until testProxy() passes.
+   */
+  async setProxy({ url, scheme, host, port, username, password, label } = {}) {
+    const json = clean({ url, scheme, host, port, username, password, label });
+    return this._call({ method: "PUT", path: "/v1/proxy", json });
+  }
+
+  /** Send one real HTTPS request through your proxy; a pass (`ok`) unlocks scraping. */
+  async testProxy() {
+    return this._call({ method: "POST", path: "/v1/proxy/test" });
+  }
+
+  /** Remove your proxy (scraping is locked again). */
+  async removeProxy() {
+    return this._call({ method: "DELETE", path: "/v1/proxy" });
+  }
+
   // -- crawls and jobs ----------------------------------------------------------------------------
   /** Start a bounded crawl that publishes a new dataset version. */
   async crawl(crawlTarget, { exportFormat, maxItems, maxSeconds, idempotencyKey } = {}) {

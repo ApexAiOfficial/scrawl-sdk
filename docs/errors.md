@@ -85,6 +85,7 @@ Generated from the vendored error catalogue (`contracts/apexapi_errors.json`) an
 | `invalid_artifact_name` | 422 | no | API, MCP | `ValidationError` | `ErrorCode.INVALID_ARTIFACT_NAME` | An artifact must be named by a single file name from the job's artifact list. |
 | `invalid_request` | 422 | no | API, MCP | `ValidationError` | `ErrorCode.INVALID_REQUEST` | The request is malformed or outside a documented bound; field errors never echo the submitted values. |
 | `unsafe_artifact_path` | 422 | no | API, MCP | `ValidationError` | `ErrorCode.UNSAFE_ARTIFACT_PATH` | The artifact name resolves outside its job's files. |
+| `ai_daily_budget_exceeded` | 429 | yes | API, MCP, result | `RateLimitError` | `ErrorCode.AI_DAILY_BUDGET_EXCEEDED` | Your daily AI token budget on this deployment is used up (cache tokens included); it resets at 00:00 UTC. Retry after Retry-After seconds. |
 | `rate_limited` | 429 | yes | API, MCP | `RateLimitError` | `ErrorCode.RATE_LIMITED` | Too many requests for this account; wait Retry-After seconds, then retry. |
 | `too_many_active_jobs` | 429 | yes | API, MCP | `RateLimitError` | `ErrorCode.TOO_MANY_ACTIVE_JOBS` | The caller already has the maximum number of running or queued jobs, or the browser renderer is busy; retry after Retry-After seconds. |
 | `internal_error` | 500 | no | API, result | `ServerError` | `ErrorCode.INTERNAL_ERROR` | An unexpected failure, possibly after work started: list your jobs before sending a job request again. Quote the request ID when reporting it. |
@@ -100,6 +101,8 @@ Generated from the vendored error catalogue (`contracts/apexapi_errors.json`) an
 | `ai_refused` | 502 | no | API, MCP, result | `ServerError` | `ErrorCode.AI_REFUSED` | Your AI provider refused to answer (a content filter or safety refusal). |
 | `ai_timeout` | 502 | yes | API, MCP, result | `ServerError` | `ErrorCode.AI_TIMEOUT` | Your AI provider did not answer in time. |
 | `ai_unavailable` | 502 | yes | API, MCP, result | `ServerError` | `ErrorCode.AI_UNAVAILABLE` | Your AI provider is unavailable: an outage or a connection failure. |
+| `ai_unsupported` | 502 | no | API, MCP, result | `ServerError` | `ErrorCode.AI_UNSUPPORTED` | The AI profile's model or endpoint does not support tool calls. |
+| `ai_kill_switch_engaged` | 503 | no | API, MCP, result | `ServerError` | `ErrorCode.AI_KILL_SWITCH_ENGAGED` | The operator has switched AI features off on this deployment; no further call is made to your AI provider. Profiles can still be listed and removed. |
 | `browser_unavailable` | 503 | no | API, MCP | `ServerError` | `ErrorCode.BROWSER_UNAVAILABLE` | This deployment cannot render pages in a browser; use the static engine. |
 | `temporarily_unavailable` | 503 | yes | MCP | - | `ErrorCode.TEMPORARILY_UNAVAILABLE` | MCP over HTTP: the key store is unavailable; retry after Retry-After seconds. |
 | `unavailable` | 503 | no | API, MCP | `ServerError` | `ErrorCode.UNAVAILABLE` | A feature or service the request needs is turned off, not configured or not running on this deployment; try again later only if the message says to. |
@@ -113,6 +116,7 @@ Generated from the vendored error catalogue (`contracts/apexapi_errors.json`) an
 | `preflight_denied` | none | no | result | - | `ErrorCode.PREFLIGHT_DENIED` | The destination policy refused the page before any fetch. |
 | `render_interrupted` | none | yes | result | - | `ErrorCode.RENDER_INTERRUPTED` | A scrape's JSON step was interrupted; scrape the URL again, or extract from the job. |
 | `render_not_supported` | none | no | SDK | `ScrawlError` | `ErrorCode.RENDER_NOT_SUPPORTED` | Raised by the SDKs, not the API: you asked for engine=browser, but the finished result came from another engine. |
+| `robots_disallowed` | none | no | result | - | `ErrorCode.ROBOTS_DISALLOWED` | robots.txt refused the page. A robots.txt answering 429, or 503 with Retry-After, refuses it too; on the browser engine, so does an unreadable one (a network error or another 5xx). |
 | `settlement_failed` | none | no | result | - | `ErrorCode.SETTLEMENT_FAILED` | The job's charge could not be settled or confirmed; its failure_reason says whether anything was charged. Check it before sending the request again. |
 | `too_many_streams` | none | yes | MCP | - | `ErrorCode.TOO_MANY_STREAMS` | The caller already holds the maximum number of open listen streams; close one first. |
 <!-- END GENERATED: error codes -->

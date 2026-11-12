@@ -5,7 +5,22 @@ versions follow [Semantic Versioning](https://semver.org/) (before 1.0, a minor 
 The Python package (`scrawl-sdk`) and the npm package (`@apexaiofficial/scrawl`) are released separately; each
 entry says which one it covers.
 
-## Unreleased
+## Python 0.1.1 and TypeScript 0.1.1 (2026-11-12)
+
+### Added
+- Your proxy, which every job needs before anything is fetched: `set_proxy`, `get_proxy`, `test_proxy` and
+  `remove_proxy` (TypeScript `setProxy`, `getProxy`, `testProxy`, `removeProxy`), and `scrawl proxy
+  show|set|test|remove`. The CLI reads the proxy URL from an environment variable (`SCRAWL_PROXY_URL` by default)
+  or stdin, never from argv. `scrawl doctor` reports whether your proxy has passed its test.
+- `ErrorCode` gains `ai_daily_budget_exceeded`, `ai_kill_switch_engaged`, `ai_unsupported` and
+  `robots_disallowed`, with the catalogue's retry flags.
+
+### Changed
+- Contracts re-synced to the backend's current bundle: the four proxy operations, the new error codes, and the
+  error catalogue's `mcp_tool_error` block (`tools/check_contracts.py` now validates it; the SDKs do not use MCP).
+- A request's JSON body no longer appears in its `repr` (it may carry a proxy URL or an AI provider key).
+
+## Earlier unreleased changes, shipped in 0.1.1
 
 ### Changed
 - Contracts re-synced to digest `sha256:36eed387f186c86e011df22ad9817507b299aedcbca4e2242b9a78b11f6b7e58`:
