@@ -213,6 +213,18 @@
       },
       "AIUsageTotal": {
         "properties": {
+          "cache_creation_tokens": {
+            "default": 0,
+            "description": "Prompt-cache writes the provider reports apart from input tokens (Anthropic); counted in the daily token budget",
+            "title": "Cache Creation Tokens",
+            "type": "integer"
+          },
+          "cache_read_tokens": {
+            "default": 0,
+            "description": "Prompt-cache reads the provider reports apart from input tokens (Anthropic); counted in the daily token budget",
+            "title": "Cache Read Tokens",
+            "type": "integer"
+          },
           "calls": {
             "title": "Calls",
             "type": "integer"
@@ -2842,6 +2854,219 @@
         "title": "ParseJobRequest",
         "type": "object"
       },
+      "ProxyInfo": {
+        "description": "The caller's proxy. The username and password are never returned.",
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "has_credentials": {
+            "title": "Has Credentials",
+            "type": "boolean"
+          },
+          "host": {
+            "title": "Host",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "last_error": {
+            "title": "Last Error",
+            "type": "string"
+          },
+          "last_exit_ip": {
+            "title": "Last Exit Ip",
+            "type": "string"
+          },
+          "last_latency_ms": {
+            "title": "Last Latency Ms",
+            "type": "integer"
+          },
+          "last_validated_at": {
+            "title": "Last Validated At",
+            "type": "string"
+          },
+          "port": {
+            "title": "Port",
+            "type": "integer"
+          },
+          "remote_dns": {
+            "description": "Whether target names are resolved by the proxy (http, https, socks5h)",
+            "title": "Remote Dns",
+            "type": "boolean"
+          },
+          "sanitized_url": {
+            "description": "The proxy URL with any credentials replaced by ***",
+            "title": "Sanitized Url",
+            "type": "string"
+          },
+          "scheme": {
+            "description": "http, https, socks5 or socks5h",
+            "title": "Scheme",
+            "type": "string"
+          },
+          "usable": {
+            "description": "True once a test has passed: scraping is unlocked",
+            "title": "Usable",
+            "type": "boolean"
+          },
+          "validation_state": {
+            "description": "unverified, valid, invalid or external_blocked",
+            "title": "Validation State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "scheme",
+          "host",
+          "port",
+          "has_credentials",
+          "label",
+          "enabled",
+          "validation_state",
+          "usable",
+          "remote_dns",
+          "last_validated_at",
+          "last_exit_ip",
+          "last_latency_ms",
+          "last_error",
+          "sanitized_url"
+        ],
+        "title": "ProxyInfo",
+        "type": "object"
+      },
+      "ProxyRequest": {
+        "description": "Register (or replace) the caller's proxy: either ``url``, or ``scheme``, ``host`` and ``port``.\n\nThe endpoint must be a public internet address. A new proxy is untested: scraping stays locked\nuntil ``POST /v1/proxy/test`` passes.",
+        "properties": {
+          "host": {
+            "anyOf": [
+              {
+                "maxLength": 253,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Host"
+          },
+          "label": {
+            "default": "",
+            "description": "Your name for it, for example the provider",
+            "maxLength": 64,
+            "title": "Label",
+            "type": "string"
+          },
+          "password": {
+            "default": "",
+            "description": "Write-only",
+            "maxLength": 512,
+            "title": "Password",
+            "type": "string"
+          },
+          "port": {
+            "anyOf": [
+              {
+                "maximum": 65535.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Port"
+          },
+          "scheme": {
+            "anyOf": [
+              {
+                "maxLength": 16,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "http, https, socks5 or socks5h",
+            "title": "Scheme"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "maxLength": 2048,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "scheme://[user:pass@]host:port (write-only)",
+            "title": "Url"
+          },
+          "username": {
+            "default": "",
+            "description": "Write-only",
+            "maxLength": 512,
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "title": "ProxyRequest",
+        "type": "object"
+      },
+      "ProxyTestResponse": {
+        "description": "Whether the proxy carried a real HTTPS request, and the proxy as it now stands.",
+        "properties": {
+          "checked_via": {
+            "title": "Checked Via",
+            "type": "string"
+          },
+          "error": {
+            "title": "Error",
+            "type": "string"
+          },
+          "exit_ip": {
+            "description": "The address targets see",
+            "title": "Exit Ip",
+            "type": "string"
+          },
+          "host_ip_exposed": {
+            "description": "True if the target would see the server's own address",
+            "title": "Host Ip Exposed",
+            "type": "boolean"
+          },
+          "latency_ms": {
+            "title": "Latency Ms",
+            "type": "integer"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "proxy": {
+            "$ref": "#/components/schemas/ProxyInfo"
+          },
+          "validation_state": {
+            "title": "Validation State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "validation_state",
+          "exit_ip",
+          "latency_ms",
+          "host_ip_exposed",
+          "checked_via",
+          "error",
+          "proxy"
+        ],
+        "title": "ProxyTestResponse",
+        "type": "object"
+      },
       "QuarantineRequest": {
         "description": "Why a record is being suppressed.",
         "properties": {
@@ -3081,7 +3306,7 @@
                 "type": "null"
               }
             ],
-            "description": "Why it failed: fetch_failed, or an ai_* code from the JSON step",
+            "description": "Why it failed: robots_disallowed (robots.txt refused the page; the error catalogue says when an unreadable robots.txt refuses it too), fetch_failed, or an ai_* code from the JSON step",
             "title": "Error Code"
           },
           "final_url": {
@@ -3871,6 +4096,16 @@
             },
             "description": "Unprocessable Entity"
           },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
           "502": {
             "content": {
               "application/json": {
@@ -4143,6 +4378,16 @@
               }
             },
             "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Too Many Requests"
           },
           "502": {
             "content": {
@@ -5449,6 +5694,16 @@
             },
             "description": "Unprocessable Entity"
           },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
           "502": {
             "content": {
               "application/json": {
@@ -6208,6 +6463,16 @@
             },
             "description": "Unprocessable Entity"
           },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
           "502": {
             "content": {
               "application/json": {
@@ -6642,6 +6907,333 @@
         "summary": "Map Url",
         "tags": [
           "scrape"
+        ]
+      }
+    },
+    "/v1/proxy": {
+      "delete": {
+        "description": "Remove your proxy; scraping is locked again (404 when none is registered).",
+        "operationId": "delete_proxy",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Delete Proxy",
+        "tags": [
+          "proxy"
+        ]
+      },
+      "get": {
+        "description": "Your proxy and whether it is usable (404 when none is registered).",
+        "operationId": "get_proxy",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProxyInfo"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Get Proxy",
+        "tags": [
+          "proxy"
+        ]
+      },
+      "put": {
+        "description": "Register or replace your proxy. It stays untested (scraping locked) until a test passes.",
+        "operationId": "set_proxy",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProxyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProxyInfo"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Set Proxy",
+        "tags": [
+          "proxy"
+        ]
+      }
+    },
+    "/v1/proxy/test": {
+      "post": {
+        "description": "Send one real HTTPS request through your proxy and record the outcome; a pass unlocks scraping.",
+        "operationId": "test_proxy",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProxyTestResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Test Proxy",
+        "tags": [
+          "proxy"
         ]
       }
     },

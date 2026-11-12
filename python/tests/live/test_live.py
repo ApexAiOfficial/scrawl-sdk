@@ -4,6 +4,9 @@ Skipped unless both are set:
   SCRAWL_LIVE_BASE_URL      the server, e.g. https://scrawl.example or http://127.0.0.1:8088
   SCRAWL_LIVE_API_KEY       a key with the default scopes (scrape:write, jobs:read, artifacts:read, credits:read)
 Deterministic targets and optional areas (each area is skipped, with its reason, until its variables are set):
+  SCRAWL_LIVE_PROXY_URL     the key subject's own proxy, scheme://[user:pass@]host:port: every job needs one that
+                            has passed a test, so the suite registers and tests it first (and the proxy test
+                            removes and re-registers it); without it, the key's subject must already have one
   SCRAWL_LIVE_TARGET_URL    a stable page the server may fetch (required for anything that fetches)
   SCRAWL_LIVE_CRAWL_TARGET  a crawl target the key may run (crawl, datasets, search, documents, quarantine)
   SCRAWL_LIVE_AI_PROVIDER, SCRAWL_LIVE_AI_API_KEY [SCRAWL_LIVE_AI_MODEL, SCRAWL_LIVE_AI_BASE_URL]
@@ -65,6 +68,33 @@ def need(*names: str) -> list[str]:
 def client() -> Iterator[Scrawl]:
     with Scrawl(API_KEY, base_url=BASE_URL, timeout=90) as live:
         yield live
+
+
+@pytest.fixture(scope="module", autouse=True)
+def proxy(client: Scrawl) -> str | None:
+    """Register and test the key subject's proxy before anything fetches (every job needs one that passed a test)."""
+    url = os.environ.get("SCRAWL_LIVE_PROXY_URL", "")
+    if not url:
+        return None
+    client.set_proxy(url, label="scrawl-sdk live suite")
+    result = client.test_proxy()
+    assert result.ok is True, result.get("error")
+    return url
+
+
+@covers("GET /v1/proxy", "DELETE /v1/proxy", "PUT /v1/proxy", "POST /v1/proxy/test")
+def test_the_proxy_gate_locks_and_unlocks(client: Scrawl, proxy: str | None) -> None:
+    if not proxy:
+        pytest.skip("set SCRAWL_LIVE_PROXY_URL")
+    shown = client.get_proxy()
+    assert shown.usable is True and "***" in shown.sanitized_url or not shown.has_credentials
+    client.remove_proxy()
+    with pytest.raises(NotFoundError):
+        client.get_proxy()
+    saved = client.set_proxy(proxy, label="scrawl-sdk live suite")
+    assert saved.usable is False and saved.validation_state == "unverified"
+    tested = client.test_proxy()
+    assert tested.ok is True and tested.host_ip_exposed is False and tested.proxy.usable is True
 
 
 @pytest.fixture(scope="module")

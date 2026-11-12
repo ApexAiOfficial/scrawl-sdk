@@ -67,6 +67,8 @@ class FakeApexAPI:
         self.problems: list[str] = []
         self.requests: list[dict[str, Any]] = []
         self.profiles: dict[str, dict[str, Any]] = {}
+        #: The caller's proxy (sanitized view), as GET /v1/proxy answers it; None until PUT /v1/proxy.
+        self.proxy: dict[str, Any] | None = None
         self.flaky_seen: set[str] = set()
         self.lock = threading.Lock()
 
@@ -217,6 +219,47 @@ class FakeApexAPI:
             return _error(404, "not_found", "No such AI profile")
         return Reply(200, {"profile": info["profile"], "provider": info["provider"], "model": info["model"],
                            "ok": True, "model_listed": True, "latency_ms": 42, "error": None, "error_kind": None})
+
+    # -- your proxy ----------------------------------------------------------------------------------
+    def _get_v1_proxy(self, params: dict, query: dict, body: dict, headers: dict) -> Reply:
+        if self.proxy is None:
+            return _error(404, "not_found", "No proxy is configured. Register one with PUT /v1/proxy.")
+        return Reply(200, self.proxy)
+
+    def _put_v1_proxy(self, params: dict, query: dict, body: dict, headers: dict) -> Reply:
+        url = body.get("url")
+        if url:
+            parts = urlsplit(url)
+            scheme, host, port = parts.scheme, parts.hostname or "", parts.port or 0
+            has_credentials = bool(parts.username)
+        else:
+            scheme, host, port = body.get("scheme"), body.get("host"), body.get("port")
+            has_credentials = bool(body.get("username"))
+        if scheme not in ("http", "https", "socks5", "socks5h") or not host or not port:
+            return _error(422, "invalid_request", "Give url, or scheme, host and port.")
+        auth = "***:***@" if has_credentials else ""
+        proxy = {"scheme": scheme, "host": host, "port": int(port), "has_credentials": has_credentials,
+                 "label": body.get("label") or "", "enabled": True, "validation_state": "unverified", "usable": False,
+                 "remote_dns": scheme != "socks5", "last_validated_at": "", "last_exit_ip": "", "last_latency_ms": 0,
+                 "last_error": "", "sanitized_url": f"{scheme}://{auth}{host}:{port}"}
+        with self.lock:
+            self.proxy = proxy
+        return Reply(200, proxy)
+
+    def _post_v1_proxy_test(self, params: dict, query: dict, body: dict, headers: dict) -> Reply:
+        if self.proxy is None:
+            return _error(404, "not_found", "No proxy is configured. Register one first.")
+        with self.lock:
+            self.proxy.update(validation_state="valid", usable=True, last_validated_at=NOW,
+                              last_exit_ip="198.51.100.7", last_latency_ms=42)
+        return Reply(200, {"ok": True, "validation_state": "valid", "exit_ip": "198.51.100.7", "latency_ms": 42,
+                           "host_ip_exposed": False, "checked_via": "https://echo.example/ip", "error": "",
+                           "proxy": self.proxy})
+
+    def _delete_v1_proxy(self, params: dict, query: dict, body: dict, headers: dict) -> Reply:
+        with self.lock:
+            removed, self.proxy = self.proxy, None
+        return Reply(204) if removed else _error(404, "not_found", "No proxy is configured.")
 
     def _get_v1_ai_usage(self, params: dict, query: dict, body: dict, headers: dict) -> Reply:
         return Reply(200, {"days": int(query.get("days", 30)), "totals": [

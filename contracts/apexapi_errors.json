@@ -44,9 +44,31 @@
       ]
     },
     {
+      "code": "ai_daily_budget_exceeded",
+      "description": "Your daily AI token budget on this deployment is used up (cache tokens included); it resets at 00:00 UTC. Retry after Retry-After seconds.",
+      "http_status": 429,
+      "retryable": true,
+      "surfaces": [
+        "apexapi",
+        "mcp",
+        "result"
+      ]
+    },
+    {
       "code": "ai_endpoint_forbidden",
       "description": "The AI profile's base URL is not allowed by the endpoint policy.",
       "http_status": 502,
+      "retryable": false,
+      "surfaces": [
+        "apexapi",
+        "mcp",
+        "result"
+      ]
+    },
+    {
+      "code": "ai_kill_switch_engaged",
+      "description": "The operator has switched AI features off on this deployment; no further call is made to your AI provider. Profiles can still be listed and removed.",
+      "http_status": 503,
       "retryable": false,
       "surfaces": [
         "apexapi",
@@ -125,6 +147,17 @@
       "description": "Your AI provider is unavailable: an outage or a connection failure.",
       "http_status": 502,
       "retryable": true,
+      "surfaces": [
+        "apexapi",
+        "mcp",
+        "result"
+      ]
+    },
+    {
+      "code": "ai_unsupported",
+      "description": "The AI profile's model or endpoint does not support tool calls.",
+      "http_status": 502,
+      "retryable": false,
       "surfaces": [
         "apexapi",
         "mcp",
@@ -378,6 +411,15 @@
       ]
     },
     {
+      "code": "robots_disallowed",
+      "description": "robots.txt refused the page. A robots.txt answering 429, or 503 with Retry-After, refuses it too; on the browser engine, so does an unreadable one (a network error or another 5xx).",
+      "http_status": null,
+      "retryable": false,
+      "surfaces": [
+        "result"
+      ]
+    },
+    {
       "code": "settlement_failed",
       "description": "The job's charge could not be settled or confirmed; its failure_reason says whether anything was charged. Check it before sending the request again.",
       "http_status": null,
@@ -469,10 +511,22 @@
     "retryable": "Whether the same request can succeed if sent again later unchanged; honour Retry-After when the response has it.",
     "surfaces": "Where the code appears (see surfaces)."
   },
+  "mcp_tool_error": {
+    "fields": {
+      "code": "The code from this catalogue: the [code] the text starts with. Should an AI failure ever carry a kind this catalogue lacks (none does today), the text keeps that ai_<kind> and this is its family's code, ai_provider_error.",
+      "http_status": "The code's http_status, from this catalogue (null for an MCP-only code).",
+      "message": "What failed, as the text says it.",
+      "remedy": "What to do next, as the text's Fix says it.",
+      "request_id": "The JSON-RPC id of the tools/call request, as a string; null when the call had none.",
+      "retry_after_seconds": "When the error says when to retry, the seconds to wait; else null.",
+      "retryable": "The code's retryable, from this catalogue."
+    },
+    "meta_key": "apex-scrapy/error"
+  },
   "schema_version": 1,
   "surfaces": {
     "apexapi": "An ApexAPI error response: the envelope {\"error\": {\"code\", \"message\", \"request_id\"}}, or {\"detail\", \"code\"} for authentication, scope, request-schema and route failures.",
-    "mcp": "An MCP error: a tool or resource error whose text starts with [code], a JSON-RPC error whose data.code is the code, or, over MCP HTTP, a {\"error\", \"error_description\"} body.",
+    "mcp": "An MCP error: a tool error whose text starts with [code] and whose result carries the same failure as an object under _meta[\"apex-scrapy/error\"], a resource error whose text starts with [code], a JSON-RPC error whose data.code is the code, or, over MCP HTTP, a {\"error\", \"error_description\"} body.",
     "result": "The error_code of a failed scrape or asset result (the request itself succeeded). A failed result may also carry a request-error code met while the result was rendered."
   }
 }
