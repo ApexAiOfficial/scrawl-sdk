@@ -52,7 +52,7 @@ class _Request:
     method: str
     path: str
     params: dict[str, Any] = field(default_factory=dict)
-    json: Any = None
+    json: Any = field(default=None, repr=False)     # may carry credentials (a proxy URL, an AI key)
     idempotency_key: str | None = None
     raw: bool = False
     auth: bool = True
@@ -200,6 +200,31 @@ class _Endpoints:
     def ai_usage(self, *, days: int = 30) -> Any:
         """Your AI calls and tokens by provider, model and feature."""
         return self._call(_Request("GET", "/v1/ai/usage", params={"days": days}))
+
+    # -- your proxy: every job needs one that has passed a test ---------------------------------
+    def get_proxy(self) -> Any:
+        """Your proxy and whether it is usable; ``NotFoundError`` when none is registered."""
+        return self._call(_Request("GET", "/v1/proxy"))
+
+    def set_proxy(self, url: str | None = None, *, scheme: str | None = None, host: str | None = None,
+                  port: int | None = None, username: str | None = None, password: str | None = None,
+                  label: str | None = None) -> Any:
+        """Register or replace your proxy: ``url`` (``scheme://[user:pass@]host:port``) or scheme, host and port.
+
+        The credentials are stored encrypted and never returned. The endpoint must be a public address.
+        Scraping stays locked (``egress_required``) until :meth:`test_proxy` passes.
+        """
+        body = _clean({"url": url, "scheme": scheme, "host": host, "port": port, "username": username,
+                       "password": password, "label": label})
+        return self._call(_Request("PUT", "/v1/proxy", json=body))
+
+    def test_proxy(self) -> Any:
+        """Send one real HTTPS request through your proxy; a pass (``ok``) unlocks scraping."""
+        return self._call(_Request("POST", "/v1/proxy/test"))
+
+    def remove_proxy(self) -> Any:
+        """Remove your proxy (scraping is locked again)."""
+        return self._call(_Request("DELETE", "/v1/proxy"))
 
     # -- crawls and jobs -------------------------------------------------------------------------
     def crawl(self, crawl_target: str, *, export_format: str | None = None, max_items: int | None = None,

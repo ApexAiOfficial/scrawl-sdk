@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "scrawl-sdk"
-version = "0.1.0"
+version = "0.1.1"
 description = "Official Python SDK and CLI for Scrawl: URL to Markdown or structured JSON, site maps, batches, crawls into versioned datasets"
 readme = "README.md"
 requires-python = ">=3.10"

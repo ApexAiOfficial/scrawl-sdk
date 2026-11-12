@@ -87,6 +87,62 @@
         "enums": {}
       }
     },
+    "GET /v1/proxy": {
+      "python": "get_proxy",
+      "typescript": "getProxy",
+      "cli": "proxy show",
+      "sends": {
+        "auth": true,
+        "idempotency_key": false,
+        "query": [],
+        "body": null,
+        "enums": {}
+      }
+    },
+    "PUT /v1/proxy": {
+      "python": "set_proxy",
+      "typescript": "setProxy",
+      "cli": "proxy set",
+      "sends": {
+        "auth": true,
+        "idempotency_key": false,
+        "query": [],
+        "body": [
+          "url",
+          "scheme",
+          "host",
+          "port",
+          "username",
+          "password",
+          "label"
+        ],
+        "enums": {}
+      }
+    },
+    "DELETE /v1/proxy": {
+      "python": "remove_proxy",
+      "typescript": "removeProxy",
+      "cli": "proxy remove",
+      "sends": {
+        "auth": true,
+        "idempotency_key": false,
+        "query": [],
+        "body": null,
+        "enums": {}
+      }
+    },
+    "POST /v1/proxy/test": {
+      "python": "test_proxy",
+      "typescript": "testProxy",
+      "cli": "proxy test",
+      "sends": {
+        "auth": true,
+        "idempotency_key": false,
+        "query": [],
+        "body": null,
+        "enums": {}
+      }
+    },
     "GET /v1/artifacts/{job_id}": {
       "python": "list_artifacts",
       "typescript": "listArtifacts",
@@ -758,8 +814,16 @@
       "status": 502,
       "retryable": false
     },
+    "ai_daily_budget_exceeded": {
+      "status": 429,
+      "retryable": true
+    },
     "ai_endpoint_forbidden": {
       "status": 502,
+      "retryable": false
+    },
+    "ai_kill_switch_engaged": {
+      "status": 503,
       "retryable": false
     },
     "ai_malformed_output": {
@@ -789,6 +853,10 @@
     "ai_unavailable": {
       "status": 502,
       "retryable": true
+    },
+    "ai_unsupported": {
+      "status": 502,
+      "retryable": false
     },
     "browser_unavailable": {
       "status": 503,
@@ -837,6 +905,10 @@
     "render_interrupted": {
       "status": null,
       "retryable": true
+    },
+    "robots_disallowed": {
+      "status": null,
+      "retryable": false
     },
     "settlement_failed": {
       "status": null,

@@ -49,6 +49,39 @@ export interface AiUsageInfo extends ApiObject {
 /** Which engine fetched a page: the static fetcher, or a sandboxed browser. */
 export type ScrapeEngine = "static" | "browser";
 
+export type ProxyScheme = "http" | "https" | "socks5" | "socks5h";
+
+/** Your proxy. The username and password are never returned. */
+export interface ProxyInfo extends ApiObject {
+  scheme: ProxyScheme;
+  host: string;
+  port: number;
+  has_credentials: boolean;
+  label: string;
+  enabled: boolean;
+  /** unverified, valid, invalid or external_blocked */
+  validation_state: string;
+  /** True once a test has passed: scraping is unlocked. */
+  usable: boolean;
+  remote_dns: boolean;
+  last_validated_at: string;
+  last_exit_ip: string;
+  last_latency_ms: number;
+  last_error: string;
+  sanitized_url: string;
+}
+
+export interface ProxyTestResult extends ApiObject {
+  ok: boolean;
+  validation_state: string;
+  exit_ip: string;
+  latency_ms: number;
+  host_ip_exposed: boolean;
+  checked_via: string;
+  error: string;
+  proxy: ProxyInfo;
+}
+
 /** How a browser render went; every string in it is an enum value. */
 export interface BrowserRenderInfo extends ApiObject {
   settle?: string | null;
@@ -476,6 +509,12 @@ export declare class Scrawl {
   testAiProvider(profile: string): Promise<AiTestResult>;
   aiUsage(options?: { days?: number }): Promise<AiUsage>;
 
+  getProxy(): Promise<ProxyInfo>;
+  setProxy(options: { url?: string; scheme?: ProxyScheme; host?: string; port?: number; username?: string;
+    password?: string; label?: string }): Promise<ProxyInfo>;
+  testProxy(): Promise<ProxyTestResult>;
+  removeProxy(): Promise<ApiObject | null>;
+
   crawl(crawlTarget: string, options?: { exportFormat?: ExportFormat; maxItems?: number; maxSeconds?: number; idempotencyKey?: string }): Promise<CrawlLaunch>;
   getJob(jobId: string, options?: { waitSeconds?: number }): Promise<Job>;
   listJobs(options?: { limit?: number; status?: string; cursor?: string }): Promise<{ jobs: Job[]; next_cursor?: string | null } & ApiObject>;
@@ -550,7 +589,9 @@ export declare const ErrorCode: {
   readonly AI_AUTH: "ai_auth";
   readonly AI_BAD_REQUEST: "ai_bad_request";
   readonly AI_CONTEXT_OVERFLOW: "ai_context_overflow";
+  readonly AI_DAILY_BUDGET_EXCEEDED: "ai_daily_budget_exceeded";
   readonly AI_ENDPOINT_FORBIDDEN: "ai_endpoint_forbidden";
+  readonly AI_KILL_SWITCH_ENGAGED: "ai_kill_switch_engaged";
   readonly AI_MALFORMED_OUTPUT: "ai_malformed_output";
   readonly AI_PROVIDER_ERROR: "ai_provider_error";
   readonly AI_QUOTA: "ai_quota";
@@ -558,6 +599,7 @@ export declare const ErrorCode: {
   readonly AI_REFUSED: "ai_refused";
   readonly AI_TIMEOUT: "ai_timeout";
   readonly AI_UNAVAILABLE: "ai_unavailable";
+  readonly AI_UNSUPPORTED: "ai_unsupported";
   readonly BROWSER_UNAVAILABLE: "browser_unavailable";
   readonly TEMPORARILY_UNAVAILABLE: "temporarily_unavailable";
   readonly UNAVAILABLE: "unavailable";
@@ -570,6 +612,7 @@ export declare const ErrorCode: {
   readonly LISTEN_EXPIRED: "listen_expired";
   readonly PREFLIGHT_DENIED: "preflight_denied";
   readonly RENDER_INTERRUPTED: "render_interrupted";
+  readonly ROBOTS_DISALLOWED: "robots_disallowed";
   readonly SETTLEMENT_FAILED: "settlement_failed";
   readonly TOO_MANY_STREAMS: "too_many_streams";
   readonly RENDER_NOT_SUPPORTED: "render_not_supported";
