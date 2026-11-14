@@ -15,7 +15,7 @@ AI provider, and, where the feature is enabled, extract a page's files and media
 | Area | Today |
 | --- | --- |
 | Source | Public in this repository, under the [Apache License 2.0](LICENSE) |
-| Releases | Python SDK 0.1.0 (tag `py-v0.1.0`) and TypeScript SDK 0.1.0 (tag `ts-v0.1.0`), published as [GitHub Releases](https://github.com/ApexAiOfficial/scrawl-sdk/releases) with installable files |
+| Releases | Python SDK 0.1.1 (tag `py-v0.1.1`) and TypeScript SDK 0.1.1 (tag `ts-v0.1.1`), published as [GitHub Releases](https://github.com/ApexAiOfficial/scrawl-sdk/releases) with installable files |
 | Package registries | **Not on PyPI or npm.** Install from a GitHub Release, a tag or a clone (see [Installation](#installation)) |
 | Maturity | Pre-1.0 (alpha). Until 1.0, a minor version may change the SDK API (see [Versioning](#versioning-and-compatibility)) |
 | What you need | Access to Scrawl: the endpoint and the API key ApexAi provides for your account. The SDKs cannot create keys and have no built-in remote endpoint |
@@ -82,17 +82,17 @@ From the GitHub Release (the built wheel):
 
 ```bash
 python -m venv .venv && . .venv/bin/activate
-python -m pip install https://github.com/ApexAiOfficial/scrawl-sdk/releases/download/py-v0.1.0/scrawl_sdk-0.1.0-py3-none-any.whl
+python -m pip install https://github.com/ApexAiOfficial/scrawl-sdk/releases/download/py-v0.1.1/scrawl_sdk-0.1.1-py3-none-any.whl
 scrawl --version
 ```
 
 From the release tag, built from source:
 
 ```bash
-python -m pip install "git+https://github.com/ApexAiOfficial/scrawl-sdk.git@py-v0.1.0#subdirectory=python"
+python -m pip install "git+https://github.com/ApexAiOfficial/scrawl-sdk.git@py-v0.1.1#subdirectory=python"
 ```
 
-From a clone (the `main` branch, or `git checkout py-v0.1.0` for the release):
+From a clone (the `main` branch, or `git checkout py-v0.1.1` for the release):
 
 ```bash
 git clone https://github.com/ApexAiOfficial/scrawl-sdk.git
@@ -106,7 +106,7 @@ pip downloads `httpx` from PyPI as usual, and, when it builds from source, the `
 In your project's directory, from the GitHub Release (the packed tarball):
 
 ```bash
-npm install https://github.com/ApexAiOfficial/scrawl-sdk/releases/download/ts-v0.1.0/apexaiofficial-scrawl-0.1.0.tgz
+npm install https://github.com/ApexAiOfficial/scrawl-sdk/releases/download/ts-v0.1.1/apexaiofficial-scrawl-0.1.1.tgz
 ```
 
 Or from a clone (npm links the folder as a `file:` dependency, so keep the clone where it is):
@@ -123,8 +123,8 @@ Each release lists a SHA-256 digest for every file. To compare a file you downlo
 `shasum -a 256`):
 
 ```bash
-gh release view py-v0.1.0 --repo ApexAiOfficial/scrawl-sdk --json assets --jq '.assets[] | "\(.digest)  \(.name)"'
-sha256sum scrawl_sdk-0.1.0-py3-none-any.whl
+gh release view py-v0.1.1 --repo ApexAiOfficial/scrawl-sdk --json assets --jq '.assets[] | "\(.digest)  \(.name)"'
+sha256sum scrawl_sdk-0.1.1-py3-none-any.whl
 ```
 
 ### Package registries (not yet)
@@ -574,7 +574,7 @@ Start with `scrawl doctor`: it names the failing check (`base_url`, `tls`, `reac
   a fingerprint. The CLI reads it only from an environment variable or stdin, and its usage
   errors never repeat what you typed.
 - **What is contacted.** The SDKs and the CLI send requests only to the Scrawl endpoint at your base URL, with a
-  `User-Agent` naming the SDK and its version (`scrawl-python/0.1.0`, `scrawl-ts/0.1.0`). They collect no
+  `User-Agent` naming the SDK and its version (`scrawl-python/0.1.1`, `scrawl-ts/0.1.1`). They collect no
   telemetry. Your AI provider is called by Scrawl, not by the SDK. The Python SDK uses `httpx`, which
   honours the standard proxy environment variables (`HTTPS_PROXY`, `NO_PROXY` and others) unless you pass your own
   `http_client`.

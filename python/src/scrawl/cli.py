@@ -33,6 +33,7 @@ from ._errors import (
     APIConnectionError,
     AuthenticationError,
     ConfigurationError,
+    NotFoundError,
     PermissionDeniedError,
     ScrawlError,
 )
@@ -51,6 +52,8 @@ ASSET_CLASSES = ("images", "video", "audio", "documents", "data", "web_assets")
 FORMATS = ("markdown", "links", "html", "json")
 FILTER_OPS = ("eq", "ne", "lt", "lte", "gt", "gte", "contains", "in", "exists")
 DEFAULT_AI_KEY_ENV = "SCRAWL_AI_API_KEY"
+DEFAULT_PROXY_URL_ENV = "SCRAWL_PROXY_URL"
+MAX_PROXY_URL = 2048
 _JOB_ACTIVE = frozenset({"PENDING", "RUNNING"})
 
 
@@ -565,6 +568,47 @@ def _cmd_ai_usage(client: Scrawl, args: argparse.Namespace) -> int:
     return EXIT_OK
 
 
+# -- your proxy (every job needs one that has passed a test) ----------------------------------------
+
+def _proxy_url(args: argparse.Namespace) -> str:
+    """The proxy URL from stdin (``--url-stdin``) or an environment variable; never from argv."""
+    if args.url_stdin:
+        url = sys.stdin.readline().strip()
+        if not url:
+            raise ConfigurationError("No proxy URL on stdin")
+    else:
+        name = args.url_env or DEFAULT_PROXY_URL_ENV
+        url = os.environ.get(name, "").strip()
+        if not url:
+            raise ConfigurationError(f"No proxy URL: set {name} (or pipe it with --url-stdin)")
+    if len(url) > MAX_PROXY_URL:
+        raise ConfigurationError(f"The proxy URL is longer than {MAX_PROXY_URL} characters")
+    return url
+
+
+def _cmd_proxy_show(client: Scrawl, args: argparse.Namespace) -> int:
+    _emit(client.get_proxy(), as_json=True)
+    return EXIT_OK
+
+
+def _cmd_proxy_set(client: Scrawl, args: argparse.Namespace) -> int:
+    _emit(client.set_proxy(_proxy_url(args), label=args.label), as_json=True)
+    print("Saved. Scraping stays locked until `scrawl proxy test` passes.", file=sys.stderr)
+    return EXIT_OK
+
+
+def _cmd_proxy_test(client: Scrawl, args: argparse.Namespace) -> int:
+    result = client.test_proxy()
+    _emit(result, as_json=True)
+    return EXIT_OK if isinstance(result, dict) and result.get("ok") else EXIT_FAILED
+
+
+def _cmd_proxy_remove(client: Scrawl, args: argparse.Namespace) -> int:
+    client.remove_proxy()
+    _emit({"removed": True}, as_json=True)
+    return EXIT_OK
+
+
 def _cmd_balance(client: Scrawl, args: argparse.Namespace) -> int:
     _emit(client.credit_balance(), as_json=True)
     return EXIT_OK
@@ -651,7 +695,26 @@ def _doctor_checks(client: Scrawl, add: Any, checks: list[dict[str, str]], args:
         return _doctor_report(checks, base, args.json, EXIT_ERROR)
     else:
         add("auth", "ok", "the API key is accepted (GET /v1/jobs)")
+    _doctor_proxy(client, add)
     return _doctor_report(checks, base, args.json, EXIT_OK)
+
+
+def _doctor_proxy(client: Scrawl, add: Any) -> None:
+    """Whether the key's subject has a proxy that passed its test: every job needs one."""
+    try:
+        proxy = client.get_proxy()
+    except NotFoundError:
+        add("proxy", "warn", "no proxy yet: every job needs your own (scrawl proxy set, then scrawl proxy test)")
+    except PermissionDeniedError:
+        add("proxy", "warn", "cannot read the proxy: the API key lacks the scrape:write scope")
+    except ScrawlError as exc:
+        add("proxy", "warn", f"GET /v1/proxy: {exc}")
+    else:
+        if isinstance(proxy, dict) and proxy.get("usable"):
+            add("proxy", "ok", f"{proxy.get('sanitized_url')} passed its test {proxy.get('last_validated_at')}")
+        else:
+            state = proxy.get("validation_state") if isinstance(proxy, dict) else "?"
+            add("proxy", "warn", f"the proxy is {state}: run scrawl proxy test (jobs are refused until it passes)")
 
 
 # -- the parser ----------------------------------------------------------------------------------------
@@ -854,6 +917,22 @@ def build_parser() -> argparse.ArgumentParser:
     p = providers.add_parser("usage", help="your AI calls and tokens by provider, model and feature")
     p.add_argument("--days", type=int, default=30)
     p.set_defaults(handler=_cmd_ai_usage)
+
+    proxy = sub.add_parser("proxy", help="your proxy: every job needs one that has passed a test").add_subparsers(
+        dest="proxy_command", required=True, metavar="ACTION")
+    p = proxy.add_parser("show", help="your proxy and whether it is usable (never the credentials)")
+    p.set_defaults(handler=_cmd_proxy_show)
+    p = proxy.add_parser("set", help="register or replace it; the URL comes from an env var or stdin")
+    url = p.add_mutually_exclusive_group()
+    url.add_argument("--url-env", type=_env_name, metavar="NAME",
+                     help=f"read the proxy URL from this environment variable (default {DEFAULT_PROXY_URL_ENV})")
+    url.add_argument("--url-stdin", action="store_true", help="read the proxy URL from the first line of stdin")
+    p.add_argument("--label", help="your name for it, for example the provider")
+    p.set_defaults(handler=_cmd_proxy_set)
+    p = proxy.add_parser("test", help="one real HTTPS request through it; a pass unlocks jobs (exit 1 if not)")
+    p.set_defaults(handler=_cmd_proxy_test)
+    p = proxy.add_parser("remove", help="remove it (jobs are refused again)")
+    p.set_defaults(handler=_cmd_proxy_remove)
 
     def asset_options(p: argparse.ArgumentParser) -> None:
         p.add_argument("url")

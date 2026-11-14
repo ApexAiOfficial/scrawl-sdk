@@ -42,6 +42,11 @@ DIGEST_ALGORITHM = "sha256sum-listing-v1"
 ERROR_CATALOGUE = "apexapi_errors.json"
 CATALOGUE_SCHEMA_VERSION = 1
 CATALOGUE_KEYS = ("schema_version", "fields", "surfaces", "errors")
+#: Optional top-level blocks the catalogue may carry. ``mcp_tool_error`` (backend 0.8.0+) documents the structured
+#: error MCP tool results carry: ``{"fields": {name: text}, "meta_key": str}``. The SDKs do not use MCP, so it is
+#: checked for shape and otherwise ignored.
+CATALOGUE_OPTIONAL_KEYS = ("mcp_tool_error",)
+MCP_TOOL_ERROR_KEYS = ("fields", "meta_key")
 CATALOGUE_ENTRY_KEYS = ("code", "http_status", "retryable", "description", "surfaces")
 _CODE = re.compile(r"[a-z][a-z0-9_]{0,63}")
 HTTP_METHODS = ("get", "put", "post", "delete", "patch", "head", "options")
@@ -413,14 +418,24 @@ def error_catalogue_codes(catalogue: Any) -> dict[str, dict[str, Any]]:
     """The codes of the backend's error catalogue, keyed by code, in catalogue order; strict about its shape.
 
     The catalogue is ``{"schema_version": 1, "fields": {name: text}, "surfaces": {name: text}, "errors":
-    [{"code", "http_status": int | null, "retryable": bool, "description", "surfaces": [name, ...]}]}``.
+    [{"code", "http_status": int | null, "retryable": bool, "description", "surfaces": [name, ...]}]}``, optionally
+    with ``"mcp_tool_error": {"fields": {name: text}, "meta_key": str}``.
     Anything else (a missing or extra key, a wrong type, a duplicate code, a surface the glossary does not
     define, an ``apexapi`` error without an HTTP status, another schema version) raises ``CatalogueError``:
     a format this tool does not know is refused, never guessed at.
     """
     if not isinstance(catalogue, dict):
         raise CatalogueError("the catalogue must be a JSON object")
-    _exact_keys("the catalogue", catalogue, CATALOGUE_KEYS)
+    _exact_keys("the catalogue", {key: value for key, value in catalogue.items() if key not in CATALOGUE_OPTIONAL_KEYS},
+                CATALOGUE_KEYS)
+    if "mcp_tool_error" in catalogue:
+        block = catalogue["mcp_tool_error"]
+        if not isinstance(block, dict):
+            raise CatalogueError("'mcp_tool_error' must be an object")
+        _exact_keys("'mcp_tool_error'", block, MCP_TOOL_ERROR_KEYS)
+        _glossary("'mcp_tool_error' 'fields'", block["fields"])
+        if not isinstance(block["meta_key"], str) or not block["meta_key"].strip():
+            raise CatalogueError("'mcp_tool_error' 'meta_key' must be non-empty text")
     version = catalogue["schema_version"]
     if type(version) is not int or version != CATALOGUE_SCHEMA_VERSION:
         raise CatalogueError(f"schema_version {version!r} is not {CATALOGUE_SCHEMA_VERSION}, the one this tool reads")

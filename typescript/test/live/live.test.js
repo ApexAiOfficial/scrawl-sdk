@@ -4,6 +4,9 @@
 //   SCRAWL_LIVE_BASE_URL      the server, e.g. https://scrawl.example or http://127.0.0.1:8088
 //   SCRAWL_LIVE_API_KEY       a key with the default scopes (scrape:write, jobs:read, artifacts:read, credits:read)
 // Deterministic targets and optional areas (each area is skipped, with its reason, until its variables are set):
+//   SCRAWL_LIVE_PROXY_URL     the key subject's own proxy, scheme://[user:pass@]host:port: every job needs one that
+//                             has passed a test, so the suite registers and tests it first (and the proxy test
+//                             removes and re-registers it); without it, the key's subject must already have one
 //   SCRAWL_LIVE_TARGET_URL    a stable page the server may fetch (required for anything that fetches)
 //   SCRAWL_LIVE_CRAWL_TARGET  a crawl target the key may run (crawl, datasets, search, documents, quarantine)
 //   SCRAWL_LIVE_AI_PROVIDER, SCRAWL_LIVE_AI_API_KEY [SCRAWL_LIVE_AI_MODEL, SCRAWL_LIVE_AI_BASE_URL]
@@ -16,7 +19,7 @@
 
 import assert from "node:assert/strict";
 import { createHash, randomUUID } from "node:crypto";
-import { test } from "node:test";
+import { before, test } from "node:test";
 
 import { AuthenticationError, ConflictError, ErrorCode, NotFoundError, Scrawl } from "../../src/index.js";
 
@@ -45,6 +48,29 @@ const once = (make) => {
   let promise = null;
   return () => (promise ??= make());
 };
+
+before(async () => {
+  // Every job needs the key subject's own proxy, tested: register it before anything fetches.
+  if (skip || !env.SCRAWL_LIVE_PROXY_URL) return;
+  await client.setProxy({ url: env.SCRAWL_LIVE_PROXY_URL, label: "scrawl-sdk live suite" });
+  const tested = await client.testProxy();
+  assert.equal(tested.ok, true, tested.error);
+});
+
+test("the proxy gate locks and unlocks", covers("GET /v1/proxy", "DELETE /v1/proxy", "PUT /v1/proxy",
+  "POST /v1/proxy/test"), async (t) => {
+  if (!need(t, "SCRAWL_LIVE_PROXY_URL")) return;
+  assert.equal((await client.getProxy()).usable, true);
+  await client.removeProxy();
+  await assert.rejects(client.getProxy(), NotFoundError);
+  const saved = await client.setProxy({ url: env.SCRAWL_LIVE_PROXY_URL, label: "scrawl-sdk live suite" });
+  assert.equal(saved.usable, false);
+  assert.ok(!JSON.stringify(saved).includes(new URL(env.SCRAWL_LIVE_PROXY_URL).password || "\u0000"),
+    "the proxy password is never returned");
+  const tested = await client.testProxy();
+  assert.equal(tested.ok, true, tested.error);
+  assert.equal(tested.host_ip_exposed, false);
+});
 
 const page = once(async () => {
   let result = await client.scrape(env.SCRAWL_LIVE_TARGET_URL, { formats: ["markdown", "links"], waitSeconds: 60 });

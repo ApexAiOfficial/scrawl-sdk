@@ -17,7 +17,7 @@ and escaped in JSON output. Usage errors never repeat what you typed, in case it
 ## Setup check
 
 ```bash
-scrawl doctor                      # base URL, TLS, reachability (GET /v1/health) and the API key
+scrawl doctor                      # base URL, TLS, reachability (GET /v1/health), the API key and your proxy
 scrawl --json doctor               # the same checks as JSON: {"ok": ..., "checks": [...]}
 ```
 
@@ -84,6 +84,22 @@ scrawl ask "Which lamps cost under 20 EUR?" --dataset ds_123        # the answer
 
 `--where FIELD OP VALUE`: `OP` is one of `eq`, `ne`, `lt`, `lte`, `gt`, `gte`, `contains`, `in`, `exists`;
 `VALUE` is parsed as JSON when it can be (`20`, `true`, `["a","b"]`) and is text otherwise.
+
+## Your proxy
+
+Every job leaves through your own proxy, and nothing is fetched until it has passed a test.
+
+```bash
+scrawl proxy set --label "my provider"           # URL from SCRAWL_PROXY_URL
+scrawl proxy set --url-env MY_PROXY_URL          # URL from another variable
+scrawl proxy set --url-stdin < proxy-url.txt     # URL from the first line of stdin
+scrawl proxy test                                # one real HTTPS request through it; exit 1 if it fails
+scrawl proxy show                                # the proxy (credentials masked) and whether it is usable
+scrawl proxy remove                              # jobs are refused again until you set and test another
+```
+
+The URL is `scheme://[user:pass@]host:port` with `http`, `https`, `socks5` or `socks5h`. It is never a
+command-line argument, and the username and password are never returned.
 
 ## Your AI providers
 

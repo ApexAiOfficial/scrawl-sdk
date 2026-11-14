@@ -56,6 +56,10 @@ def _argv(route: str, tmp: Path) -> list[str]:
         "POST /v1/ai/providers/{profile}/default": ["ai", "providers", "default", "p"],
         "POST /v1/ai/providers/{profile}/test": ["ai", "providers", "test", "p"],
         "GET /v1/ai/usage": ["ai", "providers", "usage", "--days", "7"],
+        "GET /v1/proxy": ["proxy", "show"],
+        "PUT /v1/proxy": ["proxy", "set", "--label", "provider"],
+        "POST /v1/proxy/test": ["proxy", "test"],
+        "DELETE /v1/proxy": ["proxy", "remove"],
         "POST /v1/crawls": ["crawl", "example-target", "--export-format", "csv", "--max-items", "5",
                             "--max-seconds", "60"],
         "GET /v1/jobs/{job_id}": ["job", "j1", "--wait", "5"],
@@ -90,10 +94,14 @@ def _argv(route: str, tmp: Path) -> list[str]:
 
 @pytest.mark.parametrize("route", sorted(COVERED))
 def test_each_covered_operation_is_reachable_from_the_cli(route: str, tmp_path: Path, monkeypatch, capsys) -> None:
-    from fake_apexapi import NOW, FakeApexAPI
+    from fake_apexapi import API_KEY, NOW, FakeApexAPI
 
     monkeypatch.setenv("SCRAWL_AI_API_KEY", "sk-ai-test-key")
+    monkeypatch.setenv("SCRAWL_PROXY_URL", "http://proxy.example:8000")
     fake = FakeApexAPI()
+    fake.handle("PUT", "/v1/proxy", {"Authorization": "Bearer " + API_KEY},
+                b'{"scheme": "http", "host": "proxy.example", "port": 8000}')
+    fake.requests.clear()
     fake.profiles["p"] = {"profile": "p", "provider": "example", "model": "m", "base_url": "https://ai.example/v1",
                           "key_fingerprint": "sha256:0", "is_default": True, "created_at": NOW, "updated_at": NOW}
     code = cli_main(_argv(route, tmp_path), client=fake_client(fake))
@@ -311,7 +319,8 @@ def test_doctor_reports_a_ready_setup(capsys) -> None:
     for check in ("base_url", "tls", "reachable", "auth"):
         assert re.search(rf"^ok\s+{check}\b", out.out, re.M), (check, out.out)
     assert "sk-test" not in out.out + out.err
-    assert [r.url.path for r in rec.requests] == ["/v1/health", "/v1/jobs"]
+    assert [r.url.path for r in rec.requests] == ["/v1/health", "/v1/jobs", "/v1/proxy"]
+    assert re.search(r"^(ok|warn)\s+proxy\b", out.out, re.M), out.out          # every job needs a tested proxy
     assert "Authorization" not in rec.requests[0].headers
 
 
