@@ -277,6 +277,38 @@
     },
     {
       "auth": "api_key",
+      "method": "DELETE",
+      "path": "/v1/proxy",
+      "scopes_any_of": [
+        "scrape:write"
+      ]
+    },
+    {
+      "auth": "api_key",
+      "method": "GET",
+      "path": "/v1/proxy",
+      "scopes_any_of": [
+        "scrape:write"
+      ]
+    },
+    {
+      "auth": "api_key",
+      "method": "PUT",
+      "path": "/v1/proxy",
+      "scopes_any_of": [
+        "scrape:write"
+      ]
+    },
+    {
+      "auth": "api_key",
+      "method": "POST",
+      "path": "/v1/proxy/test",
+      "scopes_any_of": [
+        "scrape:write"
+      ]
+    },
+    {
+      "auth": "api_key",
       "method": "GET",
       "path": "/v1/results/{job_id}",
       "scopes_any_of": [
@@ -400,148 +432,219 @@
     "tools": [
       {
         "name": "apex_scrapy_activate_dataset_version",
-        "scope": "scrape:write"
+        "scopes_any_of": [
+          "scrape:write"
+        ]
       },
       {
         "name": "apex_scrapy_ai_status",
-        "scope": "artifacts:read"
+        "scopes_any_of": [
+          "artifacts:read"
+        ]
       },
       {
         "name": "apex_scrapy_ask",
-        "scope": "ai:use"
+        "scopes_any_of": [
+          "ai:use"
+        ]
       },
       {
         "name": "apex_scrapy_asset_result",
-        "scope": "artifacts:read"
+        "scopes_any_of": [
+          "artifacts:read"
+        ]
       },
       {
         "name": "apex_scrapy_batch_scrape",
-        "scope": "scrape:write"
+        "scopes_any_of": [
+          "scrape:write"
+        ]
       },
       {
         "name": "apex_scrapy_batch_status",
-        "scope": "artifacts:read"
+        "scopes_any_of": [
+          "artifacts:read"
+        ]
       },
       {
         "name": "apex_scrapy_cancel_job",
-        "scope": "scrape:write"
+        "scopes_any_of": [
+          "scrape:write",
+          "ai:use"
+        ]
       },
       {
         "name": "apex_scrapy_check_project",
-        "scope": "scrape:write"
+        "scopes_any_of": [
+          "scrape:write"
+        ]
       },
       {
         "name": "apex_scrapy_credit_balance",
-        "scope": "credits:read"
+        "scopes_any_of": [
+          "credits:read"
+        ]
       },
       {
         "name": "apex_scrapy_diff_dataset_versions",
-        "scope": "artifacts:read"
+        "scopes_any_of": [
+          "artifacts:read"
+        ]
       },
       {
         "name": "apex_scrapy_extract",
-        "scope": "ai:use"
+        "scopes_any_of": [
+          "ai:use"
+        ]
       },
       {
         "name": "apex_scrapy_extract_assets",
-        "scope": "scrape:write"
+        "scopes_any_of": [
+          "scrape:write"
+        ]
       },
       {
         "name": "apex_scrapy_extract_dataset",
-        "scope": "ai:use"
+        "scopes_any_of": [
+          "ai:use"
+        ]
       },
       {
         "name": "apex_scrapy_get_dataset",
-        "scope": "artifacts:read"
+        "scopes_any_of": [
+          "artifacts:read"
+        ]
       },
       {
         "name": "apex_scrapy_get_job",
-        "scope": "jobs:read"
+        "scopes_any_of": [
+          "jobs:read"
+        ]
       },
       {
         "name": "apex_scrapy_list_artifacts",
-        "scope": "artifacts:read"
+        "scopes_any_of": [
+          "artifacts:read"
+        ]
       },
       {
         "name": "apex_scrapy_list_capabilities",
-        "scope": null
+        "scopes_any_of": []
       },
       {
         "name": "apex_scrapy_list_dataset_fields",
-        "scope": "artifacts:read"
+        "scopes_any_of": [
+          "artifacts:read"
+        ]
       },
       {
         "name": "apex_scrapy_list_datasets",
-        "scope": "artifacts:read"
+        "scopes_any_of": [
+          "artifacts:read"
+        ]
       },
       {
         "name": "apex_scrapy_list_jobs",
-        "scope": "jobs:read"
+        "scopes_any_of": [
+          "jobs:read"
+        ]
       },
       {
         "name": "apex_scrapy_list_spiders",
-        "scope": "scrape:write"
+        "scopes_any_of": [
+          "scrape:write"
+        ]
+      },
+      {
+        "name": "apex_scrapy_map_result",
+        "scopes_any_of": [
+          "artifacts:read"
+        ]
       },
       {
         "name": "apex_scrapy_map_url",
-        "scope": "scrape:write"
+        "scopes_any_of": [
+          "scrape:write"
+        ]
       },
       {
         "name": "apex_scrapy_query_dataset",
-        "scope": "artifacts:read"
+        "scopes_any_of": [
+          "artifacts:read"
+        ]
       },
       {
         "name": "apex_scrapy_query_dataset_version",
-        "scope": "artifacts:read"
+        "scopes_any_of": [
+          "artifacts:read"
+        ]
       },
       {
         "name": "apex_scrapy_quote_assets",
-        "scope": "scrape:write"
+        "scopes_any_of": [
+          "scrape:write"
+        ]
       },
       {
         "name": "apex_scrapy_read_artifact",
-        "scope": "artifacts:read"
+        "scopes_any_of": [
+          "artifacts:read"
+        ]
       },
       {
         "name": "apex_scrapy_scrape_result",
-        "scope": "artifacts:read"
+        "scopes_any_of": [
+          "artifacts:read"
+        ]
       },
       {
         "name": "apex_scrapy_scrape_url",
-        "scope": "scrape:write"
+        "scopes_any_of": [
+          "scrape:write"
+        ]
       },
       {
         "name": "apex_scrapy_set_record_quarantine",
-        "scope": "scrape:write"
+        "scopes_any_of": [
+          "scrape:write"
+        ]
       },
       {
         "name": "apex_scrapy_start_crawl",
-        "scope": "scrape:write"
+        "scopes_any_of": [
+          "scrape:write"
+        ]
       },
       {
         "name": "apex_scrapy_status",
-        "scope": null
+        "scopes_any_of": []
       },
       {
         "name": "apex_scrapy_version",
-        "scope": "scrape:write"
+        "scopes_any_of": [
+          "scrape:write"
+        ]
       },
       {
         "name": "fetch",
-        "scope": "artifacts:read"
+        "scopes_any_of": [
+          "artifacts:read"
+        ]
       },
       {
         "name": "search",
-        "scope": "artifacts:read"
+        "scopes_any_of": [
+          "artifacts:read"
+        ]
       }
     ]
   },
-  "rule": "A key holds a scope when it names it or holds '*'. A route needs one of scopes_any_of when auth is api_key; admin_token routes need the operator's admin token instead, and none routes need no credential. Two requests need more than their route or tool lists: the json scrape format needs ai:use (ApexAPI and MCP), and cancelling a job through ApexAPI needs the scope that starts that kind of job (ai:use for an AI extraction job, else scrape:write). An MCP tool with a null scope needs only a key.",
+  "rule": "A key holds a scope when it names it or holds '*'. A route needs one of scopes_any_of when auth is api_key; admin_token routes need the operator's admin token instead, and none routes need no credential. An MCP tool needs one of its scopes_any_of; an empty list needs only a key. Two requests need more than their route or tool lists: the json scrape format needs ai:use (ApexAPI and MCP), and cancelling a job (ApexAPI and MCP) needs the scope that starts that kind of job (ai:use for an AI extraction job, else scrape:write).",
   "schema_version": 1,
   "scopes": [
     {
       "default": true,
-      "description": "Start and quote jobs (Scrapy commands, scrape, map, batch, crawl and asset extraction), change datasets (activate a version, quarantine a record) and cancel jobs.",
+      "description": "Start and quote jobs (Scrapy commands, scrape, map, batch, crawl and asset extraction), register, test and remove the caller's own proxy (which every job needs), change datasets (activate a version, quarantine a record) and cancel jobs.",
       "name": "scrape:write"
     },
     {

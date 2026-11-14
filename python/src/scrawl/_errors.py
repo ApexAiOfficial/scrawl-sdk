@@ -43,7 +43,9 @@ class ErrorCode(str, Enum):
     AI_AUTH = "ai_auth"
     AI_BAD_REQUEST = "ai_bad_request"
     AI_CONTEXT_OVERFLOW = "ai_context_overflow"
+    AI_DAILY_BUDGET_EXCEEDED = "ai_daily_budget_exceeded"
     AI_ENDPOINT_FORBIDDEN = "ai_endpoint_forbidden"
+    AI_KILL_SWITCH_ENGAGED = "ai_kill_switch_engaged"
     AI_MALFORMED_OUTPUT = "ai_malformed_output"
     AI_PROVIDER_ERROR = "ai_provider_error"
     AI_QUOTA = "ai_quota"
@@ -51,6 +53,7 @@ class ErrorCode(str, Enum):
     AI_REFUSED = "ai_refused"
     AI_TIMEOUT = "ai_timeout"
     AI_UNAVAILABLE = "ai_unavailable"
+    AI_UNSUPPORTED = "ai_unsupported"
     BROWSER_UNAVAILABLE = "browser_unavailable"
     TEMPORARILY_UNAVAILABLE = "temporarily_unavailable"
     UNAVAILABLE = "unavailable"
@@ -63,6 +66,7 @@ class ErrorCode(str, Enum):
     LISTEN_EXPIRED = "listen_expired"
     PREFLIGHT_DENIED = "preflight_denied"
     RENDER_INTERRUPTED = "render_interrupted"
+    ROBOTS_DISALLOWED = "robots_disallowed"
     SETTLEMENT_FAILED = "settlement_failed"
     TOO_MANY_STREAMS = "too_many_streams"
     RENDER_NOT_SUPPORTED = "render_not_supported"
@@ -101,7 +105,9 @@ RETRYABLE: Mapping[str, bool] = MappingProxyType({
     "ai_auth": False,
     "ai_bad_request": False,
     "ai_context_overflow": False,
+    "ai_daily_budget_exceeded": True,
     "ai_endpoint_forbidden": False,
+    "ai_kill_switch_engaged": False,
     "ai_malformed_output": False,
     "ai_provider_error": False,
     "ai_quota": False,
@@ -109,6 +115,7 @@ RETRYABLE: Mapping[str, bool] = MappingProxyType({
     "ai_refused": False,
     "ai_timeout": True,
     "ai_unavailable": True,
+    "ai_unsupported": False,
     "browser_unavailable": False,
     "temporarily_unavailable": True,
     "unavailable": False,
@@ -121,6 +128,7 @@ RETRYABLE: Mapping[str, bool] = MappingProxyType({
     "listen_expired": True,
     "preflight_denied": False,
     "render_interrupted": True,
+    "robots_disallowed": False,
     "settlement_failed": False,
     "too_many_streams": True,
     "render_not_supported": False,
