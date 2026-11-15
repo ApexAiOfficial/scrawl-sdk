@@ -9,7 +9,8 @@ Exit codes:
   0  success
   1  the job (or a batch item) failed, or a downloaded file did not match its size or sha256 (not written)
   2  usage error, or a file already exists where a download would go (nothing is overwritten)
-  3  authentication or configuration: 401/403, no API key, an unusable base URL or AI key
+  3  authentication or configuration: 401/403, no API key, an unusable base URL or AI key; in doctor, a TLS
+     failure or no proxy that has passed its test
   4  still pending or running at the deadline
   5  any other API or connection error
 """
@@ -695,26 +696,30 @@ def _doctor_checks(client: Scrawl, add: Any, checks: list[dict[str, str]], args:
         return _doctor_report(checks, base, args.json, EXIT_ERROR)
     else:
         add("auth", "ok", "the API key is accepted (GET /v1/jobs)")
-    _doctor_proxy(client, add)
-    return _doctor_report(checks, base, args.json, EXIT_OK)
+    return _doctor_report(checks, base, args.json, _doctor_proxy(client, add))
 
 
-def _doctor_proxy(client: Scrawl, add: Any) -> None:
-    """Whether the key's subject has a proxy that passed its test: every job needs one."""
+def _doctor_proxy(client: Scrawl, add: Any) -> int:
+    """Whether the key's subject has a proxy that passed its test: every job needs one, so without it this machine
+    is not ready (exit 3). A key that cannot read the proxy cannot start jobs either; that is a warning only."""
     try:
         proxy = client.get_proxy()
     except NotFoundError:
-        add("proxy", "warn", "no proxy yet: every job needs your own (scrawl proxy set, then scrawl proxy test)")
+        add("proxy", "fail", "no proxy yet: every job needs your own (scrawl proxy set, then scrawl proxy test)")
+        return EXIT_CONFIG
     except PermissionDeniedError:
-        add("proxy", "warn", "cannot read the proxy: the API key lacks the scrape:write scope")
+        add("proxy", "warn", "cannot read the proxy: the API key lacks the scrape:write scope, so it cannot start jobs")
+        return EXIT_OK
     except ScrawlError as exc:
-        add("proxy", "warn", f"GET /v1/proxy: {exc}")
-    else:
-        if isinstance(proxy, dict) and proxy.get("usable"):
-            add("proxy", "ok", f"{proxy.get('sanitized_url')} passed its test {proxy.get('last_validated_at')}")
-        else:
-            state = proxy.get("validation_state") if isinstance(proxy, dict) else "?"
-            add("proxy", "warn", f"the proxy is {state}: run scrawl proxy test (jobs are refused until it passes)")
+        add("proxy", "fail", f"GET /v1/proxy: {exc}")
+        return EXIT_ERROR
+    if isinstance(proxy, dict) and proxy.get("usable"):
+        add("proxy", "ok", f"{proxy.get('sanitized_url')} passed its test {proxy.get('last_validated_at')}")
+        return EXIT_OK
+    state = proxy.get("validation_state") if isinstance(proxy, dict) else None
+    add("proxy", "fail", f"the proxy is {state or 'not tested'}: run scrawl proxy test (jobs are refused until it "
+                         "passes)")
+    return EXIT_CONFIG
 
 
 # -- the parser ----------------------------------------------------------------------------------------

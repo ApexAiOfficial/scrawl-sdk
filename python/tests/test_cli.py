@@ -101,6 +101,7 @@ def test_each_covered_operation_is_reachable_from_the_cli(route: str, tmp_path: 
     fake = FakeApexAPI()
     fake.handle("PUT", "/v1/proxy", {"Authorization": "Bearer " + API_KEY},
                 b'{"scheme": "http", "host": "proxy.example", "port": 8000}')
+    fake.handle("POST", "/v1/proxy/test", {"Authorization": "Bearer " + API_KEY}, b"")   # doctor needs it tested
     fake.requests.clear()
     fake.profiles["p"] = {"profile": "p", "provider": "example", "model": "m", "base_url": "https://ai.example/v1",
                           "key_fingerprint": "sha256:0", "is_default": True, "created_at": NOW, "updated_at": NOW}
@@ -312,16 +313,43 @@ def _health_then(*responses: httpx.Response) -> Recorder:
     return Recorder(httpx.Response(200, json={"service": "ApexAPI", "status": "ok"}), *responses)
 
 
+TESTED_PROXY = {"sanitized_url": "http://proxy.example:8080", "usable": True,
+                "validation_state": "valid", "last_validated_at": "2026-11-15T10:00:00Z"}
+
+
 def test_doctor_reports_a_ready_setup(capsys) -> None:
-    rec = _health_then(httpx.Response(200, json={"jobs": []}))
+    rec = _health_then(httpx.Response(200, json={"jobs": []}), httpx.Response(200, json=TESTED_PROXY))
     assert cli_main(["doctor"], client=make_client(rec)) == 0
     out = capsys.readouterr()
-    for check in ("base_url", "tls", "reachable", "auth"):
+    for check in ("base_url", "tls", "reachable", "auth", "proxy"):
         assert re.search(rf"^ok\s+{check}\b", out.out, re.M), (check, out.out)
+    assert out.err.strip().endswith("ready") and "not ready" not in out.err
     assert "sk-test" not in out.out + out.err
     assert [r.url.path for r in rec.requests] == ["/v1/health", "/v1/jobs", "/v1/proxy"]
-    assert re.search(r"^(ok|warn)\s+proxy\b", out.out, re.M), out.out          # every job needs a tested proxy
     assert "Authorization" not in rec.requests[0].headers
+
+
+@pytest.mark.parametrize("proxy_response, status, code, detail", [
+    (httpx.Response(404, json={"detail": "No proxy", "code": "not_found"}), "fail", 3, "no proxy yet"),
+    (httpx.Response(200, json={**TESTED_PROXY, "usable": False, "validation_state": "untested"}), "fail", 3,
+     "the proxy is untested"),
+    (httpx.Response(200, json={**TESTED_PROXY, "usable": False, "validation_state": "failed"}), "fail", 3,
+     "the proxy is failed"),
+    (httpx.Response(200, json={}), "fail", 3, "the proxy is not tested"),
+    (httpx.Response(403, json={"detail": "missing scope", "code": "forbidden"}), "warn", 0, "cannot start jobs"),
+    (httpx.Response(500, json={"detail": "boom", "code": "internal_error"}), "fail", 5, "GET /v1/proxy"),
+])
+def test_doctor_is_not_ready_until_the_proxy_has_passed_its_test(capsys, proxy_response, status, code, detail) -> None:
+    rec = _health_then(httpx.Response(200, json={"jobs": []}), proxy_response)
+    assert cli_main(["--json", "doctor"], client=make_client(rec, max_retries=0)) == code
+    report = json.loads(capsys.readouterr().out)
+    proxy = report["checks"][-1]
+    assert proxy["check"] == "proxy" and proxy["status"] == status and detail in proxy["detail"], proxy
+    assert report["ok"] is (code == 0)
+    assert cli_main(["doctor"], client=make_client(_health_then(httpx.Response(200, json={"jobs": []}),
+                                                                proxy_response), max_retries=0)) == code
+    err = capsys.readouterr().err
+    assert ("not ready" in err) is (code != 0)
 
 
 def test_doctor_json_and_auth_failures(capsys) -> None:
@@ -329,9 +357,11 @@ def test_doctor_json_and_auth_failures(capsys) -> None:
     assert cli_main(["--json", "doctor"], client=make_client(rec, max_retries=0)) == 3
     report = json.loads(capsys.readouterr().out)
     assert report["ok"] is False and [c["status"] for c in report["checks"]] == ["ok", "ok", "ok", "fail"]
-    rec = _health_then(httpx.Response(403, json={"detail": "missing scope", "code": "forbidden"}))
+    rec = _health_then(httpx.Response(403, json={"detail": "missing scope", "code": "forbidden"}),
+                       httpx.Response(200, json=TESTED_PROXY))
     assert cli_main(["--json", "doctor"], client=make_client(rec, max_retries=0)) == 0
-    assert json.loads(capsys.readouterr().out)["checks"][-1]["status"] == "warn"
+    checks = {c["check"]: c["status"] for c in json.loads(capsys.readouterr().out)["checks"]}
+    assert (checks["auth"], checks["proxy"]) == ("warn", "ok")
 
 
 def test_doctor_without_a_key_or_a_server(monkeypatch, capsys) -> None:
@@ -363,7 +393,8 @@ def test_doctor_flags_configuration_before_any_request(monkeypatch, capsys) -> N
     assert cli_main(["doctor"]) == 3
     assert re.search(r"^fail\s+base_url\s+Refusing", capsys.readouterr().out, re.M)
     insecure = Scrawl("k", base_url="http://scrawl-lan.test:8088", allow_insecure_http=True,
-                      http_client=httpx.Client(transport=httpx.MockTransport(_health_then(httpx.Response(200, json={})))))
+                      http_client=httpx.Client(transport=httpx.MockTransport(_health_then(
+                          httpx.Response(200, json={}), httpx.Response(200, json=TESTED_PROXY)))))
     assert cli_main(["doctor"], client=insecure) == 0
     assert re.search(r"^warn\s+tls\s+plain HTTP to a remote host", capsys.readouterr().out, re.M)
 
