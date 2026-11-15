@@ -623,12 +623,13 @@ def _doctor_report(checks: list[dict[str, str]], base_url: str | None, as_json: 
     else:
         for check in checks:
             print(_safe(f"{check['status']:<5} {check['check']:<10} {check['detail']}"))
-        print("ready" if code == EXIT_OK else "not ready", file=sys.stderr)
+        warned = any(check["status"] == "warn" for check in checks)
+        print(("ready, with warnings" if warned else "ready") if code == EXIT_OK else "not ready", file=sys.stderr)
     return code
 
 
 def _cmd_doctor(client: Scrawl | None, args: argparse.Namespace) -> int:
-    """Check the base URL, TLS, reachability and the API key; never prints the key."""
+    """Check the base URL, TLS, reachability, the API key and your proxy; never prints the key."""
     checks: list[dict[str, str]] = []
 
     def add(check: str, status: str, detail: str) -> None:
@@ -710,6 +711,9 @@ def _doctor_proxy(client: Scrawl, add: Any) -> int:
     except PermissionDeniedError:
         add("proxy", "warn", "cannot read the proxy: the API key lacks the scrape:write scope, so it cannot start jobs")
         return EXIT_OK
+    except AuthenticationError as exc:
+        add("proxy", "fail", f"the API key was refused: {exc}")
+        return EXIT_CONFIG
     except ScrawlError as exc:
         add("proxy", "fail", f"GET /v1/proxy: {exc}")
         return EXIT_ERROR
@@ -967,7 +971,7 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("balance", help="your credit balance")
     p.set_defaults(handler=_cmd_balance)
 
-    p = sub.add_parser("doctor", help="check the setup: base URL, TLS, reachability, API key")
+    p = sub.add_parser("doctor", help="check the setup: base URL, TLS, reachability, API key, your proxy")
     p.set_defaults(handler=_cmd_doctor)
     return parser
 

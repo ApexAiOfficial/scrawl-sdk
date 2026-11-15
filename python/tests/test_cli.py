@@ -337,6 +337,7 @@ def test_doctor_reports_a_ready_setup(capsys) -> None:
      "the proxy is failed"),
     (httpx.Response(200, json={}), "fail", 3, "the proxy is not tested"),
     (httpx.Response(403, json={"detail": "missing scope", "code": "forbidden"}), "warn", 0, "cannot start jobs"),
+    (httpx.Response(401, json={"detail": "Invalid API key", "code": "unauthorized"}), "fail", 3, "was refused"),
     (httpx.Response(500, json={"detail": "boom", "code": "internal_error"}), "fail", 5, "GET /v1/proxy"),
 ])
 def test_doctor_is_not_ready_until_the_proxy_has_passed_its_test(capsys, proxy_response, status, code, detail) -> None:
@@ -348,8 +349,10 @@ def test_doctor_is_not_ready_until_the_proxy_has_passed_its_test(capsys, proxy_r
     assert report["ok"] is (code == 0)
     assert cli_main(["doctor"], client=make_client(_health_then(httpx.Response(200, json={"jobs": []}),
                                                                 proxy_response), max_retries=0)) == code
-    err = capsys.readouterr().err
+    err = capsys.readouterr().err.strip()
     assert ("not ready" in err) is (code != 0)
+    if code == 0:
+        assert err.endswith("ready, with warnings") is (status == "warn"), err
 
 
 def test_doctor_json_and_auth_failures(capsys) -> None:
