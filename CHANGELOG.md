@@ -5,7 +5,7 @@ versions follow [Semantic Versioning](https://semver.org/) (before 1.0, a minor 
 The Python package (`scrawl-sdk`) and the npm package (`@apexaiofficial/scrawl`) are released separately; each
 entry says which one it covers.
 
-## Unreleased (Python)
+## Python 0.1.2 (2026-11-15)
 
 ### Changed
 - `scrawl doctor` says "not ready" and exits 3 until your proxy has passed its test (no proxy, or one that is
