@@ -172,8 +172,9 @@ profiles, and `ai:use` runs JSON scrapes, `extract`, `ask` and dataset extractio
 `PermissionDeniedError` with code `forbidden`. The full table is in
 [docs/authentication.md](docs/authentication.md#scopes).
 
-Check a setup before writing code. `scrawl doctor` checks the base URL, TLS, reachability (`GET /v1/health`) and
-the key, and never prints the key:
+Check a setup before writing code. `scrawl doctor` checks the base URL, TLS, reachability (`GET /v1/health`), the
+key and your proxy, and never prints the key. Every job needs your own proxy, so it says "not ready" (exit 3) until
+the proxy has passed `scrawl proxy test`:
 
 ```bash
 export SCRAWL_BASE_URL=https://scrawl.example    # the endpoint ApexAi provides for your account
@@ -195,6 +196,8 @@ from a clone, with nothing but Python 3.10 or later:
 python scrawl-sdk/tools/fake_apexapi.py --port 8099 &     # prints "listening http://127.0.0.1:8099"
 export SCRAWL_BASE_URL=http://127.0.0.1:8099
 export SCRAWL_API_KEY=sk_test_fake
+export SCRAWL_PROXY_URL=http://proxy.example:8000        # the fake accepts any proxy and tests nothing
+scrawl proxy set && scrawl proxy test
 scrawl doctor
 ```
 
@@ -203,6 +206,7 @@ ok    base_url   http://127.0.0.1:8099 (SCRAWL_BASE_URL)
 ok    tls        plain HTTP to this machine (no TLS needed)
 ok    reachable  GET /v1/health answered 'ok' in 2 ms
 ok    auth       the API key is accepted (GET /v1/jobs)
+ok    proxy      http://proxy.example:8000 passed its test 2026-10-31T00:00:00Z
 ready
 ```
 
@@ -538,7 +542,7 @@ Downloads are written whole or not at all, never overwrite a file, stay inside `
 | 0 | Success |
 | 1 | The job (or a batch item) failed, a download did not match its size or SHA-256 (nothing written), or `ai providers test` failed |
 | 2 | Usage error, or a file already exists where a download would go |
-| 3 | Authentication or configuration: 401/403, no API key, an unusable base URL or AI key, a TLS failure in `doctor` |
+| 3 | Authentication or configuration: 401/403, no API key, an unusable base URL or AI key; in `doctor`, a TLS failure or no proxy that has passed its test |
 | 4 | Still pending or running at the deadline |
 | 5 | Any other API or connection error |
 
@@ -546,7 +550,7 @@ Every command and option: [docs/cli.md](docs/cli.md).
 
 ## Troubleshooting
 
-Start with `scrawl doctor`: it names the failing check (`base_url`, `tls`, `reachable` or `auth`).
+Start with `scrawl doctor`: it names the failing check (`base_url`, `tls`, `reachable`, `auth` or `proxy`).
 
 | Symptom | Likely cause and fix |
 | --- | --- |

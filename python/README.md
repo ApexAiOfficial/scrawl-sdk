@@ -17,7 +17,7 @@ pip install scrawl-sdk            # once published; until then: pip install ./py
 ```bash
 export SCRAWL_BASE_URL=https://scrawl.example    # the endpoint ApexAi provides for your account
 export SCRAWL_API_KEY=...                        # the API key ApexAi issues for your account
-scrawl doctor                                    # checks the base URL, TLS, reachability and the key
+scrawl doctor                                    # checks the base URL, TLS, reachability, the key and your proxy
 ```
 
 The key is only ever sent over HTTPS or to this machine. Scrawl is a service ApexAi operates, and its public

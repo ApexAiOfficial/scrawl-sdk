@@ -118,7 +118,11 @@ def test_health_auth_and_the_setup_check(client: Scrawl, monkeypatch) -> None:
     assert refused.value.status == 401
     monkeypatch.setenv("SCRAWL_BASE_URL", BASE_URL)
     monkeypatch.setenv("SCRAWL_API_KEY", API_KEY)
-    assert cli_main(["doctor"]) == 0
+    try:
+        ready = bool(client.get_proxy().usable)
+    except NotFoundError:
+        ready = False
+    assert cli_main(["doctor"]) == (0 if ready else 3)     # not ready until the subject's proxy passed its test
 
 
 @covers("GET /v1/jobs/{job_id}")
