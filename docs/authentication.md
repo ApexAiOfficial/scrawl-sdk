@@ -35,7 +35,8 @@ The key never crosses a network in clear text:
   `allow_insecure_http=True` / `allowInsecureHttp: true` or `SCRAWL_ALLOW_INSECURE_HTTP=1`.
 
 `scrawl doctor` checks all of this: the base URL and where it came from, TLS, whether the endpoint answers
-`GET /v1/health`, and whether the key is accepted. It never prints the key.
+`GET /v1/health`, whether the key is accepted, and whether your proxy has passed its test (every job needs one, so
+it says "not ready" until then). It never prints the key.
 
 ## Scopes
 

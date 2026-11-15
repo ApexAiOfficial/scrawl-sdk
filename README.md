@@ -206,6 +206,7 @@ ok    base_url   http://127.0.0.1:8099 (SCRAWL_BASE_URL)
 ok    tls        plain HTTP to this machine (no TLS needed)
 ok    reachable  GET /v1/health answered 'ok' in 2 ms
 ok    auth       the API key is accepted (GET /v1/jobs)
+ok    proxy      http://proxy.example:8000 passed its test 2026-10-31T00:00:00Z
 ready
 ```
 
