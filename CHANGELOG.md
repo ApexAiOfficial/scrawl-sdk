@@ -5,6 +5,13 @@ versions follow [Semantic Versioning](https://semver.org/) (before 1.0, a minor 
 The Python package (`scrawl-sdk`) and the npm package (`@apexaiofficial/scrawl`) are released separately; each
 entry says which one it covers.
 
+## Unreleased (Python)
+
+### Changed
+- `scrawl doctor` says "not ready" and exits 3 until your proxy has passed its test (no proxy, or one that is
+  untested or failed), since every job is refused without one. It used to warn and still say "ready". A key without
+  the `scrape:write` scope still gets a warning only; an error reading the proxy exits 5.
+
 ## Python 0.1.1 and TypeScript 0.1.1 (2026-11-12)
 
 ### Added

@@ -142,6 +142,6 @@ scrawl balance
 | 0 | Success |
 | 1 | The job (or a batch item) failed, or a downloaded file did not match its size or SHA-256 (it was not written); `ai providers test` failed |
 | 2 | Usage error, or a file already exists where a download would go (nothing is overwritten) |
-| 3 | Authentication or configuration: 401/403, no API key, an unusable base URL or AI key, a TLS failure in `doctor` |
+| 3 | Authentication or configuration: 401/403, no API key, an unusable base URL or AI key; in `doctor`, a TLS failure or no proxy that has passed its test |
 | 4 | Still pending or running at the deadline |
 | 5 | Any other API or connection error |
