@@ -67,6 +67,38 @@ def test_a_long_retry_after_is_returned_immediately_instead_of_capped_and_retrie
     assert len(rec.requests) == 1 and slept == []
 
 
+def test_retry_after_accepts_http_dates_and_rejects_invalid_values(monkeypatch) -> None:
+    monkeypatch.setattr("scrawl._client.time.time", lambda: 1_445_412_475.0)
+    future = httpx.Response(429, json={"detail": "later"},
+                            headers={"Retry-After": "Wed, 21 Oct 2015 07:28:00 GMT"})
+    client, sent, slept = _scripted([future, DONE], monkeypatch)
+    assert client.get_job("j1").status == "completed"
+    assert len(sent) == 2 and slept == [5.0]
+
+    monkeypatch.setattr("scrawl._client.time.time", lambda: 1_445_412_485.0)
+    for value, expected in (("Wed, 21 Oct 2015 07:28:00 GMT", 0.0), ("not a date", None)):
+        response = httpx.Response(429, json={"detail": "later"}, headers={"Retry-After": value})
+        with pytest.raises(RateLimitError) as caught:
+            make_client(Recorder(response), max_retries=0).get_job("j1")
+        assert caught.value.retry_after == expected
+
+
+def test_a_5xx_retry_after_over_the_cap_is_returned_without_a_retry(monkeypatch) -> None:
+    monkeypatch.setattr("scrawl._client.time.time", lambda: 1_445_412_480.0)
+    response = httpx.Response(503, json={"detail": "maintenance"},
+                              headers={"Retry-After": "Wed, 21 Oct 2015 07:30:00 GMT"})
+    client, sent, slept = _scripted([response, DONE], monkeypatch)
+    with pytest.raises(ServerError) as caught:
+        client.get_job("j1")
+    assert caught.value.retry_after == 120.0
+    assert len(sent) == 1 and slept == []
+
+    at_cap = httpx.Response(503, json={"detail": "maintenance"}, headers={"Retry-After": "60"})
+    client, sent, slept = _scripted([at_cap, DONE], monkeypatch)
+    assert client.get_job("j1").status == "completed"
+    assert len(sent) == 2 and slept == [60.0]
+
+
 def test_retries_idempotent_submits_and_gets_but_never_a_plain_post_or_a_4xx(monkeypatch) -> None:
     monkeypatch.setattr("scrawl._client.time.sleep", lambda s: None)
     rec = Recorder(httpx.Response(503), httpx.Response(200, json={"job_id": "j", "status": "completed", "url": "u"}))
@@ -359,11 +391,25 @@ def test_wait_for_job_follows_a_job_until_it_leaves_pending_or_running() -> None
     assert make_client(rec).wait_for_job("c1", timeout=0).status == "RUNNING" and len(rec.requests) == 1
 
 
+def test_job_warnings_are_exposed_and_default_to_an_empty_list() -> None:
+    def job(**extra) -> httpx.Response:
+        return httpx.Response(200, json={"job_id": "c1", "command": "crawl", "args": [], "status": "COMPLETED",
+                                         "engine_id": "e", "artifacts_url": "", "result_url": "", **extra})
+
+    rec = Recorder(job(warnings=["crawl made zero requests"]), job(),
+                   httpx.Response(200, json={"jobs": [job().json()]}))
+    client = make_client(rec)
+    assert client.get_job("new").warnings == ["crawl made zero requests"]
+    assert client.get_job("old").warnings == []
+    assert client.list_jobs().jobs[0].warnings == []
+
+
 async def test_async_wait_for_job_mirrors_the_sync_one() -> None:
     rec = Recorder(httpx.Response(200, json={"job_id": "c1", "status": "RUNNING"}),
                    httpx.Response(200, json={"job_id": "c1", "status": "COMPLETED"}))
     async with make_async_client(rec) as c:
-        assert (await c.wait_for_job("c1")).status == "COMPLETED"
+        finished = await c.wait_for_job("c1")
+        assert finished.status == "COMPLETED" and finished.warnings == []
     assert len(rec.requests) == 2
 
 

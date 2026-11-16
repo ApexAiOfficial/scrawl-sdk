@@ -137,15 +137,16 @@ export function codeOf(body) {
   return typeof code === "string" ? code : null;
 }
 
-/** Any failed Scrawl call. `code` is the API's stable machine code (e.g. `not_found`). */
+/** Any failed Scrawl call. `code` is stable; `retryAfter` is set when the response supplied it. */
 export class ScrawlError extends Error {
-  constructor(message, { status = null, code = null, requestId = null, details = null } = {}) {
+  constructor(message, { status = null, code = null, requestId = null, details = null, retryAfter = null } = {}) {
     super(message);
     this.name = new.target.name;
     this.status = status;
     this.code = typeof code === "string" ? code : null;
     this.requestId = requestId;
     this.details = details;
+    this.retryAfter = retryAfter;
   }
 
   toString() {
@@ -216,6 +217,6 @@ export function errorFor(status, body, { requestId = null, retryAfter = null } =
   }
   message = message || `HTTP ${status}`;
   const Cls = BY_STATUS[status] || (status >= 500 ? ServerError : ScrawlError);
-  const options = { status, code, requestId, details };
+  const options = { status, code, requestId, details, retryAfter };
   return Cls === RateLimitError ? new RateLimitError(message, { ...options, retryAfter }) : new Cls(message, options);
 }

@@ -169,6 +169,13 @@ def test_the_vendored_contracts_match_their_manifest_and_the_sdk_records_its_dig
     assert f'"{digest}"' in ts_contract
 
 
+def test_job_warnings_are_an_optional_string_list_in_the_contract() -> None:
+    job = OPENAPI["components"]["schemas"]["JobResponse"]
+    assert job["properties"]["warnings"]["type"] == "array"
+    assert job["properties"]["warnings"]["items"] == {"type": "string"}
+    assert "warnings" not in job["required"]
+
+
 def test_the_live_suite_exercises_every_covered_operation() -> None:
     """Static check (no server needed): each covered route is named by a live test's ``covers(...)``."""
     named: set[str] = set()

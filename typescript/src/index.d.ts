@@ -246,6 +246,8 @@ export interface Job extends ApiObject {
   exit_code?: number | null;
   started_at?: string | null;
   finished_at?: string | null;
+  /** Warnings about a run that still succeeded; always an array, including with older servers. */
+  warnings: string[];
 }
 
 export interface Page<T> extends ApiObject {
@@ -713,15 +715,17 @@ export interface ScrawlErrorOptions {
   code?: string | null;
   requestId?: string | null;
   details?: unknown;
+  retryAfter?: number | null;
 }
 
-/** Any failed Scrawl call. `code` is the API's stable machine code (e.g. `not_found`). */
+/** Any failed Scrawl call. `retryAfter` is set when the response supplied Retry-After. */
 export declare class ScrawlError extends Error {
   constructor(message: string, options?: ScrawlErrorOptions);
   readonly status: number | null;
   readonly code: ErrorCode | (string & {}) | null;
   readonly requestId: string | null;
   readonly details: unknown;
+  readonly retryAfter: number | null;
 }
 /** The client cannot be used as configured (no API key, an unusable base URL); nothing was sent. */
 export declare class ConfigurationError extends ScrawlError {}

@@ -90,7 +90,14 @@ function retryAfterSeconds(headers) {
   const value = headers?.get("retry-after");
   if (value === null || value === undefined || value.trim() === "") return null;
   const seconds = Number(value);
-  return Number.isFinite(seconds) ? Math.max(0, seconds) : null;
+  if (Number.isFinite(seconds)) return Math.max(0, seconds);
+  const date = Date.parse(value);
+  return Number.isFinite(date) ? Math.max(0, (date - Date.now()) / 1000) : null;
+}
+
+function jobWithDefaults(job) {
+  if (job && typeof job === "object" && !Array.isArray(job) && job.warnings === undefined) job.warnings = [];
+  return job;
 }
 
 function itemsOf(page) {
@@ -293,13 +300,15 @@ export class Scrawl {
 
   /** A job's state; `waitSeconds` (<= 60) returns as soon as it finishes. */
   async getJob(jobId, { waitSeconds = 0 } = {}) {
-    return this._call({ method: "GET", path: `/v1/jobs/${seg(jobId)}`,
-      params: { wait_seconds: this._serverWait(waitSeconds) || undefined } });
+    return jobWithDefaults(await this._call({ method: "GET", path: `/v1/jobs/${seg(jobId)}`,
+      params: { wait_seconds: this._serverWait(waitSeconds) || undefined } }));
   }
 
   /** Your jobs, newest first (`next_cursor` pages). */
   async listJobs({ limit, status, cursor } = {}) {
-    return this._call({ method: "GET", path: "/v1/jobs", params: { limit, status, cursor } });
+    const page = await this._call({ method: "GET", path: "/v1/jobs", params: { limit, status, cursor } });
+    if (Array.isArray(page?.jobs)) for (const job of page.jobs) jobWithDefaults(job);
+    return page;
   }
 
   /** Cancel a pending or running job (another process's job: `cancelled` false, requested). */
@@ -548,7 +557,7 @@ export class Scrawl {
   }
 
   /**
-   * 429 when Retry-After is at most 60 s; 502/503/504 according to method and responder. Never when the
+   * 429/502/503/504 only when Retry-After is at most 60 s, according to method and responder. Never when the
    * error code is one the catalogue marks not retryable, whatever the status: a resend after `submission_failed`
    * or `settlement_failed` may charge twice.
    */
@@ -556,9 +565,10 @@ export class Scrawl {
     if (response.status < 400) return false;
     const body = jsonBody(response.body);              // only error bodies are parsed here: they are small
     if (neverRetry(codeOf(body))) return false;
+    const retryAfter = retryAfterSeconds(response.headers);
+    if (retryAfter !== null && retryAfter > 60) return false;
     if (response.status === 429) {
-      const retryAfter = retryAfterSeconds(response.headers);
-      return retryAfter === null || retryAfter <= 60;
+      return true;
     }
     if (!RETRY_STATUSES.has(response.status)) return false;
     // Scrawl's own 5xx on a keyed submit is final: its key now stores that outcome, so a retry would
