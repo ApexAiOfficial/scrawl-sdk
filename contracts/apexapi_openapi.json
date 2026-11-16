@@ -2678,6 +2678,14 @@
           "status": {
             "title": "Status",
             "type": "string"
+          },
+          "warnings": {
+            "description": "Warnings about a run that still succeeded, for example a crawl that made zero requests. Filled when one job is read (GET /v1/jobs/{job_id}); empty in listings.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
           }
         },
         "required": [

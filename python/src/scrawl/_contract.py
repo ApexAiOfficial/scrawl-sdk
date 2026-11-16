@@ -4,4 +4,4 @@
 the vendored contract files); ``tools/sync_contracts.py`` updates it. See ``docs/compatibility.md``.
 """
 
-CONTRACT_DIGEST = "sha256:050c240215bf1710f7f9b460dcec1be6b7245667d971ceae0ac9ac518163c1b7"
+CONTRACT_DIGEST = "sha256:4ee1ab0125fcd4df1396abb77dd5c6a8360680be5aee5b434b0f78a8a9faf7c9"
