@@ -273,7 +273,7 @@ export class Scrawl {
     return this._call({ method: "POST", path: "/v1/proxy/health" });
   }
 
-  /** List account API keys (never values). Create keys in Telegram with /api_keys create. */
+  /** List account API keys (never values). Needs a keys:manage key: /api_keys create_manager in Telegram. */
   async listApiKeys() {
     return this._call({ method: "GET", path: "/v1/keys" });
   }

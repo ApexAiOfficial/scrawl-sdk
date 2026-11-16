@@ -52,7 +52,7 @@ unless ApexAi issues one with other scopes; the AI scopes are never on by defaul
 | `credits:read` | read the credit balance |
 | `ai:configure` | manage your AI provider profiles and read your AI usage |
 | `ai:use` | JSON scrapes and batches (together with `scrape:write`), `extract`, `ask` and dataset extraction with your own AI provider, and cancelling dataset extraction jobs |
-| `keys:manage` | list the hosted account's API keys and revoke one; keys are created only in Telegram with `/api_keys create` |
+| `keys:manage` | list the hosted account's API keys and revoke one; keys are created only in Telegram (`/api_keys create`, or `/api_keys create_manager` for a key that holds this scope) |
 
 Two requests need more than the scope of their route:
 

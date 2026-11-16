@@ -18,8 +18,9 @@ two SDK versions line up again.
 - Hosted API-key listing and revocation in both clients and under `scrawl keys list|revoke`. Keys are created in
   Telegram with `/api_keys create`; there is deliberately no create method in either SDK.
 - Scrape and map outcomes (`ok`, `target_blocked`, `target_error`, `cancelled`, `pipeline_failed`) with block
-  reasons and hints, target `retry_after_s` on scrapes, and per-outcome batch counts. Only `pipeline_failed` is
-  refunded; target blocks/errors, customer-proxy failures and cancellations after work starts remain charged.
+  reasons and hints, target `retry_after_s` on scrapes, and per-outcome batch counts. Refunds cover only
+  Scrawl's own failures (a job that never started, or `pipeline_failed`); target blocks/errors, customer-proxy
+  failures and cancellations after work starts remain charged.
 
 ### Changed
 - A 429 with `Retry-After` above 60 seconds is raised immediately with the full value on `RateLimitError`, instead

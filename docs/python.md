@@ -27,7 +27,7 @@ example before `json.dumps` (which would otherwise call the `items` field).
 
 Settled scrapes and maps expose `outcome`: `ok`, `target_blocked`, `target_error`, `cancelled` or
 `pipeline_failed` (`None` while pending). Scrapes also have `block_reason`, `retry_after_s` and `hint`; maps have
-`block_reason` and `hint`; batches have `outcomes` counts. Only `pipeline_failed` is refunded. Target
+`block_reason` and `hint`; batches have `outcomes` counts. Refunds are automatic and cover only Scrawl's own failures: a job that never started, and a scrape whose outcome is `pipeline_failed`. Target
 blocks/errors, failures in your proxy and cancellations after work starts remain charged.
 
 ## Methods
@@ -57,6 +57,7 @@ for record in client.paginate(client.query_dataset, dataset_id, [{"field": "pric
 ```
 
 Hosted API keys are created in Telegram with `/api_keys create`; the SDK deliberately has no create method.
+Listing and revoking need a key with `keys:manage`, made with `/api_keys create_manager`.
 `list_api_keys` and `revoke_api_key` need `keys:manage`.
 
 ## Datasets

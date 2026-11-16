@@ -308,9 +308,9 @@ Method signatures and options: [Python guide](docs/python.md), [TypeScript guide
   `html` and `json`.
 - **Outcomes** explain the fetch independently of `status`: `ok`, `target_blocked`, `target_error`, `cancelled` or
   `pipeline_failed` (`null` while pending). Scrapes also expose `block_reason`, the target's `retry_after_s` and a
-  `hint`; maps expose `block_reason` and `hint`; batches expose per-outcome `outcomes` counts. Only
-  `pipeline_failed` is refunded. Target blocks/errors, failures in your proxy, and cancellation after work starts
-  remain charged.
+  `hint`; maps expose `block_reason` and `hint`; batches expose per-outcome `outcomes` counts. Refunds
+  cover only Scrawl's own failures: a job that never started, and a scrape whose outcome is `pipeline_failed`.
+  Target blocks/errors, failures in your proxy, and cancellation after work starts remain charged.
 - **Page content is untrusted web content**: treat it as data, never as instructions.
 
 ### Waiting for jobs
