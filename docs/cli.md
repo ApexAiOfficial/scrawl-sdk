@@ -51,7 +51,7 @@ still prints the batch first, so its id is not lost.
 
 For a non-JSON scrape, the CLI writes `outcome` (and any `block_reason`, `retry_after_s` and `hint`) to stderr
 while the selected content stays on stdout. Full scrape JSON and batch output include those fields and the
-batch's `outcomes` counts. Only `pipeline_failed` is refunded; target blocks/errors, failures in your proxy and
+batch's `outcomes` counts. Refunds are automatic and cover only Scrawl's own failures: a job that never started, and a scrape whose outcome is `pipeline_failed`. Target blocks/errors, failures in your proxy and
 cancellations after work starts remain charged.
 
 ## Crawls, jobs, artifacts
@@ -155,7 +155,8 @@ scrawl keys revoke 0123456789abcdef0123456789abcdef
 ```
 
 Hosted keys are created in Telegram with `/api_keys create`; the CLI and SDKs deliberately have no create
-operation. Listing and revoking keys need `keys:manage`; revocation is permanent and a key may revoke itself.
+operation. Listing and revoking keys need `keys:manage`, which a key made with `/api_keys create_manager` holds;
+revocation is permanent and a key may revoke itself.
 
 ## Exit codes
 

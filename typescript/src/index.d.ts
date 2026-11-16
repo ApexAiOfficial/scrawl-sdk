@@ -38,7 +38,7 @@ export type ScrapeFormat = "markdown" | "links" | "html" | "json";
 export type RenderFormat = Exclude<ScrapeFormat, "json">;
 export type ExportFormat = "jsonlines" | "json" | "csv";
 export type ScrapeStatus = "completed" | "pending" | "failed";
-/** The settled fetch outcome; null while pending. Only pipeline_failed is refunded. */
+/** The settled fetch outcome; null while pending. Of these, only pipeline_failed is refunded (and a job that never started). */
 export type ScrapeOutcome = "ok" | "target_blocked" | "target_error" | "cancelled" | "pipeline_failed";
 
 export interface AiUsageInfo extends ApiObject {
@@ -182,7 +182,7 @@ export interface ScrapeResult extends ApiObject {
   truncated?: boolean;
   error?: string | null;
   error_code?: string | null;
-  /** Null while pending. Only pipeline_failed is refunded; all other settled outcomes are charged. */
+  /** Null while pending. Of the settled outcomes only pipeline_failed is refunded; a job that never started is too. */
   outcome?: ScrapeOutcome | null;
   block_reason?: string | null;
   /** The target's Retry-After value, when it sent one. */
@@ -598,7 +598,8 @@ export declare class Scrawl {
   setProxyPoolMode(mode: ProxyPoolMode): Promise<ProxyPool>;
   proxyHealth(): Promise<ProxyHealth>;
 
-  /** Hosted keys are created in Telegram with /api_keys create; the SDK deliberately has no create method. */
+  /** Hosted keys are created in Telegram with /api_keys create; listing and revoking need a keys:manage key
+   * (/api_keys create_manager). The SDK deliberately has no create method. */
   listApiKeys(): Promise<ApiKeyList>;
   revokeApiKey(keyId: string): Promise<null>;
 

@@ -119,7 +119,8 @@ class _Endpoints:
         ``ScrawlError(code="render_not_supported")``.
 
         A settled result's ``outcome`` distinguishes success, a target block/error, cancellation and a Scrawl
-        pipeline failure. Only ``pipeline_failed`` is refunded; target/proxy failures and cancellations are charged.
+        pipeline failure. Refunds cover only Scrawl's own failures (a job that never started, or ``pipeline_failed``);
+        a target block or error, a failure in your proxy and a cancellation after work starts are charged.
         """
         body = _clean({"url": url, "formats": formats or ["markdown"], "schema": schema,
                        "instruction": instruction, "profile": profile, "wait_seconds": self._wait(wait_seconds),
@@ -265,7 +266,8 @@ class _Endpoints:
 
     # -- hosted API keys ---------------------------------------------------------------------------
     def list_api_keys(self) -> Any:
-        """List account API keys (never values). Create keys in Telegram with ``/api_keys create``."""
+        """List account API keys (never values). Needs a key with ``keys:manage``: make it in Telegram with
+        ``/api_keys create_manager`` (``/api_keys create`` makes ordinary keys)."""
         return self._call(_Request("GET", "/v1/keys"))
 
     def revoke_api_key(self, key_id: str) -> Any:
