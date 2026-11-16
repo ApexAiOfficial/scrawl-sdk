@@ -143,6 +143,126 @@
         "enums": {}
       }
     },
+    "GET /v1/proxy-pool": {
+      "python": "list_proxy_pool",
+      "typescript": "listProxyPool",
+      "cli": "proxy pool list",
+      "sends": {
+        "auth": true,
+        "idempotency_key": false,
+        "query": [],
+        "body": null,
+        "enums": {}
+      }
+    },
+    "POST /v1/proxy-pool": {
+      "python": "add_proxy_pool_entry",
+      "typescript": "addProxyPoolEntry",
+      "cli": "proxy pool add",
+      "sends": {
+        "auth": true,
+        "idempotency_key": false,
+        "query": [],
+        "body": ["url", "label", "pool_id"],
+        "enums": {}
+      }
+    },
+    "POST /v1/proxy-pool/{entry_ref}/test": {
+      "python": "test_proxy_pool_entry",
+      "typescript": "testProxyPoolEntry",
+      "cli": "proxy pool test",
+      "sends": {
+        "auth": true,
+        "idempotency_key": false,
+        "query": [],
+        "body": null,
+        "enums": {}
+      }
+    },
+    "POST /v1/proxy-pool/{entry_ref}/enable": {
+      "python": "enable_proxy_pool_entry",
+      "typescript": "enableProxyPoolEntry",
+      "cli": "proxy pool enable",
+      "sends": {
+        "auth": true,
+        "idempotency_key": false,
+        "query": [],
+        "body": null,
+        "enums": {}
+      }
+    },
+    "POST /v1/proxy-pool/{entry_ref}/disable": {
+      "python": "disable_proxy_pool_entry",
+      "typescript": "disableProxyPoolEntry",
+      "cli": "proxy pool disable",
+      "sends": {
+        "auth": true,
+        "idempotency_key": false,
+        "query": [],
+        "body": null,
+        "enums": {}
+      }
+    },
+    "DELETE /v1/proxy-pool/{entry_ref}": {
+      "python": "remove_proxy_pool_entry",
+      "typescript": "removeProxyPoolEntry",
+      "cli": "proxy pool remove",
+      "sends": {
+        "auth": true,
+        "idempotency_key": false,
+        "query": [],
+        "body": null,
+        "enums": {}
+      }
+    },
+    "PUT /v1/proxy-pool/mode": {
+      "python": "set_proxy_pool_mode",
+      "typescript": "setProxyPoolMode",
+      "cli": "proxy pool mode",
+      "sends": {
+        "auth": true,
+        "idempotency_key": false,
+        "query": [],
+        "body": ["mode"],
+        "enums": {"mode": ["direct", "pool", "required_pool"]}
+      }
+    },
+    "POST /v1/proxy/health": {
+      "python": "proxy_health",
+      "typescript": "proxyHealth",
+      "cli": "proxy health",
+      "sends": {
+        "auth": true,
+        "idempotency_key": false,
+        "query": [],
+        "body": null,
+        "enums": {}
+      }
+    },
+    "GET /v1/keys": {
+      "python": "list_api_keys",
+      "typescript": "listApiKeys",
+      "cli": "keys list",
+      "sends": {
+        "auth": true,
+        "idempotency_key": false,
+        "query": [],
+        "body": null,
+        "enums": {}
+      }
+    },
+    "DELETE /v1/keys/{key_id}": {
+      "python": "revoke_api_key",
+      "typescript": "revokeApiKey",
+      "cli": "keys revoke",
+      "sends": {
+        "auth": true,
+        "idempotency_key": false,
+        "query": [],
+        "body": null,
+        "enums": {}
+      }
+    },
     "GET /v1/artifacts/{job_id}": {
       "python": "list_artifacts",
       "typescript": "listArtifacts",

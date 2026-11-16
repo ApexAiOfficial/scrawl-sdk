@@ -25,6 +25,11 @@ use `.get()` for fields that may be absent. An API field named like a dict metho
 batch's items; the method stays available as `dict.items(batch)`). Call `.to_dict()` for plain data, for
 example before `json.dumps` (which would otherwise call the `items` field).
 
+Settled scrapes and maps expose `outcome`: `ok`, `target_blocked`, `target_error`, `cancelled` or
+`pipeline_failed` (`None` while pending). Scrapes also have `block_reason`, `retry_after_s` and `hint`; maps have
+`block_reason` and `hint`; batches have `outcomes` counts. Refunds are automatic and cover only Scrawl's own failures: a job that never started, and a scrape whose outcome is `pipeline_failed`. Target
+blocks/errors, failures in your proxy and cancellations after work starts remain charged.
+
 ## Methods
 
 Every ApexAPI operation the SDK covers has one method; [`coverage.json`](../coverage.json) is the authoritative
@@ -37,7 +42,8 @@ map. Submits that start work take an optional `idempotency_key` (one is generate
 | Crawls and jobs | `crawl(crawl_target, export_format=, max_items=, max_seconds=)`, `get_job(job_id, wait_seconds=)`, `list_jobs(limit=, status=, cursor=)`, `cancel_job(job_id)`, `list_artifacts(job_id)`, `download_artifact(job_id, filename, format=)` (bytes) |
 | Datasets | `list_datasets`, `get_dataset`, `list_versions`, `activate_version`, `diff_versions`, `dataset_fields`, `query_dataset(dataset_id, filters, version_id=, limit=, cursor=)`, `extract_dataset`, `quarantine_record`, `release_record`, `search`, `get_document` |
 | Assets | `quote_assets(url, classes=, max_items=, max_bytes=, max_credits=)`, `extract_assets(...)`, `get_assets(job_id, view=, limit=, cursor=, wait_seconds=)`, `download_asset(job_id, asset_id)` (bytes) |
-| Account | `credit_balance()`, `health()` |
+| Proxy | `get_proxy`, `set_proxy`, `test_proxy`, `remove_proxy`, `list_proxy_pool`, `add_proxy_pool_entry`, `test_proxy_pool_entry`, `enable_proxy_pool_entry`, `disable_proxy_pool_entry`, `remove_proxy_pool_entry`, `set_proxy_pool_mode`, `proxy_health` |
+| Account | `credit_balance()`, `health()`, `list_api_keys()`, `revoke_api_key(key_id)` |
 | Helpers | `wait_for_scrape(job_id, timeout=300, engine=)`, `wait_for_batch(batch_id, timeout=600)`, `wait_for_assets(job_id, timeout=600)`, `wait_for_job(job_id, timeout=1800)`, `paginate(method, *args, **kwargs)` |
 
 The `wait_for_*` helpers use server-side waits (up to 60 s per request, kept inside your `timeout`), never
@@ -49,6 +55,10 @@ for version in client.paginate(client.list_versions, dataset_id):
 for record in client.paginate(client.query_dataset, dataset_id, [{"field": "price", "op": "lt", "value": 20}]):
     print(record.record_id)
 ```
+
+Hosted API keys are created in Telegram with `/api_keys create`; the SDK deliberately has no create method.
+Listing and revoking need a key with `keys:manage`, made with `/api_keys create_manager`.
+`list_api_keys` and `revoke_api_key` need `keys:manage`.
 
 ## Datasets
 
@@ -104,7 +114,8 @@ try:
 except NotFoundError:
     ...
 except RateLimitError as error:
-    time.sleep(error.retry_after or 5)
+    # A short wait was already retried for you; this one may be hours (a daily cap). Schedule, don't block.
+    retry_at = time.time() + (error.retry_after or 60)
 except ScrawlError as error:
     if error.code == ErrorCode.EGRESS_REQUIRED:
         ...

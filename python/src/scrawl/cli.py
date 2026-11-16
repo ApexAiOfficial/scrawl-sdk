@@ -48,6 +48,9 @@ _C1 = re.compile(r"[\x7f-\x9f]")          # JSON escapes C0 controls itself, but
 _NAME_CONTROL = re.compile(r"[\x00-\x1f\x7f-\x9f]")
 _UNSAFE_NAME = re.compile(r"[^A-Za-z0-9._-]")
 _ENV_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]{0,127}")
+#: A proxy URL's userinfo, up to the LAST "@" before the host (a password may contain "@"); with or without a scheme.
+_PROXY_USERINFO = re.compile(r"\b((?:https?|socks5h?)://)[^/\s]*@", re.I)
+_BARE_USERINFO = re.compile(r"(?<![/\w@.*-])[^\s/@\"':*]+:[^\s/\"']*@(?=[A-Za-z0-9.\[\]-]+:\d)")
 MAX_JSON_FILE_BYTES = 64 * 1024
 ASSET_CLASSES = ("images", "video", "audio", "documents", "data", "web_assets")
 FORMATS = ("markdown", "links", "html", "json")
@@ -96,6 +99,21 @@ def _emit(value: Any, *, as_json: bool, field: str | None = None) -> None:
         print(_json(value[field]))
     else:
         print(_safe(str(value[field])))
+
+
+def _redact_proxy_passwords(value: Any) -> Any:
+    """Defense in depth for proxy CLI output: never trust an unexpected server field to have redacted userinfo."""
+    if isinstance(value, dict):
+        return {key: _redact_proxy_passwords(item) for key, item in dict.items(value)}
+    if isinstance(value, list):
+        return [_redact_proxy_passwords(item) for item in value]
+    if isinstance(value, str):
+        return _BARE_USERINFO.sub("***:***@", _PROXY_USERINFO.sub(r"\1***:***@", value))
+    return value
+
+
+def _emit_proxy(value: Any) -> None:
+    _emit(_redact_proxy_passwords(value), as_json=True)
 
 
 def _json_file(path: str | None, flag: str) -> Any:
@@ -166,6 +184,12 @@ def _cmd_scrape(client: Scrawl, args: argparse.Namespace) -> int:
         follow = f"scrawl result {result.job_id}" + (" --browser" if args.browser else "")
         print(_safe(f"pending: job {result.job_id} ({follow})"), file=sys.stderr)
         return EXIT_PENDING
+    if not args.json and result.get("outcome") is not None:
+        detail = [f"outcome: {result.get('outcome')}"]
+        for key in ("block_reason", "retry_after_s", "hint"):
+            if result.get(key) is not None:
+                detail.append(f"{key}: {result.get(key)}")
+        print(_safe("; ".join(detail)), file=sys.stderr)
     if result.status == "failed":
         print(f"failed: {_safe(str(result.get('error')))}", file=sys.stderr)
         if not args.json:
@@ -588,25 +612,81 @@ def _proxy_url(args: argparse.Namespace) -> str:
 
 
 def _cmd_proxy_show(client: Scrawl, args: argparse.Namespace) -> int:
-    _emit(client.get_proxy(), as_json=True)
+    _emit_proxy(client.get_proxy())
     return EXIT_OK
 
 
 def _cmd_proxy_set(client: Scrawl, args: argparse.Namespace) -> int:
-    _emit(client.set_proxy(_proxy_url(args), label=args.label), as_json=True)
+    _emit_proxy(client.set_proxy(_proxy_url(args), label=args.label))
     print("Saved. Scraping stays locked until `scrawl proxy test` passes.", file=sys.stderr)
     return EXIT_OK
 
 
 def _cmd_proxy_test(client: Scrawl, args: argparse.Namespace) -> int:
     result = client.test_proxy()
-    _emit(result, as_json=True)
+    _emit_proxy(result)
     return EXIT_OK if isinstance(result, dict) and result.get("ok") else EXIT_FAILED
 
 
 def _cmd_proxy_remove(client: Scrawl, args: argparse.Namespace) -> int:
     client.remove_proxy()
     _emit({"removed": True}, as_json=True)
+    return EXIT_OK
+
+
+def _cmd_proxy_pool_list(client: Scrawl, args: argparse.Namespace) -> int:
+    _emit_proxy(client.list_proxy_pool())
+    return EXIT_OK
+
+
+def _cmd_proxy_pool_add(client: Scrawl, args: argparse.Namespace) -> int:
+    client.add_proxy_pool_entry(_proxy_url(args), label=args.label, pool_id=args.pool_id)
+    _emit({"added": True, "label": args.label, "pool_id": args.pool_id}, as_json=True)
+    print("Added. Run `scrawl proxy pool test ENTRY` before the entry can carry jobs.", file=sys.stderr)
+    return EXIT_OK
+
+
+def _cmd_proxy_pool_test(client: Scrawl, args: argparse.Namespace) -> int:
+    result = client.test_proxy_pool_entry(args.entry_ref)
+    _emit_proxy(result)
+    entry = result.get("entry") if isinstance(result, dict) else None
+    return EXIT_OK if isinstance(entry, dict) and entry.get("status") == "ACTIVE" else EXIT_FAILED
+
+
+def _cmd_proxy_pool_enable(client: Scrawl, args: argparse.Namespace) -> int:
+    _emit_proxy(client.enable_proxy_pool_entry(args.entry_ref))
+    return EXIT_OK
+
+
+def _cmd_proxy_pool_disable(client: Scrawl, args: argparse.Namespace) -> int:
+    _emit_proxy(client.disable_proxy_pool_entry(args.entry_ref))
+    return EXIT_OK
+
+
+def _cmd_proxy_pool_remove(client: Scrawl, args: argparse.Namespace) -> int:
+    client.remove_proxy_pool_entry(args.entry_ref)
+    _emit({"entry_ref": args.entry_ref, "removed": True}, as_json=True)
+    return EXIT_OK
+
+
+def _cmd_proxy_pool_mode(client: Scrawl, args: argparse.Namespace) -> int:
+    _emit_proxy(client.set_proxy_pool_mode(args.mode))
+    return EXIT_OK
+
+
+def _cmd_proxy_health(client: Scrawl, args: argparse.Namespace) -> int:
+    _emit_proxy(client.proxy_health())
+    return EXIT_OK
+
+
+def _cmd_keys_list(client: Scrawl, args: argparse.Namespace) -> int:
+    _emit(client.list_api_keys(), as_json=True)
+    return EXIT_OK
+
+
+def _cmd_keys_revoke(client: Scrawl, args: argparse.Namespace) -> int:
+    client.revoke_api_key(args.key_id)
+    _emit({"key_id": args.key_id, "revoked": True}, as_json=True)
     return EXIT_OK
 
 
@@ -701,8 +781,37 @@ def _doctor_checks(client: Scrawl, add: Any, checks: list[dict[str, str]], args:
 
 
 def _doctor_proxy(client: Scrawl, add: Any) -> int:
-    """Whether the key's subject has a proxy that passed its test: every job needs one, so without it this machine
-    is not ready (exit 3). A key that cannot read the proxy cannot start jobs either; that is a warning only."""
+    """Whether the proxy selected by the account's mode has passed its test."""
+    try:
+        pool = client.list_proxy_pool()
+    except PermissionDeniedError:
+        add("proxy", "warn", "cannot read proxy settings: the API key lacks scrape:write, so it cannot start jobs")
+        return EXIT_OK
+    except AuthenticationError as exc:
+        add("proxy", "fail", f"the API key was refused: {exc}")
+        return EXIT_CONFIG
+    except ScrawlError as exc:
+        add("proxy", "fail", f"GET /v1/proxy-pool: {exc}")
+        return EXIT_ERROR
+    mode = pool.get("mode") if isinstance(pool, dict) else None
+    if mode in ("pool", "required_pool"):
+        entries = pool.get("entries") or []
+        active = [entry for entry in entries if isinstance(entry, dict) and entry.get("status") == "ACTIVE"]
+        if active:
+            count = len(active)
+            add("proxy", "ok", f"{mode} mode: {count} tested entr{'y' if count == 1 else 'ies'} active")
+            return EXIT_OK
+        hint = "run scrawl proxy pool test ENTRY" if entries else "add one with scrawl proxy pool add, then test it"
+        add("proxy", "fail", f"{mode} mode: no active tested entries; {hint}")
+        return EXIT_CONFIG
+    if mode != "direct":
+        add("proxy", "fail", f"GET /v1/proxy-pool returned unknown mode {mode!r}")
+        return EXIT_ERROR
+    return _doctor_direct_proxy(client, add)
+
+
+def _doctor_direct_proxy(client: Scrawl, add: Any) -> int:
+    """The 0.1.2 direct-mode rule: the single proxy must have passed its test."""
     try:
         proxy = client.get_proxy()
     except NotFoundError:
@@ -718,7 +827,8 @@ def _doctor_proxy(client: Scrawl, add: Any) -> int:
         add("proxy", "fail", f"GET /v1/proxy: {exc}")
         return EXIT_ERROR
     if isinstance(proxy, dict) and proxy.get("usable"):
-        add("proxy", "ok", f"{proxy.get('sanitized_url')} passed its test {proxy.get('last_validated_at')}")
+        add("proxy", "ok", _redact_proxy_passwords(
+            f"{proxy.get('sanitized_url')} passed its test {proxy.get('last_validated_at')}"))
         return EXIT_OK
     state = proxy.get("validation_state") if isinstance(proxy, dict) else None
     add("proxy", "fail", f"the proxy is {state or 'not tested'}: run scrawl proxy test (jobs are refused until it "
@@ -942,6 +1052,43 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(handler=_cmd_proxy_test)
     p = proxy.add_parser("remove", help="remove it (jobs are refused again)")
     p.set_defaults(handler=_cmd_proxy_remove)
+    p = proxy.add_parser("health", help="free advisory report on proxy quality (does not decide job readiness)")
+    p.set_defaults(handler=_cmd_proxy_health)
+
+    pool = proxy.add_parser("pool", help="manage the account's proxy pool").add_subparsers(
+        dest="proxy_pool_command", required=True, metavar="ACTION")
+    p = pool.add_parser("list", help="show the proxy mode and redacted pool entries")
+    p.set_defaults(handler=_cmd_proxy_pool_list)
+    p = pool.add_parser("add", help="add an entry; the URL comes from an env var or stdin, never argv")
+    pool_url = p.add_mutually_exclusive_group()
+    pool_url.add_argument("--url-env", type=_env_name, metavar="NAME",
+                          help=f"read the proxy URL from this environment variable (default {DEFAULT_PROXY_URL_ENV})")
+    pool_url.add_argument("--url-stdin", action="store_true", help="read the proxy URL from the first line of stdin")
+    p.add_argument("--label", help="a unique name for the entry")
+    p.add_argument("--pool-id", help="optional UUID grouping entries into a pool")
+    p.set_defaults(handler=_cmd_proxy_pool_add)
+    for name, handler, text in (
+        ("test", _cmd_proxy_pool_test, "test an entry; a pass makes it active (exit 1 if not)"),
+        ("enable", _cmd_proxy_pool_enable, "enable an entry; test it again before use"),
+        ("disable", _cmd_proxy_pool_disable, "take an entry out of rotation"),
+        ("remove", _cmd_proxy_pool_remove, "permanently remove an entry"),
+    ):
+        p = pool.add_parser(name, help=text)
+        p.add_argument("entry_ref", help="entry id or label")
+        p.set_defaults(handler=handler)
+    p = pool.add_parser("mode", help="choose direct, pool or required_pool routing")
+    p.add_argument("mode", choices=("direct", "pool", "required_pool"))
+    p.set_defaults(handler=_cmd_proxy_pool_mode)
+
+    keys = sub.add_parser(
+        "keys", help="list or revoke hosted API keys (needs a keys:manage key: /api_keys create_manager in Telegram)"
+    ).add_subparsers(dest="keys_command", required=True, metavar="ACTION")
+    p = keys.add_parser("list", help="list keys (never their secret values); needs a key made in Telegram with "
+                                     "/api_keys create_manager")
+    p.set_defaults(handler=_cmd_keys_list)
+    p = keys.add_parser("revoke", help="permanently revoke a key; make replacements in Telegram with /api_keys create")
+    p.add_argument("key_id", help="key id from `scrawl keys list`")
+    p.set_defaults(handler=_cmd_keys_revoke)
 
     def asset_options(p: argparse.ArgumentParser) -> None:
         p.add_argument("url")

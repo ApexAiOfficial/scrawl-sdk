@@ -350,6 +350,111 @@
         "title": "APIKeyCreateResponse",
         "type": "object"
       },
+      "APIKeyInfo": {
+        "description": "One of the account's API keys. The key itself is never returned: it was shown once, when it was made.",
+        "properties": {
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "key_id": {
+            "title": "Key Id",
+            "type": "string"
+          },
+          "key_prefix": {
+            "description": "The first characters of the key, to recognise it by",
+            "title": "Key Prefix",
+            "type": "string"
+          },
+          "label": {
+            "description": "The name its owner gave it",
+            "title": "Label",
+            "type": "string"
+          },
+          "last_used_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Accurate to about a minute; null if never used",
+            "title": "Last Used At"
+          },
+          "revoked_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revoked At"
+          },
+          "scopes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Scopes",
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "active",
+              "revoked"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key_id",
+          "key_prefix",
+          "label",
+          "scopes",
+          "status",
+          "created_at"
+        ],
+        "title": "APIKeyInfo",
+        "type": "object"
+      },
+      "APIKeyListResponse": {
+        "description": "The account's keys: active ones first, newest first within each.",
+        "properties": {
+          "active": {
+            "description": "How many of them are active",
+            "title": "Active",
+            "type": "integer"
+          },
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "keys": {
+            "items": {
+              "$ref": "#/components/schemas/APIKeyInfo"
+            },
+            "title": "Keys",
+            "type": "array"
+          },
+          "limit": {
+            "description": "The most active keys one account may hold",
+            "title": "Limit",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "count",
+          "active",
+          "limit",
+          "keys"
+        ],
+        "title": "APIKeyListResponse",
+        "type": "object"
+      },
       "ActivateVersionRequest": {
         "description": "Make one completed version active (rollback or roll forward).",
         "properties": {
@@ -1334,6 +1439,14 @@
             },
             "title": "Items",
             "type": "array"
+          },
+          "outcomes": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "description": "Settled items by outcome: ok, target_blocked, target_error, cancelled, pipeline_failed. A blocked page is a completed item: only its outcome says the target refused it",
+            "title": "Outcomes",
+            "type": "object"
           },
           "status": {
             "enum": [
@@ -2682,6 +2795,18 @@
       "MapResponse": {
         "description": "Same-host URLs (page links first, then sitemap URLs), with the gated jobs that fetched them.",
         "properties": {
+          "block_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Why the target blocked or failed the start page",
+            "title": "Block Reason"
+          },
           "elapsed_ms": {
             "anyOf": [
               {
@@ -2714,6 +2839,18 @@
             ],
             "title": "Error"
           },
+          "hint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What to do next, when the target blocked the start page",
+            "title": "Hint"
+          },
           "job_ids": {
             "items": {
               "type": "string"
@@ -2727,6 +2864,25 @@
             },
             "title": "Links",
             "type": "array"
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "enum": [
+                  "ok",
+                  "target_blocked",
+                  "target_error",
+                  "cancelled",
+                  "pipeline_failed"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The start page's outcome (see ScrapeResponse); null while it is pending",
+            "title": "Outcome"
           },
           "sources": {
             "additionalProperties": {
@@ -2852,6 +3008,298 @@
           "url"
         ],
         "title": "ParseJobRequest",
+        "type": "object"
+      },
+      "PoolEntry": {
+        "description": "One entry of the account's pool, redacted.",
+        "properties": {
+          "consecutive_failures": {
+            "title": "Consecutive Failures",
+            "type": "integer"
+          },
+          "display": {
+            "description": "The proxy with its credentials masked",
+            "title": "Display",
+            "type": "string"
+          },
+          "entry_id": {
+            "title": "Entry Id",
+            "type": "string"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "last_check_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Check Status"
+          },
+          "last_checked_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Checked At"
+          },
+          "pool_id": {
+            "title": "Pool Id",
+            "type": "string"
+          },
+          "status": {
+            "description": "PENDING_LIVENESS, ACTIVE, FAILING, QUARANTINED, DISABLED or REMOVED (a removed entry is final and is no longer listed)",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "entry_id",
+          "label",
+          "pool_id",
+          "status",
+          "display",
+          "last_checked_at",
+          "last_check_status",
+          "consecutive_failures"
+        ],
+        "title": "PoolEntry",
+        "type": "object"
+      },
+      "PoolImportRequest": {
+        "properties": {
+          "label": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "pool_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional: a pool's id (a UUID) to group entries",
+            "title": "Pool Id"
+          },
+          "url": {
+            "description": "scheme://[user:pass@]host:port (http, https or socks5)",
+            "maxLength": 2048,
+            "minLength": 1,
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "title": "PoolImportRequest",
+        "type": "object"
+      },
+      "PoolModeRequest": {
+        "properties": {
+          "mode": {
+            "enum": [
+              "direct",
+              "pool",
+              "required_pool"
+            ],
+            "title": "Mode",
+            "type": "string"
+          }
+        },
+        "required": [
+          "mode"
+        ],
+        "title": "PoolModeRequest",
+        "type": "object"
+      },
+      "PoolTestResponse": {
+        "properties": {
+          "entry": {
+            "$ref": "#/components/schemas/PoolEntry"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason",
+          "entry"
+        ],
+        "title": "PoolTestResponse",
+        "type": "object"
+      },
+      "PoolView": {
+        "properties": {
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/PoolEntry"
+            },
+            "title": "Entries",
+            "type": "array"
+          },
+          "mode": {
+            "description": "direct (your single proxy), pool or required_pool",
+            "title": "Mode",
+            "type": "string"
+          }
+        },
+        "required": [
+          "mode",
+          "entries"
+        ],
+        "title": "PoolView",
+        "type": "object"
+      },
+      "ProxyHealthResponse": {
+        "description": "An advisory report on your proxy. It never decides whether the proxy may carry jobs.",
+        "properties": {
+          "advice": {
+            "description": "What the report means for charging: proxy quality is your choice",
+            "title": "Advice",
+            "type": "string"
+          },
+          "asn": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The exit network's AS number, when known",
+            "title": "Asn"
+          },
+          "asn_org": {
+            "title": "Asn Org",
+            "type": "string"
+          },
+          "auth_ok": {
+            "description": "False when the proxy rejected the credentials (407)",
+            "title": "Auth Ok",
+            "type": "boolean"
+          },
+          "checked_at": {
+            "title": "Checked At",
+            "type": "string"
+          },
+          "country": {
+            "description": "The exit network's country code, when the deployment's ASN table knows it",
+            "title": "Country",
+            "type": "string"
+          },
+          "exit_prefix": {
+            "description": "The exit address's /24 (IPv4) or /48 (IPv6); the full address is not kept",
+            "title": "Exit Prefix",
+            "type": "string"
+          },
+          "ip_type": {
+            "description": "datacenter, residential, mobile or unknown",
+            "title": "Ip Type",
+            "type": "string"
+          },
+          "latency_ms": {
+            "title": "Latency Ms",
+            "type": "integer"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "proxy": {
+            "description": "The proxy URL with any credentials replaced by ***",
+            "title": "Proxy",
+            "type": "string"
+          },
+          "reachable": {
+            "description": "Whether the proxy carried a request",
+            "title": "Reachable",
+            "type": "boolean"
+          },
+          "reference": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Each reference site's host: ok, blocked (it refused this exit) or error (no answer)",
+            "title": "Reference",
+            "type": "object"
+          },
+          "reference_blocked": {
+            "description": "Reference sites that refused this exit",
+            "title": "Reference Blocked",
+            "type": "integer"
+          },
+          "reference_checked": {
+            "description": "Reference sites that answered",
+            "title": "Reference Checked",
+            "type": "integer"
+          },
+          "reputation": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Reputation facts, when the deployment has a source",
+            "title": "Reputation"
+          }
+        },
+        "required": [
+          "proxy",
+          "reachable",
+          "auth_ok",
+          "latency_ms",
+          "exit_prefix",
+          "country",
+          "asn",
+          "asn_org",
+          "ip_type",
+          "reference",
+          "reference_checked",
+          "reference_blocked",
+          "reputation",
+          "checked_at",
+          "notes",
+          "advice"
+        ],
+        "title": "ProxyHealthResponse",
         "type": "object"
       },
       "ProxyInfo": {
@@ -3241,6 +3689,18 @@
             ],
             "title": "Ai"
           },
+          "block_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Why the target blocked or failed (a fixed vocabulary)",
+            "title": "Block Reason"
+          },
           "browser": {
             "anyOf": [
               {
@@ -3321,6 +3781,18 @@
             "description": "browser only: the page's URL after redirects",
             "title": "Final Url"
           },
+          "hint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What to do next, for a blocked result",
+            "title": "Hint"
+          },
           "html": {
             "anyOf": [
               {
@@ -3383,6 +3855,37 @@
               }
             ],
             "title": "Markdown"
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "enum": [
+                  "ok",
+                  "target_blocked",
+                  "target_error",
+                  "cancelled",
+                  "pipeline_failed"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "null while pending; then ok; target_blocked (the target refused: 401/403/429/451, a challenge, CAPTCHA or soft-block page, robots.txt); target_error (the target or your proxy failed); cancelled (cancelled after it started); pipeline_failed (Scrawl itself failed; the only refunded case). status 'failed' with outcome 'ok': the page was fetched and your own JSON extraction failed",
+            "title": "Outcome"
+          },
+          "retry_after_s": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The target's Retry-After, when it sent one",
+            "title": "Retry After S"
           },
           "status": {
             "enum": [
@@ -6758,6 +7261,167 @@
         ]
       }
     },
+    "/v1/keys": {
+      "get": {
+        "description": "List your account's API keys (hosted). Keys are created in Telegram with /api_keys create.",
+        "operationId": "list_api_keys",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIKeyListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "List Api Keys",
+        "tags": [
+          "keys"
+        ]
+      }
+    },
+    "/v1/keys/{key_id}": {
+      "delete": {
+        "description": "Revoke one of your account's API keys for good (hosted). It stops working at its next request.\n\nA key may revoke itself. A key of another account, a revoked one and one that never existed are all 404.",
+        "operationId": "revoke_api_key",
+        "parameters": [
+          {
+            "description": "The key's id, from GET /v1/keys",
+            "in": "path",
+            "name": "key_id",
+            "required": true,
+            "schema": {
+              "description": "The key's id, from GET /v1/keys",
+              "pattern": "^[0-9a-f]{32}$",
+              "title": "Key Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Revoke Api Key",
+        "tags": [
+          "keys"
+        ]
+      }
+    },
     "/v1/map": {
       "post": {
         "description": "Map a site: same-host URLs of the start page plus its sitemap.xml, from gated fetch jobs.\n\nEach fetch is an ordinary scrape job (billed and policed as one). The start page still\nrunning at the end of `wait_seconds`: `pending` (HTTP 202) with the job IDs. A retry with the\nsame `Idempotency-Key` returns the first response without fetching again.",
@@ -7150,6 +7814,733 @@
           }
         },
         "summary": "Set Proxy",
+        "tags": [
+          "proxy"
+        ]
+      }
+    },
+    "/v1/proxy-pool": {
+      "get": {
+        "description": "Your account's proxy mode and pool entries (redacted).",
+        "operationId": "get_proxy_pool",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PoolView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Get Proxy Pool",
+        "tags": [
+          "proxy"
+        ]
+      },
+      "post": {
+        "description": "Add a proxy to your pool. It carries jobs once a test passes (POST /v1/proxy-pool/{entry}/test).",
+        "operationId": "add_proxy_pool_entry",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PoolImportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PoolEntry"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Add Proxy Pool Entry",
+        "tags": [
+          "proxy"
+        ]
+      }
+    },
+    "/v1/proxy-pool/mode": {
+      "put": {
+        "description": "direct: your single proxy carries jobs. pool or required_pool: a pool entry whose test passed recently does.\nNo mode ever runs a job from the service's own address.",
+        "operationId": "set_proxy_pool_mode",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PoolModeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PoolView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Set Proxy Pool Mode",
+        "tags": [
+          "proxy"
+        ]
+      }
+    },
+    "/v1/proxy-pool/{entry_ref}": {
+      "delete": {
+        "description": "Remove an entry from your pool.",
+        "operationId": "remove_proxy_pool_entry",
+        "parameters": [
+          {
+            "description": "The entry's id or label",
+            "in": "path",
+            "name": "entry_ref",
+            "required": true,
+            "schema": {
+              "description": "The entry's id or label",
+              "maxLength": 128,
+              "minLength": 1,
+              "title": "Entry Ref",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Remove Proxy Pool Entry",
+        "tags": [
+          "proxy"
+        ]
+      }
+    },
+    "/v1/proxy-pool/{entry_ref}/disable": {
+      "post": {
+        "description": "Take an entry out of rotation without removing it.",
+        "operationId": "disable_proxy_pool_entry",
+        "parameters": [
+          {
+            "description": "The entry's id or label",
+            "in": "path",
+            "name": "entry_ref",
+            "required": true,
+            "schema": {
+              "description": "The entry's id or label",
+              "maxLength": 128,
+              "minLength": 1,
+              "title": "Entry Ref",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PoolEntry"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Disable Proxy Pool Entry",
+        "tags": [
+          "proxy"
+        ]
+      }
+    },
+    "/v1/proxy-pool/{entry_ref}/enable": {
+      "post": {
+        "description": "Re-enable a disabled or quarantined entry; it carries jobs again after a passing test.",
+        "operationId": "enable_proxy_pool_entry",
+        "parameters": [
+          {
+            "description": "The entry's id or label",
+            "in": "path",
+            "name": "entry_ref",
+            "required": true,
+            "schema": {
+              "description": "The entry's id or label",
+              "maxLength": 128,
+              "minLength": 1,
+              "title": "Entry Ref",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PoolEntry"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Enable Proxy Pool Entry",
+        "tags": [
+          "proxy"
+        ]
+      }
+    },
+    "/v1/proxy-pool/{entry_ref}/test": {
+      "post": {
+        "description": "Send one liveness request through the entry and record the outcome; a pass makes it ACTIVE.",
+        "operationId": "test_proxy_pool_entry",
+        "parameters": [
+          {
+            "description": "The entry's id or label",
+            "in": "path",
+            "name": "entry_ref",
+            "required": true,
+            "schema": {
+              "description": "The entry's id or label",
+              "maxLength": 128,
+              "minLength": 1,
+              "title": "Entry Ref",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PoolTestResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Test Proxy Pool Entry",
+        "tags": [
+          "proxy"
+        ]
+      }
+    },
+    "/v1/proxy/health": {
+      "post": {
+        "description": "A free, advisory report on your proxy: its exit's network type and whether ordinary sites block it.",
+        "operationId": "check_proxy_health",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProxyHealthResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Check Proxy Health",
         "tags": [
           "proxy"
         ]
@@ -8213,7 +9604,7 @@
     },
     "/v1/scrapy/version": {
       "get": {
-        "description": "Return Scrapy version through ApexAPI.",
+        "description": "Return Scrapy version through ApexAPI (self-hosted only: an operator command, as on MCP).",
         "operationId": "scrapy_version_v1_scrapy_version_get",
         "responses": {
           "200": {

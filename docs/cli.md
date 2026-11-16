@@ -21,6 +21,9 @@ scrawl doctor                      # base URL, TLS, reachability (GET /v1/health
 scrawl --json doctor               # the same checks as JSON: {"ok": ..., "checks": [...]}
 ```
 
+In `direct` mode, doctor requires the single proxy to have passed its test. In `pool` or `required_pool` mode,
+it requires at least one active pool entry that passed its test. It never reports ready with no tested proxy.
+
 ## Scrape, map, batch
 
 ```bash
@@ -45,6 +48,11 @@ needs `ai:use` as well as `scrape:write`. `cancel` needs the scope that starts t
 `--browser` keeps the downgrade guard: a finished result, or a finished batch item, that another engine
 rendered (a Scrawl version that predates the browser engine) is an error (`render_not_supported`, exit 5); `batch`
 still prints the batch first, so its id is not lost.
+
+For a non-JSON scrape, the CLI writes `outcome` (and any `block_reason`, `retry_after_s` and `hint`) to stderr
+while the selected content stays on stdout. Full scrape JSON and batch output include those fields and the
+batch's `outcomes` counts. Refunds are automatic and cover only Scrawl's own failures: a job that never started, and a scrape whose outcome is `pipeline_failed`. Target blocks/errors, failures in your proxy and
+cancellations after work starts remain charged.
 
 ## Crawls, jobs, artifacts
 
@@ -96,10 +104,19 @@ scrawl proxy set --url-stdin < proxy-url.txt     # URL from the first line of st
 scrawl proxy test                                # one real HTTPS request through it; exit 1 if it fails
 scrawl proxy show                                # the proxy (credentials masked) and whether it is usable
 scrawl proxy remove                              # jobs are refused again until you set and test another
+scrawl proxy health                              # free advisory quality report; does not change readiness
+scrawl proxy pool list                           # mode and entries (credentials masked)
+scrawl proxy pool add --label provider-a         # URL from SCRAWL_PROXY_URL, as for proxy set
+scrawl proxy pool test provider-a                # a pass makes the entry active
+scrawl proxy pool disable provider-a
+scrawl proxy pool enable provider-a              # test it again before use
+scrawl proxy pool mode required_pool
+scrawl proxy pool remove provider-a
 ```
 
-The URL is `scheme://[user:pass@]host:port` with `http`, `https`, `socks5` or `socks5h`. It is never a
-command-line argument, and the username and password are never returned.
+The URL is `scheme://[user:pass@]host:port` with `http`, `https`, `socks5` or `socks5h`. For both `proxy set`
+and `proxy pool add`, it is never a command-line argument: use `--url-env` or `--url-stdin`. Proxy passwords are
+never returned, and the CLI masks unexpected URL userinfo defensively.
 
 ## Your AI providers
 
@@ -133,7 +150,13 @@ scrawl assets-result job_123 --out ./assets                          # download 
 
 ```bash
 scrawl balance
+scrawl keys list
+scrawl keys revoke 0123456789abcdef0123456789abcdef
 ```
+
+Hosted keys are created in Telegram with `/api_keys create`; the CLI and SDKs deliberately have no create
+operation. Listing and revoking keys need `keys:manage`, which a key made with `/api_keys create_manager` holds;
+revocation is permanent and a key may revoke itself.
 
 ## Exit codes
 
@@ -142,6 +165,6 @@ scrawl balance
 | 0 | Success |
 | 1 | The job (or a batch item) failed, or a downloaded file did not match its size or SHA-256 (it was not written); `ai providers test` failed |
 | 2 | Usage error, or a file already exists where a download would go (nothing is overwritten) |
-| 3 | Authentication or configuration: 401/403, no API key, an unusable base URL or AI key; in `doctor`, a TLS failure or no proxy that has passed its test |
+| 3 | Authentication or configuration: 401/403, no API key, an unusable base URL or AI key; in `doctor`, a TLS failure or no proxy that has passed its test (in pool modes, no pool entry that has) |
 | 4 | Still pending or running at the deadline |
 | 5 | Any other API or connection error |

@@ -1,26 +1,26 @@
 {
-  "digest": "sha256:417e9fceab16d1d328ca33f4b4b6a576dec28cfe27ff4d8de74bb2b72e1e413a",
+  "digest": "sha256:050c240215bf1710f7f9b460dcec1be6b7245667d971ceae0ac9ac518163c1b7",
   "digest_algorithm": "sha256sum-listing-v1",
   "files": {
     "apexapi_errors.json": {
-      "bytes": 15509,
-      "sha256": "40e7d59938b1de2fe0f6772250ec4fc4d53f73c8f5ccb0b87da95ff59386ee26"
+      "bytes": 15546,
+      "sha256": "bfbb43d69a003cad55eabf47f0a62a433e49c917f8b10ac8be2de12355a36749"
     },
     "apexapi_openapi.json": {
-      "bytes": 225719,
-      "sha256": "b509990c5cbe7b4019c505d8a27ba446ebe2f4301116291e177c7637983382eb"
+      "bytes": 264678,
+      "sha256": "46afcf544ee3628920848cf4ecc403a28e97be3aff1579bdb52dd358ee382698"
     },
     "apexapi_scopes.json": {
-      "bytes": 14734,
-      "sha256": "e41e8e1bd65094c4386fd2db84e38641855b89d343e52e8916638bd880449640"
+      "bytes": 16497,
+      "sha256": "0cfec0cc4ab709da9fed608dd0808114054ffa9badde445784f7f8353738d6bc"
     },
     "mcp_resources.json": {
       "bytes": 1922,
       "sha256": "bbf330c9f0682e6ad878bcb269d36efed12a178fbb2e8e614c56186be11beb45"
     },
     "mcp_tools.json": {
-      "bytes": 125695,
-      "sha256": "e51ab36448d67ce8f1fa63a958734b486af3e86f47956587c36ab7d9283ea8a5"
+      "bytes": 131753,
+      "sha256": "d9ae58397b11d20e451f4c2b0bee40d5494b8d879ab63dc2c6c1be3be0960ce6"
     }
   },
   "format": 1,

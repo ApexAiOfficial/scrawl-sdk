@@ -157,6 +157,17 @@ test("a 429 carries Retry-After and the retry waits that long", async () => {
   assert.equal(keys.size, 1, "a retry reuses the same Idempotency-Key");
 });
 
+test("a long Retry-After is returned immediately instead of capped and retried", async () => {
+  const limited = { status: 429, body: { error: { code: "rate_limited", message: "daily limit reached" } },
+    headers: { "Retry-After": "86400" } };
+  const { client, fetch, sleeps } = makeClient([limited]);
+  const error = await client.getJob("j").catch((exc) => exc);
+  assert.ok(error instanceof RateLimitError);
+  assert.equal(error.retryAfter, 86400);
+  assert.equal(fetch.calls.length, 1);
+  assert.deepEqual(sleeps, []);
+});
+
 test("idempotent submits and GETs retry 5xx and network errors with backoff", async () => {
   const { client, fetch, sleeps } = makeClient([{ status: 503, body: {} }, new TypeError("fetch failed"), DONE]);
   const result = await client.map("https://e.example", { idempotencyKey: "mine" });

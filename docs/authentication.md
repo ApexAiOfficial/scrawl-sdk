@@ -35,8 +35,9 @@ The key never crosses a network in clear text:
   `allow_insecure_http=True` / `allowInsecureHttp: true` or `SCRAWL_ALLOW_INSECURE_HTTP=1`.
 
 `scrawl doctor` checks all of this: the base URL and where it came from, TLS, whether the endpoint answers
-`GET /v1/health`, whether the key is accepted, and whether your proxy has passed its test (every job needs one, so
-it says "not ready" until then). It never prints the key.
+`GET /v1/health`, whether the key is accepted, and whether the proxy selected by the account's mode is ready. In
+`direct` mode the single proxy must have passed its test; in `pool` or `required_pool` mode at least one active
+pool entry must have passed. It never prints the key.
 
 ## Scopes
 
@@ -45,12 +46,13 @@ unless ApexAi issues one with other scopes; the AI scopes are never on by defaul
 
 | Scope | Lets the key |
 | --- | --- |
-| `scrape:write` | scrape, map, batch, crawl, extract assets, cancel jobs (other than AI extraction jobs), activate versions, quarantine records |
+| `scrape:write` | scrape, map, batch, crawl, extract assets, manage and check the direct proxy or proxy pool, cancel jobs (other than AI extraction jobs), activate versions, quarantine records |
 | `jobs:read` | read jobs and list them |
 | `artifacts:read` | read results, artifacts, assets, datasets, versions, diffs, fields, queries, search, documents |
 | `credits:read` | read the credit balance |
 | `ai:configure` | manage your AI provider profiles and read your AI usage |
 | `ai:use` | JSON scrapes and batches (together with `scrape:write`), `extract`, `ask` and dataset extraction with your own AI provider, and cancelling dataset extraction jobs |
+| `keys:manage` | list the hosted account's API keys and revoke one; keys are created only in Telegram (`/api_keys create`, or `/api_keys create_manager` for a key that holds this scope) |
 
 Two requests need more than the scope of their route:
 
