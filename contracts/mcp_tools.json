@@ -860,6 +860,18 @@
               "default": null,
               "title": "Ai"
             },
+            "block_reason": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Block Reason"
+            },
             "browser": {
               "anyOf": [
                 {
@@ -951,6 +963,18 @@
               "default": null,
               "title": "Final Url"
             },
+            "hint": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Hint"
+            },
             "html": {
               "anyOf": [
                 {
@@ -1005,6 +1029,30 @@
               ],
               "default": null,
               "title": "Markdown"
+            },
+            "outcome": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Outcome"
+            },
+            "retry_after_s": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Retry After S"
             },
             "status": {
               "title": "Status",
@@ -1065,6 +1113,13 @@
           },
           "title": "Items",
           "type": "array"
+        },
+        "outcomes": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Outcomes",
+          "type": "object"
         },
         "status": {
           "title": "Status",
@@ -1194,6 +1249,18 @@
               "default": null,
               "title": "Ai"
             },
+            "block_reason": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Block Reason"
+            },
             "browser": {
               "anyOf": [
                 {
@@ -1285,6 +1352,18 @@
               "default": null,
               "title": "Final Url"
             },
+            "hint": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Hint"
+            },
             "html": {
               "anyOf": [
                 {
@@ -1339,6 +1418,30 @@
               ],
               "default": null,
               "title": "Markdown"
+            },
+            "outcome": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Outcome"
+            },
+            "retry_after_s": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Retry After S"
             },
             "status": {
               "title": "Status",
@@ -1399,6 +1502,13 @@
           },
           "title": "Items",
           "type": "array"
+        },
+        "outcomes": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Outcomes",
+          "type": "object"
         },
         "status": {
           "title": "Status",
@@ -3254,6 +3364,18 @@
     "outputSchema": {
       "description": "A site map: same-host URLs from the start page and its sitemap (gated scrape jobs).",
       "properties": {
+        "block_reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Block Reason"
+        },
         "elapsed_ms": {
           "anyOf": [
             {
@@ -3283,6 +3405,18 @@
           "default": null,
           "title": "Error"
         },
+        "hint": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Hint"
+        },
         "job_ids": {
           "items": {
             "type": "string"
@@ -3308,6 +3442,18 @@
           ],
           "default": null,
           "title": "Next"
+        },
+        "outcome": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Outcome"
         },
         "sources": {
           "additionalProperties": {
@@ -3409,6 +3555,18 @@
     "outputSchema": {
       "description": "A site map: same-host URLs from the start page and its sitemap (gated scrape jobs).",
       "properties": {
+        "block_reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Block Reason"
+        },
         "elapsed_ms": {
           "anyOf": [
             {
@@ -3438,6 +3596,18 @@
           "default": null,
           "title": "Error"
         },
+        "hint": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Hint"
+        },
         "job_ids": {
           "items": {
             "type": "string"
@@ -3463,6 +3633,18 @@
           ],
           "default": null,
           "title": "Next"
+        },
+        "outcome": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Outcome"
         },
         "sources": {
           "additionalProperties": {
@@ -4220,6 +4402,18 @@
           "default": null,
           "title": "Ai"
         },
+        "block_reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Block Reason"
+        },
         "browser": {
           "anyOf": [
             {
@@ -4311,6 +4505,18 @@
           "default": null,
           "title": "Final Url"
         },
+        "hint": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Hint"
+        },
         "html": {
           "anyOf": [
             {
@@ -4365,6 +4571,30 @@
           ],
           "default": null,
           "title": "Markdown"
+        },
+        "outcome": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Outcome"
+        },
+        "retry_after_s": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Retry After S"
         },
         "status": {
           "title": "Status",
@@ -4531,6 +4761,18 @@
           "default": null,
           "title": "Ai"
         },
+        "block_reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Block Reason"
+        },
         "browser": {
           "anyOf": [
             {
@@ -4622,6 +4864,18 @@
           "default": null,
           "title": "Final Url"
         },
+        "hint": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Hint"
+        },
         "html": {
           "anyOf": [
             {
@@ -4676,6 +4930,30 @@
           ],
           "default": null,
           "title": "Markdown"
+        },
+        "outcome": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Outcome"
+        },
+        "retry_after_s": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Retry After S"
         },
         "status": {
           "title": "Status",

@@ -269,6 +269,22 @@
     },
     {
       "auth": "api_key",
+      "method": "GET",
+      "path": "/v1/keys",
+      "scopes_any_of": [
+        "keys:manage"
+      ]
+    },
+    {
+      "auth": "api_key",
+      "method": "DELETE",
+      "path": "/v1/keys/{key_id}",
+      "scopes_any_of": [
+        "keys:manage"
+      ]
+    },
+    {
+      "auth": "api_key",
       "method": "POST",
       "path": "/v1/map",
       "scopes_any_of": [
@@ -295,6 +311,70 @@
       "auth": "api_key",
       "method": "PUT",
       "path": "/v1/proxy",
+      "scopes_any_of": [
+        "scrape:write"
+      ]
+    },
+    {
+      "auth": "api_key",
+      "method": "GET",
+      "path": "/v1/proxy-pool",
+      "scopes_any_of": [
+        "scrape:write"
+      ]
+    },
+    {
+      "auth": "api_key",
+      "method": "POST",
+      "path": "/v1/proxy-pool",
+      "scopes_any_of": [
+        "scrape:write"
+      ]
+    },
+    {
+      "auth": "api_key",
+      "method": "PUT",
+      "path": "/v1/proxy-pool/mode",
+      "scopes_any_of": [
+        "scrape:write"
+      ]
+    },
+    {
+      "auth": "api_key",
+      "method": "DELETE",
+      "path": "/v1/proxy-pool/{entry_ref}",
+      "scopes_any_of": [
+        "scrape:write"
+      ]
+    },
+    {
+      "auth": "api_key",
+      "method": "POST",
+      "path": "/v1/proxy-pool/{entry_ref}/disable",
+      "scopes_any_of": [
+        "scrape:write"
+      ]
+    },
+    {
+      "auth": "api_key",
+      "method": "POST",
+      "path": "/v1/proxy-pool/{entry_ref}/enable",
+      "scopes_any_of": [
+        "scrape:write"
+      ]
+    },
+    {
+      "auth": "api_key",
+      "method": "POST",
+      "path": "/v1/proxy-pool/{entry_ref}/test",
+      "scopes_any_of": [
+        "scrape:write"
+      ]
+    },
+    {
+      "auth": "api_key",
+      "method": "POST",
+      "path": "/v1/proxy/health",
       "scopes_any_of": [
         "scrape:write"
       ]
@@ -644,7 +724,7 @@
   "scopes": [
     {
       "default": true,
-      "description": "Start and quote jobs (Scrapy commands, scrape, map, batch, crawl and asset extraction), register, test and remove the caller's own proxy (which every job needs), change datasets (activate a version, quarantine a record) and cancel jobs.",
+      "description": "Start and quote jobs (Scrapy commands, scrape, map, batch, crawl and asset extraction), manage the caller's own proxy or hosted proxy pool (every job needs one), change datasets and cancel jobs.",
       "name": "scrape:write"
     },
     {
@@ -676,6 +756,11 @@
       "default": false,
       "description": "Run AI extraction and questions with the caller's own AI provider, spending that provider's credit (also the json scrape format and cancelling the caller's AI extraction jobs).",
       "name": "ai:use"
+    },
+    {
+      "default": false,
+      "description": "List the account's own API keys and revoke one (hosted). No key can create a key, and a key carries this scope only when its owner asked for it.",
+      "name": "keys:manage"
     }
   ],
   "wildcard": "*"
