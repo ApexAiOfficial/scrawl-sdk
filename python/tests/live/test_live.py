@@ -26,6 +26,7 @@ import os
 import uuid
 from collections.abc import Callable, Iterator
 from typing import Any
+from urllib.parse import urlsplit
 
 import pytest
 
@@ -109,7 +110,8 @@ def test_proxy_pool(client: Scrawl) -> None:
         client.add_proxy_pool_entry(url, label=label)
         added = True
         tested = client.test_proxy_pool_entry(label)
-        assert tested.entry.status == "ACTIVE" and "password" not in tested.entry.display.lower()
+        secret = urlsplit(url).password or ""
+        assert tested.entry.status == "ACTIVE" and (not secret or secret not in tested.entry.display)
         assert client.disable_proxy_pool_entry(label).status == "DISABLED"
         assert client.enable_proxy_pool_entry(label).status != "ACTIVE"
         assert client.test_proxy_pool_entry(label).entry.status == "ACTIVE"
@@ -131,7 +133,9 @@ def test_proxy_health_is_advisory(client: Scrawl) -> None:
 def test_list_hosted_api_keys(client: Scrawl) -> None:
     need("SCRAWL_LIVE_KEYS")
     result = client.list_api_keys()
-    assert result.count == len(result.keys) and all("key" not in item or "key_id" in item for item in result.keys)
+    assert result.count == len(result.keys)
+    for item in result.keys:                         # a listing never carries a key's secret value
+        assert "key" not in item and item.key_prefix and len(item.key_prefix) < 20
 
 
 @covers("DELETE /v1/keys/{key_id}")

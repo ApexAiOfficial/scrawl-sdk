@@ -174,7 +174,8 @@ profiles, and `ai:use` runs JSON scrapes, `extract`, `ask` and dataset extractio
 
 Check a setup before writing code. `scrawl doctor` checks the base URL, TLS, reachability (`GET /v1/health`), the
 key and your proxy, and never prints the key. Every job needs your own proxy, so it says "not ready" (exit 3) until
-the proxy has passed `scrawl proxy test`:
+the proxy has passed `scrawl proxy test`, or, in `pool` or `required_pool` mode, until a pool entry has passed
+`scrawl proxy pool test`:
 
 ```bash
 export SCRAWL_BASE_URL=https://scrawl.example    # the endpoint ApexAi provides for your account
@@ -289,8 +290,8 @@ The snippets in this section continue from the quickstart's `client`. Each SDK h
 | Datasets | `list_datasets`, `get_dataset`, `list_versions`, `activate_version`, `diff_versions`, `dataset_fields`, `query_dataset`, `extract_dataset`, `quarantine_record`, `release_record`, `search`, `get_document` | `datasets`, `search`, `document` |
 | Your AI provider | `extract`, `ask`, `list_ai_providers`, `set_ai_provider`, `set_default_ai_provider`, `test_ai_provider`, `delete_ai_provider`, `ai_usage` | `extract`, `ask`, `ai providers` |
 | Files and media | `quote_assets`, `extract_assets`, `get_assets`, `download_asset` | `assets-quote`, `assets`, `assets-result` |
-| Proxy | `get_proxy`, `set_proxy`, `test_proxy`, `remove_proxy`, `list_proxy_pool`, `add_proxy_pool_entry`, `test_proxy_pool_entry`, `enable_proxy_pool_entry`, `disable_proxy_pool_entry`, `remove_proxy_pool_entry`, `set_proxy_pool_mode`, `proxy_health` | `proxy show|set|test|remove|health`, `proxy pool list|add|test|enable|disable|remove|mode` |
-| Account | `credit_balance`, `health`, `list_api_keys`, `revoke_api_key` | `balance`, `doctor`, `keys list|revoke` |
+| Proxy | `get_proxy`, `set_proxy`, `test_proxy`, `remove_proxy`, `list_proxy_pool`, `add_proxy_pool_entry`, `test_proxy_pool_entry`, `enable_proxy_pool_entry`, `disable_proxy_pool_entry`, `remove_proxy_pool_entry`, `set_proxy_pool_mode`, `proxy_health` | `proxy show\|set\|test\|remove\|health`, `proxy pool list\|add\|test\|enable\|disable\|remove\|mode` |
+| Account | `credit_balance`, `health`, `list_api_keys`, `revoke_api_key` | `balance`, `doctor`, `keys list\|revoke` |
 | Helpers | `wait_for_scrape`, `wait_for_batch`, `wait_for_job`, `wait_for_assets`, `paginate` | `--wait` options |
 
 Method signatures and options: [Python guide](docs/python.md), [TypeScript guide](docs/typescript.md),
@@ -371,7 +372,9 @@ The SDKs retry automatically (`max_retries` / `maxRetries`, default 2), with exp
 `Retry-After`:
 
 - **GETs** retry on 429, 502, 503, 504 and network errors.
-- **Keyed submits** retry on 429, network errors, and a 502, 503 or 504 from a proxy. A 5xx in Scrawl's own error
+- **Keyed submits** retry on 429, network errors, and a 502, 503 or 504 from a proxy.
+- **A 429 asking for more than 60 s** (a daily cap, for example) is never retried: it is raised at once as a
+  `RateLimitError` whose `retry_after` (`retryAfter` in TypeScript) holds the server's full wait. A 5xx in Scrawl's own error
   format is final. If a retry finds the first attempt still running (409), the SDK waits for its stored response.
 - **Other POSTs** and other 4xx are never retried.
 - **A code the error catalogue marks not retryable is never retried.** That includes `submission_failed` and

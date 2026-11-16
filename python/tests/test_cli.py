@@ -376,6 +376,21 @@ def test_proxy_pool_add_reads_the_url_off_argv_and_proxy_output_redacts_password
     assert usage.value.code == 2 and secret not in capsys.readouterr().err
 
 
+@pytest.mark.parametrize(("text", "secret"), [
+    ("http://user:p@ss-word@proxy.example:8000", "ss-word"),       # a password with "@": masked up to the last one
+    ("socks5://u:pw-1@proxy.example:1080/path", "pw-1"),
+    ("user:bare-secret@203.0.113.9:3128", "bare-secret"),           # no scheme
+])
+def test_proxy_output_masks_every_userinfo_shape(text: str, secret: str) -> None:
+    from scrawl.cli import _redact_proxy_passwords
+
+    masked = _redact_proxy_passwords({"display": text, "nested": [text]})
+    assert secret not in str(masked) and "***:***@" in masked["display"]
+    assert _redact_proxy_passwords(masked) == masked                 # masking what is masked changes nothing
+    assert _redact_proxy_passwords("a@b.example and https://docs.example/a@b") == (
+        "a@b.example and https://docs.example/a@b")
+
+
 def test_keys_help_says_creation_is_hosted_in_telegram(capsys) -> None:
     with pytest.raises(SystemExit) as shown:
         cli_main(["keys", "--help"])
