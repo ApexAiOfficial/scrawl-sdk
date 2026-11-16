@@ -5,6 +5,25 @@ versions follow [Semantic Versioning](https://semver.org/) (before 1.0, a minor 
 The Python package (`scrawl-sdk`) and the npm package (`@apexaiofficial/scrawl`) are released separately; each
 entry says which one it covers.
 
+## Python 0.1.4 and TypeScript 0.1.4 (2026-11-16)
+
+Built against contract digest
+`sha256:4ee1ab0125fcd4df1396abb77dd5c6a8360680be5aee5b434b0f78a8a9faf7c9`.
+
+### Added
+- `Job.warnings`: a list of strings about a run that still succeeded, for example a crawl that made zero requests.
+  It is filled when one job is read (`get_job` / `getJob`, and the jobs `wait` returns). It is empty in listings,
+  and empty when an older server omits it. `scrawl jobs get` shows it.
+
+### Changed
+- `Retry-After` in HTTP-date form (RFC 9110) is now understood, in both clients. It was treated as absent before.
+- A retryable 502, 503 or 504 whose `Retry-After` is above 60 seconds is raised at once, with the value on the
+  error's `retry_after` / `retryAfter`. Before, the client slept 60 seconds and retried sooner than the server
+  asked. Delays up to 60 seconds are still retried, as for 429.
+- `retry_after` / `retryAfter` is available on every Scrawl error, not only on rate-limit errors.
+- `scrawl map` exits 1, and says why on stderr, when the start page itself was blocked (`outcome:
+  target_blocked`). It exited 0 before.
+
 ## Python 0.1.3 and TypeScript 0.1.3 (2026-11-16)
 
 Built against contract digest

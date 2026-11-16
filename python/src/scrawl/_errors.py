@@ -153,16 +153,17 @@ def code_of(body: Any) -> str | None:
 
 
 class ScrawlError(Exception):
-    """Any failed Scrawl call. ``code`` is the API's stable machine code (e.g. ``"not_found"``)."""
+    """Any failed Scrawl call. ``code`` is stable; ``retry_after`` is set when the response supplied it."""
 
     def __init__(self, message: str, *, status: int | None = None, code: str | None = None,
-                 request_id: str | None = None, details: Any = None) -> None:
+                 request_id: str | None = None, details: Any = None, retry_after: float | None = None) -> None:
         super().__init__(message)
         self.message = message
         self.status = status
         self.code = str(code) if code is not None else None
         self.request_id = request_id
         self.details = details
+        self.retry_after = retry_after
 
     def __str__(self) -> str:
         parts = [self.message]
@@ -209,8 +210,7 @@ class RateLimitError(ScrawlError):
     """429: rate limited or ``too_many_active_jobs``; ``retry_after`` is in seconds when the API says."""
 
     def __init__(self, message: str, *, retry_after: float | None = None, **kwargs: Any) -> None:
-        super().__init__(message, **kwargs)
-        self.retry_after = retry_after
+        super().__init__(message, retry_after=retry_after, **kwargs)
 
 
 class ServerError(ScrawlError):
@@ -252,7 +252,5 @@ def error_for(status: int, body: Any, *, request_id: str | None, retry_after: fl
     message = message or f"HTTP {status}"
     cls = _BY_STATUS.get(status) or (ServerError if status >= 500 else ScrawlError)
     kwargs: dict[str, Any] = {"status": status, "code": code if isinstance(code, str) else None,
-                              "request_id": request_id, "details": details}
-    if cls is RateLimitError:
-        return RateLimitError(message, retry_after=retry_after, **kwargs)
+                              "request_id": request_id, "details": details, "retry_after": retry_after}
     return cls(message, **kwargs)

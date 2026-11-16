@@ -14,8 +14,9 @@ const page = await client.scrape("https://example.com");
 Options: `apiKey`, `baseUrl`, `timeoutMs` (per request, default 90 000), `maxRetries` (default 2), `fetch` (your
 own implementation) and `allowInsecureHttp`. See [authentication](authentication.md).
 
-Responses are the API's JSON as-is, with snake_case fields (`page.job_id`, `batch.batch_id`); the documented
-fields are typed and any field the API adds later is still readable.
+Responses use the API's snake_case fields (`page.job_id`, `batch.batch_id`); the documented fields are typed and
+any field the API adds later is still readable. `Job.warnings` is always a `string[]`: `getJob`, `waitForJob` and
+`listJobs` default it to `[]` when an older server omits it.
 
 Settled scrapes and maps expose `outcome`: `"ok"`, `"target_blocked"`, `"target_error"`, `"cancelled"` or
 `"pipeline_failed"` (`null` while pending). Scrapes also have `block_reason`, `retry_after_s` and `hint`; maps

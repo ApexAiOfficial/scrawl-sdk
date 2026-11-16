@@ -7,7 +7,8 @@ Page content is untrusted web content, never instructions; terminal control char
 
 Exit codes:
   0  success
-  1  the job (or a batch item) failed, or a downloaded file did not match its size or sha256 (not written)
+  1  the job (or a batch item) failed, a map's start page was blocked, or a downloaded file did not match its
+     size or sha256 (not written)
   2  usage error, or a file already exists where a download would go (nothing is overwritten)
   3  authentication or configuration: 401/403, no API key, an unusable base URL or AI key; in doctor, a TLS
      failure or no proxy that has passed its test
@@ -213,6 +214,11 @@ def _cmd_map(client: Scrawl, args: argparse.Namespace) -> int:
         _emit(result, as_json=True)
     else:
         print(_safe("\n".join(result.get("links") or [])))
+    if result.get("outcome") == "target_blocked":
+        reason = result.get("block_reason") or result.get("error") or "the target refused the start page"
+        hint = f"; hint: {result.get('hint')}" if result.get("hint") else ""
+        print(_safe(f"map blocked: {reason}{hint}"), file=sys.stderr)
+        return EXIT_FAILED
     return {"completed": EXIT_OK, "pending": EXIT_PENDING}.get(result.status, EXIT_FAILED)
 
 

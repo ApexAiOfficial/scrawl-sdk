@@ -20,6 +20,8 @@ import time
 import uuid
 from collections.abc import AsyncIterator, Iterator
 from dataclasses import dataclass, field
+from datetime import timezone
+from email.utils import parsedate_to_datetime
 from typing import Any
 from urllib.parse import quote, urlsplit
 
@@ -87,6 +89,19 @@ def _check_engine(request: _Request, result: Any) -> Any:
             and result.get("status") in ("completed", "failed") and result.get("engine") != "browser":
         raise ScrawlError("The server did not render this page in a browser (it may predate the browser engine)",
                           code=ErrorCode.RENDER_NOT_SUPPORTED.value, details={"engine": result.get("engine")})
+    return result
+
+
+def _with_job_defaults(request: _Request, result: Any) -> Any:
+    """Keep the Job model stable when an older server omits newer optional fields."""
+    if request.method != "GET" or not isinstance(result, ScrawlObject):
+        return result
+    if request.path == "/v1/jobs":
+        for job in result.get("jobs") or []:
+            if isinstance(job, ScrawlObject):
+                job.setdefault("warnings", [])
+    elif request.path.startswith("/v1/jobs/"):
+        result.setdefault("warnings", [])
     return result
 
 
@@ -482,7 +497,7 @@ class _Transport:
         return request.method == "GET" or request.idempotency_key is not None
 
     def retry_response(self, request: _Request, response: httpx.Response) -> bool:
-        """429 when Retry-After is at most 60 s; 502/503/504 according to method and responder.
+        """429/502/503/504 only when Retry-After is at most 60 s, according to method and responder.
 
         Never when the error code is one the catalogue marks not retryable, whatever the status: a resend
         after ``submission_failed`` or ``settlement_failed`` may charge twice. Scrawl's own 5xx on a keyed
@@ -494,9 +509,11 @@ class _Transport:
         body = _json_body(response)                    # only error bodies are parsed here: they are small
         if never_retry(code_of(body)):
             return False
+        retry_after = _retry_after(response)
+        if retry_after is not None and retry_after > 60.0:
+            return False
         if response.status_code == 429:
-            retry_after = _retry_after(response)
-            return retry_after is None or retry_after <= 60.0
+            return True
         if response.status_code not in RETRY_STATUSES:
             return False
         return request.method == "GET" or not _is_error_envelope(body)
@@ -533,15 +550,23 @@ class _Transport:
         except ValueError:
             raise ScrawlError("The API returned a response that is not JSON", status=response.status_code,
                               request_id=response.headers.get("X-Request-ID")) from None
-        return _check_engine(request, wrap(data))
+        return _with_job_defaults(request, _check_engine(request, wrap(data)))
 
 
 def _retry_after(response: httpx.Response) -> float | None:
     value = response.headers.get("Retry-After")
-    try:
-        return max(0.0, float(value)) if value is not None else None
-    except ValueError:
+    if value is None:
         return None
+    try:
+        return max(0.0, float(value))
+    except ValueError:
+        try:
+            when = parsedate_to_datetime(value)
+            if when.tzinfo is None:
+                when = when.replace(tzinfo=timezone.utc)
+            return max(0.0, when.timestamp() - time.time())
+        except (TypeError, ValueError, OverflowError):
+            return None
 
 
 def _items(page: Any) -> list[Any]:

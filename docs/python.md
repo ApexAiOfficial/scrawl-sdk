@@ -25,6 +25,9 @@ use `.get()` for fields that may be absent. An API field named like a dict metho
 batch's items; the method stays available as `dict.items(batch)`). Call `.to_dict()` for plain data, for
 example before `json.dumps` (which would otherwise call the `items` field).
 
+Jobs returned by `get_job` / `wait_for_job` expose `warnings` as a list of strings. It defaults to `[]` when an
+older server omits the field; job entries returned by `list_jobs` get the same default.
+
 Settled scrapes and maps expose `outcome`: `ok`, `target_blocked`, `target_error`, `cancelled` or
 `pipeline_failed` (`None` while pending). Scrapes also have `block_reason`, `retry_after_s` and `hint`; maps have
 `block_reason` and `hint`; batches have `outcomes` counts. Refunds are automatic and cover only Scrawl's own failures: a job that never started, and a scrape whose outcome is `pipeline_failed`. Target

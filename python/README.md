@@ -51,6 +51,8 @@ results expose `outcomes` counts. Only `pipeline_failed` is refunded. Both clien
 and proxy pools, run the advisory proxy-health report, and list/revoke hosted API keys. Hosted keys are created
 in Telegram with `/api_keys create`.
 
+`get_job` / `wait_for_job` expose `job.warnings` as a list of strings, defaulting to `[]` for older servers.
+
 ```bash
 scrawl scrape https://example.com                             # Markdown to stdout
 scrawl crawl my-target --wait 1800 && scrawl datasets
