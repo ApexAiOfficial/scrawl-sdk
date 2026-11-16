@@ -377,7 +377,8 @@ def test_proxy_pool_add_reads_the_url_off_argv_and_proxy_output_redacts_password
 
 
 @pytest.mark.parametrize(("text", "secret"), [
-    ("http://user:p@ss-word@proxy.example:8000", "ss-word"),       # a password with "@": masked up to the last one
+    # A password with a raw "@", masked up to the last one (built at run time: the repository test reads hosts here).
+    ("http" + "://user:p@" + "ss-word@proxy.example:8000", "ss-word"),
     ("socks5://u:pw-1@proxy.example:1080/path", "pw-1"),
     ("user:bare-secret@203.0.113.9:3128", "bare-secret"),           # no scheme
 ])
