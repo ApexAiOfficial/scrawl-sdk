@@ -60,6 +60,17 @@ def _argv(route: str, tmp: Path) -> list[str]:
         "PUT /v1/proxy": ["proxy", "set", "--label", "provider"],
         "POST /v1/proxy/test": ["proxy", "test"],
         "DELETE /v1/proxy": ["proxy", "remove"],
+        "GET /v1/proxy-pool": ["proxy", "pool", "list"],
+        "POST /v1/proxy-pool": ["proxy", "pool", "add", "--label", "pool-a",
+                                "--pool-id", "123e4567-e89b-12d3-a456-426614174000"],
+        "POST /v1/proxy-pool/{entry_ref}/test": ["proxy", "pool", "test", "pool-a"],
+        "POST /v1/proxy-pool/{entry_ref}/enable": ["proxy", "pool", "enable", "pool-a"],
+        "POST /v1/proxy-pool/{entry_ref}/disable": ["proxy", "pool", "disable", "pool-a"],
+        "DELETE /v1/proxy-pool/{entry_ref}": ["proxy", "pool", "remove", "pool-a"],
+        "PUT /v1/proxy-pool/mode": ["proxy", "pool", "mode", "required_pool"],
+        "POST /v1/proxy/health": ["proxy", "health"],
+        "GET /v1/keys": ["keys", "list"],
+        "DELETE /v1/keys/{key_id}": ["keys", "revoke", "0123456789abcdef0123456789abcdef"],
         "POST /v1/crawls": ["crawl", "example-target", "--export-format", "csv", "--max-items", "5",
                             "--max-seconds", "60"],
         "GET /v1/jobs/{job_id}": ["job", "j1", "--wait", "5"],
@@ -98,6 +109,42 @@ def test_each_covered_operation_is_reachable_from_the_cli(route: str, tmp_path: 
 
     monkeypatch.setenv("SCRAWL_AI_API_KEY", "sk-ai-test-key")
     monkeypatch.setenv("SCRAWL_PROXY_URL", "http://proxy.example:8000")
+    new_routes = {
+        "GET /v1/health": [httpx.Response(200, json={"status": "ok"}), httpx.Response(200, json={"jobs": []}),
+                           httpx.Response(200, json={"mode": "direct", "entries": []}),
+                           httpx.Response(200, json=TESTED_PROXY)],
+        "GET /v1/proxy-pool": httpx.Response(200, json={"mode": "direct", "entries": []}),
+        "POST /v1/proxy-pool": httpx.Response(204),
+        "POST /v1/proxy-pool/{entry_ref}/test": httpx.Response(200, json={"reason": "ok", "entry": {"status": "ACTIVE"}}),
+        "POST /v1/proxy-pool/{entry_ref}/enable": httpx.Response(200, json={"status": "PENDING_LIVENESS"}),
+        "POST /v1/proxy-pool/{entry_ref}/disable": httpx.Response(200, json={"status": "DISABLED"}),
+        "DELETE /v1/proxy-pool/{entry_ref}": httpx.Response(204),
+        "PUT /v1/proxy-pool/mode": httpx.Response(200, json={"mode": "required_pool", "entries": []}),
+        "POST /v1/proxy/health": httpx.Response(200, json={"reachable": True, "proxy": "http://proxy.example:8000"}),
+        "GET /v1/keys": httpx.Response(200, json={"count": 1, "active": 1, "limit": 5, "keys": []}),
+        "DELETE /v1/keys/{key_id}": httpx.Response(204),
+    }
+    if route in new_routes:
+        replies = new_routes[route] if isinstance(new_routes[route], list) else [new_routes[route]]
+        rec = Recorder(*replies)
+        code = cli_main(_argv(route, tmp_path), client=make_client(rec))
+        out = capsys.readouterr()
+        assert code == 0, out.err
+        expected = {
+            "GET /v1/health": ("GET", "/v1/health"),
+            "GET /v1/proxy-pool": ("GET", "/v1/proxy-pool"),
+            "POST /v1/proxy-pool": ("POST", "/v1/proxy-pool"),
+            "POST /v1/proxy-pool/{entry_ref}/test": ("POST", "/v1/proxy-pool/pool-a/test"),
+            "POST /v1/proxy-pool/{entry_ref}/enable": ("POST", "/v1/proxy-pool/pool-a/enable"),
+            "POST /v1/proxy-pool/{entry_ref}/disable": ("POST", "/v1/proxy-pool/pool-a/disable"),
+            "DELETE /v1/proxy-pool/{entry_ref}": ("DELETE", "/v1/proxy-pool/pool-a"),
+            "PUT /v1/proxy-pool/mode": ("PUT", "/v1/proxy-pool/mode"),
+            "POST /v1/proxy/health": ("POST", "/v1/proxy/health"),
+            "GET /v1/keys": ("GET", "/v1/keys"),
+            "DELETE /v1/keys/{key_id}": ("DELETE", "/v1/keys/0123456789abcdef0123456789abcdef"),
+        }[route]
+        assert expected in [(request.method, request.url.path) for request in rec.requests]
+        return
     fake = FakeApexAPI()
     fake.handle("PUT", "/v1/proxy", {"Authorization": "Bearer " + API_KEY},
                 b'{"scheme": "http", "host": "proxy.example", "port": 8000}')
@@ -124,11 +171,14 @@ def test_the_cli_documents_its_exit_codes() -> None:
 # -- scrape, map, batch, ask, crawl -----------------------------------------------------------------
 
 def test_cli_prints_markdown_and_maps_exit_codes(capsys) -> None:
-    rec = Recorder(httpx.Response(200, json={"job_id": "j", "status": "completed", "url": "u", "markdown": "# Page"}),
+    rec = Recorder(httpx.Response(200, json={"job_id": "j", "status": "completed", "url": "u", "markdown": "# Page",
+                                                   "outcome": "ok", "block_reason": None, "retry_after_s": None, "hint": None}),
                    httpx.Response(200, json={"job_id": "j", "status": "failed", "url": "u", "error": "Not a text page"}),
                    httpx.Response(401, json={"detail": "bad key", "code": "unauthorized"}))
     c = make_client(rec, max_retries=0)
-    assert cli_main(["scrape", "https://e.example/"], client=c) == 0 and capsys.readouterr().out.strip() == "# Page"
+    assert cli_main(["scrape", "https://e.example/"], client=c) == 0
+    shown = capsys.readouterr()
+    assert shown.out.strip() == "# Page" and "outcome: ok" in shown.err
     assert cli_main(["scrape", "https://e.example/x.png"], client=c) == 1
     assert cli_main(["jobs"], client=c) == 3                      # authentication -> 3
     assert cli_main(["job", "x"], client=make_client(Recorder(httpx.Response(422, json={"detail": "bad"})),
@@ -157,9 +207,11 @@ def test_cli_configuration_problems_exit_3_without_sending_anything(monkeypatch,
 def test_batch_status_exit_codes(capsys) -> None:
     def batch(status: str, items: list[str]) -> httpx.Response:
         return httpx.Response(200, json={"batch_id": "b1", "status": status, "total": len(items),
-                                         "items": [{"url": "u", "status": s} for s in items]})
+                                         "items": [{"url": "u", "status": s} for s in items],
+                                         "outcomes": {"ok": sum(s == "completed" for s in items)}})
 
     assert cli_main(["batch-status", "b1"], client=make_client(Recorder(batch("completed", ["completed"])))) == 0
+    assert json.loads(capsys.readouterr().out)["outcomes"] == {"ok": 1}
     assert cli_main(["batch-status", "b1"], client=make_client(Recorder(batch("completed", ["failed"])))) == 1
     assert cli_main(["batch-status", "b1"], client=make_client(Recorder(batch("running", ["pending"])))) == 4
     rec = Recorder(batch("running", ["pending"]), batch("completed", ["completed"]))
@@ -307,6 +359,31 @@ def test_ai_providers_test_exits_1_when_the_provider_fails_and_remove_reports(ca
                                                               ("DELETE", "/v1/ai/providers/p")]
 
 
+def test_proxy_pool_add_reads_the_url_off_argv_and_proxy_output_redacts_passwords(monkeypatch, capsys) -> None:
+    secret = "pool-password-must-not-print"
+    url = f"http://user:{secret}@proxy.example:8000"
+    monkeypatch.setenv("SCRAWL_PROXY_URL", url)
+    rec = Recorder(httpx.Response(204), httpx.Response(200, json={"mode": "pool", "entries": [
+        {"entry_id": "e1", "display": url, "status": "ACTIVE"}]}))
+    client = make_client(rec)
+    assert cli_main(["proxy", "pool", "add", "--label", "a"], client=client) == 0
+    assert body(rec.requests[0])["url"] == url
+    assert cli_main(["proxy", "pool", "list"], client=client) == 0
+    printed = capsys.readouterr()
+    assert secret not in printed.out + printed.err
+    with pytest.raises(SystemExit) as usage:
+        cli_main(["proxy", "pool", "add", url], client=client)
+    assert usage.value.code == 2 and secret not in capsys.readouterr().err
+
+
+def test_keys_help_says_creation_is_hosted_in_telegram(capsys) -> None:
+    with pytest.raises(SystemExit) as shown:
+        cli_main(["keys", "--help"])
+    assert shown.value.code == 0
+    help_text = capsys.readouterr().out
+    assert "Telegram" in help_text and "/api_keys create" in help_text
+
+
 # -- doctor --------------------------------------------------------------------------------------------
 
 def _health_then(*responses: httpx.Response) -> Recorder:
@@ -315,17 +392,19 @@ def _health_then(*responses: httpx.Response) -> Recorder:
 
 TESTED_PROXY = {"sanitized_url": "http://proxy.example:8080", "usable": True,
                 "validation_state": "valid", "last_validated_at": "2026-11-15T10:00:00Z"}
+DIRECT_POOL = {"mode": "direct", "entries": []}
 
 
 def test_doctor_reports_a_ready_setup(capsys) -> None:
-    rec = _health_then(httpx.Response(200, json={"jobs": []}), httpx.Response(200, json=TESTED_PROXY))
+    rec = _health_then(httpx.Response(200, json={"jobs": []}), httpx.Response(200, json=DIRECT_POOL),
+                       httpx.Response(200, json=TESTED_PROXY))
     assert cli_main(["doctor"], client=make_client(rec)) == 0
     out = capsys.readouterr()
     for check in ("base_url", "tls", "reachable", "auth", "proxy"):
         assert re.search(rf"^ok\s+{check}\b", out.out, re.M), (check, out.out)
     assert out.err.strip().endswith("ready") and "not ready" not in out.err
     assert "sk-test" not in out.out + out.err
-    assert [r.url.path for r in rec.requests] == ["/v1/health", "/v1/jobs", "/v1/proxy"]
+    assert [r.url.path for r in rec.requests] == ["/v1/health", "/v1/jobs", "/v1/proxy-pool", "/v1/proxy"]
     assert "Authorization" not in rec.requests[0].headers
 
 
@@ -341,18 +420,34 @@ def test_doctor_reports_a_ready_setup(capsys) -> None:
     (httpx.Response(500, json={"detail": "boom", "code": "internal_error"}), "fail", 5, "GET /v1/proxy"),
 ])
 def test_doctor_is_not_ready_until_the_proxy_has_passed_its_test(capsys, proxy_response, status, code, detail) -> None:
-    rec = _health_then(httpx.Response(200, json={"jobs": []}), proxy_response)
+    rec = _health_then(httpx.Response(200, json={"jobs": []}), httpx.Response(200, json=DIRECT_POOL), proxy_response)
     assert cli_main(["--json", "doctor"], client=make_client(rec, max_retries=0)) == code
     report = json.loads(capsys.readouterr().out)
     proxy = report["checks"][-1]
     assert proxy["check"] == "proxy" and proxy["status"] == status and detail in proxy["detail"], proxy
     assert report["ok"] is (code == 0)
     assert cli_main(["doctor"], client=make_client(_health_then(httpx.Response(200, json={"jobs": []}),
-                                                                proxy_response), max_retries=0)) == code
+                                                                httpx.Response(200, json=DIRECT_POOL), proxy_response),
+                                                     max_retries=0)) == code
     err = capsys.readouterr().err.strip()
     assert ("not ready" in err) is (code != 0)
     if code == 0:
         assert err.endswith("ready, with warnings") is (status == "warn"), err
+
+
+@pytest.mark.parametrize("mode", ["pool", "required_pool"])
+def test_doctor_pool_modes_need_an_active_tested_entry(mode, capsys) -> None:
+    active = {"entry_id": "e1", "label": "a", "status": "ACTIVE", "display": "http://proxy.example:8000",
+              "last_checked_at": "2026-11-16T10:00:00Z", "last_check_status": "ok"}
+    for entries, code, detail in [([active], 0, "1 tested entry"),
+                                  ([{**active, "status": "DISABLED"}], 3, "no active tested entries"),
+                                  ([], 3, "no active tested entries")]:
+        pool = httpx.Response(200, json={"mode": mode, "entries": entries})
+        rec = _health_then(httpx.Response(200, json={"jobs": []}), pool)
+        assert cli_main(["--json", "doctor"], client=make_client(rec)) == code
+        check = json.loads(capsys.readouterr().out)["checks"][-1]
+        assert check["check"] == "proxy" and detail in check["detail"]
+        assert [request.url.path for request in rec.requests][-1] == "/v1/proxy-pool"
 
 
 def test_doctor_json_and_auth_failures(capsys) -> None:
@@ -361,7 +456,7 @@ def test_doctor_json_and_auth_failures(capsys) -> None:
     report = json.loads(capsys.readouterr().out)
     assert report["ok"] is False and [c["status"] for c in report["checks"]] == ["ok", "ok", "ok", "fail"]
     rec = _health_then(httpx.Response(403, json={"detail": "missing scope", "code": "forbidden"}),
-                       httpx.Response(200, json=TESTED_PROXY))
+                       httpx.Response(200, json=DIRECT_POOL), httpx.Response(200, json=TESTED_PROXY))
     assert cli_main(["--json", "doctor"], client=make_client(rec, max_retries=0)) == 0
     checks = {c["check"]: c["status"] for c in json.loads(capsys.readouterr().out)["checks"]}
     assert (checks["auth"], checks["proxy"]) == ("warn", "ok")
@@ -397,7 +492,8 @@ def test_doctor_flags_configuration_before_any_request(monkeypatch, capsys) -> N
     assert re.search(r"^fail\s+base_url\s+Refusing", capsys.readouterr().out, re.M)
     insecure = Scrawl("k", base_url="http://scrawl-lan.test:8088", allow_insecure_http=True,
                       http_client=httpx.Client(transport=httpx.MockTransport(_health_then(
-                          httpx.Response(200, json={}), httpx.Response(200, json=TESTED_PROXY)))))
+                          httpx.Response(200, json={}), httpx.Response(200, json=DIRECT_POOL),
+                          httpx.Response(200, json=TESTED_PROXY)))))
     assert cli_main(["doctor"], client=insecure) == 0
     assert re.search(r"^warn\s+tls\s+plain HTTP to a remote host", capsys.readouterr().out, re.M)
 

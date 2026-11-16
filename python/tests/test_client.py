@@ -56,6 +56,17 @@ def test_errors_carry_the_api_code_request_id_and_retry_after() -> None:
     assert caught.value.request_id == "rq1" and "too_many_active_jobs" in str(caught.value)
 
 
+def test_a_long_retry_after_is_returned_immediately_instead_of_capped_and_retried(monkeypatch) -> None:
+    slept: list[float] = []
+    monkeypatch.setattr("scrawl._client.time.sleep", slept.append)
+    envelope = {"error": {"code": "rate_limited", "message": "daily limit reached"}}
+    rec = Recorder(httpx.Response(429, json=envelope, headers={"Retry-After": "86400"}))
+    with pytest.raises(RateLimitError) as caught:
+        make_client(rec).get_job("j")
+    assert caught.value.retry_after == 86400.0
+    assert len(rec.requests) == 1 and slept == []
+
+
 def test_retries_idempotent_submits_and_gets_but_never_a_plain_post_or_a_4xx(monkeypatch) -> None:
     monkeypatch.setattr("scrawl._client.time.sleep", lambda s: None)
     rec = Recorder(httpx.Response(503), httpx.Response(200, json={"job_id": "j", "status": "completed", "url": "u"}))

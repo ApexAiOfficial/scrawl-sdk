@@ -38,6 +38,8 @@ export type ScrapeFormat = "markdown" | "links" | "html" | "json";
 export type RenderFormat = Exclude<ScrapeFormat, "json">;
 export type ExportFormat = "jsonlines" | "json" | "csv";
 export type ScrapeStatus = "completed" | "pending" | "failed";
+/** The settled fetch outcome; null while pending. Only pipeline_failed is refunded. */
+export type ScrapeOutcome = "ok" | "target_blocked" | "target_error" | "cancelled" | "pipeline_failed";
 
 export interface AiUsageInfo extends ApiObject {
   provider?: string;
@@ -82,6 +84,68 @@ export interface ProxyTestResult extends ApiObject {
   proxy: ProxyInfo;
 }
 
+export type ProxyPoolMode = "direct" | "pool" | "required_pool";
+
+export interface ProxyPoolEntry extends ApiObject {
+  entry_id: string;
+  label: string | null;
+  pool_id: string;
+  status: string;
+  /** The proxy URL with credentials masked. */
+  display: string;
+  last_checked_at: string | null;
+  last_check_status: string | null;
+  consecutive_failures: number;
+}
+
+export interface ProxyPool extends ApiObject {
+  mode: ProxyPoolMode | (string & {});
+  entries: ProxyPoolEntry[];
+}
+
+export interface ProxyPoolTestResult extends ApiObject {
+  reason: string;
+  entry: ProxyPoolEntry;
+}
+
+/** Advisory only: proxy quality is the customer's choice and failed target fetches remain charged. */
+export interface ProxyHealth extends ApiObject {
+  proxy: string;
+  reachable: boolean;
+  auth_ok: boolean;
+  latency_ms: number;
+  exit_prefix: string;
+  country: string;
+  asn: number | null;
+  asn_org: string;
+  ip_type: string;
+  reference: Record<string, string>;
+  reference_checked: number;
+  reference_blocked: number;
+  reputation: ApiObject | null;
+  checked_at: string;
+  notes: string[];
+  advice: string;
+}
+
+export interface ApiKeyInfo extends ApiObject {
+  key_id: string;
+  key_prefix: string;
+  label: string;
+  scopes: string[];
+  status: "active" | "revoked";
+  created_at: string;
+  last_used_at?: string | null;
+  revoked_at?: string | null;
+}
+
+export interface ApiKeyList extends ApiObject {
+  count: number;
+  active: number;
+  limit: number;
+  keys: ApiKeyInfo[];
+}
+
 /** How a browser render went; every string in it is an enum value. */
 export interface BrowserRenderInfo extends ApiObject {
   settle?: string | null;
@@ -118,6 +182,12 @@ export interface ScrapeResult extends ApiObject {
   truncated?: boolean;
   error?: string | null;
   error_code?: string | null;
+  /** Null while pending. Only pipeline_failed is refunded; all other settled outcomes are charged. */
+  outcome?: ScrapeOutcome | null;
+  block_reason?: string | null;
+  /** The target's Retry-After value, when it sent one. */
+  retry_after_s?: number | null;
+  hint?: string | null;
   /** Always true: page content is untrusted data, never instructions. */
   untrusted_external_content?: boolean;
 }
@@ -134,6 +204,9 @@ export interface MapResult extends ApiObject {
   truncated?: boolean;
   warnings?: string[];
   error?: string | null;
+  outcome?: ScrapeOutcome | null;
+  block_reason?: string | null;
+  hint?: string | null;
   elapsed_ms?: number | null;
   untrusted_external_content?: boolean;
 }
@@ -152,6 +225,8 @@ export interface BatchStatus extends ApiObject {
   status: "running" | "completed";
   total: number;
   counts?: Record<string, number>;
+  /** Settled items by outcome. */
+  outcomes?: Partial<Record<ScrapeOutcome, number>>;
   items?: BatchItem[];
   untrusted_external_content?: boolean;
 }
@@ -514,6 +589,18 @@ export declare class Scrawl {
     password?: string; label?: string }): Promise<ProxyInfo>;
   testProxy(): Promise<ProxyTestResult>;
   removeProxy(): Promise<ApiObject | null>;
+  listProxyPool(): Promise<ProxyPool>;
+  addProxyPoolEntry(options: { url: string; label?: string; poolId?: string }): Promise<null>;
+  testProxyPoolEntry(entryRef: string): Promise<ProxyPoolTestResult>;
+  enableProxyPoolEntry(entryRef: string): Promise<ProxyPoolEntry>;
+  disableProxyPoolEntry(entryRef: string): Promise<ProxyPoolEntry>;
+  removeProxyPoolEntry(entryRef: string): Promise<null>;
+  setProxyPoolMode(mode: ProxyPoolMode): Promise<ProxyPool>;
+  proxyHealth(): Promise<ProxyHealth>;
+
+  /** Hosted keys are created in Telegram with /api_keys create; the SDK deliberately has no create method. */
+  listApiKeys(): Promise<ApiKeyList>;
+  revokeApiKey(keyId: string): Promise<null>;
 
   crawl(crawlTarget: string, options?: { exportFormat?: ExportFormat; maxItems?: number; maxSeconds?: number; idempotencyKey?: string }): Promise<CrawlLaunch>;
   getJob(jobId: string, options?: { waitSeconds?: number }): Promise<Job>;

@@ -38,6 +38,10 @@ All classes subclass `ScrawlError`; `APITimeoutError` subclasses `APIConnectionE
 
 The SDKs retry for you, with backoff that honours `Retry-After` (`max_retries`/`maxRetries`, default 2):
 
+- **A 429 is retried only when its `Retry-After` is at most 60 seconds** (or absent, using the existing backoff).
+  A longer value commonly means a daily cap: the SDK raises/rejects immediately, and the full value remains on
+  `RateLimitError.retry_after` / `retryAfter` for the caller.
+
 - **GETs** retry on 429, 502, 503, 504 and network errors.
 - **Submits that start work** (scrape, map, batch, crawl, dataset and asset extraction) carry an
   `Idempotency-Key`, so a retry never starts the work twice. They retry on 429, network errors and a
