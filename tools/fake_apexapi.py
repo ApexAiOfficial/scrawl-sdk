@@ -69,6 +69,11 @@ class FakeApexAPI:
         self.profiles: dict[str, dict[str, Any]] = {}
         #: The caller's proxy (sanitized view), as GET /v1/proxy answers it; None until PUT /v1/proxy.
         self.proxy: dict[str, Any] | None = None
+        self.pool_mode = "direct"
+        self.pool: list[dict[str, Any]] = []
+        self.keys: list[dict[str, Any]] = [
+            {"key_id": "key-1", "key_prefix": "sk_test_ab", "label": "laptop", "scopes": ["scrape:write"],
+             "status": "active", "created_at": NOW, "last_used_at": None, "revoked_at": None}]
         self.flaky_seen: set[str] = set()
         self.lock = threading.Lock()
 
@@ -260,6 +265,86 @@ class FakeApexAPI:
         with self.lock:
             removed, self.proxy = self.proxy, None
         return Reply(204) if removed else _error(404, "not_found", "No proxy is configured.")
+
+    def _post_v1_proxy_health(self, params: dict, query: dict, body: dict, headers: dict) -> Reply:
+        if self.proxy is None:
+            return _error(404, "not_found", "No proxy is configured. Register one first.")
+        return Reply(200, {"proxy": self.proxy["sanitized_url"], "reachable": True, "auth_ok": True, "latency_ms": 42,
+                           "exit_prefix": "198.51.100.0/24", "country": "US", "asn": 64500, "asn_org": "Example Net",
+                           "ip_type": "datacenter", "reference": {"https://echo.example/ip": "ok"},
+                           "reference_checked": 3, "reference_blocked": 0, "reputation": None, "checked_at": NOW,
+                           "notes": [], "advice": "Your proxy works; datacenter exits are blocked by some sites."})
+
+    # -- the proxy pool --------------------------------------------------------------------------------
+    def _pool_view(self) -> dict[str, Any]:
+        return {"mode": self.pool_mode, "entries": [entry for entry in self.pool if entry["status"] != "REMOVED"]}
+
+    def _pool_entry(self, ref: str) -> dict[str, Any] | None:
+        return next((entry for entry in self.pool if entry["status"] != "REMOVED"
+                     and ref in (entry["entry_id"], entry["label"])), None)
+
+    def _get_v1_proxy_pool(self, params: dict, query: dict, body: dict, headers: dict) -> Reply:
+        return Reply(200, self._pool_view())
+
+    def _post_v1_proxy_pool(self, params: dict, query: dict, body: dict, headers: dict) -> Reply:
+        parts = urlsplit(str(body.get("url") or ""))
+        if parts.scheme not in ("http", "https", "socks5", "socks5h") or not parts.hostname or not parts.port:
+            return _error(422, "invalid_request", "The proxy was not added: give scheme://[user:pass@]host:port.")
+        auth = "***:***@" if parts.username else ""
+        entry = {"entry_id": "", "label": body.get("label"),
+                 "pool_id": body.get("pool_id") or "pool-1", "status": "PENDING_LIVENESS",
+                 "display": f"{parts.scheme}://{auth}{parts.hostname}:{parts.port}", "last_checked_at": None,
+                 "last_check_status": None, "consecutive_failures": 0}
+        with self.lock:
+            entry["entry_id"] = f"pe-{len(self.pool) + 1}"
+            self.pool.append(entry)
+        return Reply(201, entry)
+
+    def _post_v1_proxy_pool_entry_ref_test(self, params: dict, query: dict, body: dict, headers: dict) -> Reply:
+        entry = self._pool_entry(params["entry_ref"])
+        if entry is None:
+            return _error(404, "not_found", "No proxy pool entry has that id or label")
+        with self.lock:
+            entry.update(status="ACTIVE", last_checked_at=NOW, last_check_status="ok")
+        return Reply(200, {"reason": "liveness_passed", "entry": entry})
+
+    def _set_pool_status(self, ref: str, status: str) -> Reply:
+        entry = self._pool_entry(ref)
+        if entry is None:
+            return _error(404, "not_found", "No proxy pool entry has that id or label")
+        with self.lock:
+            entry["status"] = status
+        return Reply(200, entry)
+
+    def _post_v1_proxy_pool_entry_ref_enable(self, params: dict, query: dict, body: dict, headers: dict) -> Reply:
+        return self._set_pool_status(params["entry_ref"], "PENDING_LIVENESS")
+
+    def _post_v1_proxy_pool_entry_ref_disable(self, params: dict, query: dict, body: dict, headers: dict) -> Reply:
+        return self._set_pool_status(params["entry_ref"], "DISABLED")
+
+    def _delete_v1_proxy_pool_entry_ref(self, params: dict, query: dict, body: dict, headers: dict) -> Reply:
+        reply = self._set_pool_status(params["entry_ref"], "REMOVED")
+        return Reply(204) if reply.status == 200 else reply
+
+    def _put_v1_proxy_pool_mode(self, params: dict, query: dict, body: dict, headers: dict) -> Reply:
+        if body.get("mode") not in ("direct", "pool", "required_pool"):
+            return _error(422, "invalid_request", "mode is direct, pool or required_pool")
+        with self.lock:
+            self.pool_mode = body["mode"]
+        return Reply(200, self._pool_view())
+
+    # -- the account's API keys ------------------------------------------------------------------------
+    def _get_v1_keys(self, params: dict, query: dict, body: dict, headers: dict) -> Reply:
+        active = sum(1 for key in self.keys if key["status"] == "active")
+        return Reply(200, {"count": len(self.keys), "active": active, "limit": 10, "keys": self.keys})
+
+    def _delete_v1_keys_key_id(self, params: dict, query: dict, body: dict, headers: dict) -> Reply:
+        key = next((key for key in self.keys if key["key_id"] == params["key_id"]), None)
+        if key is None or key["status"] != "active":
+            return _error(404, "not_found", "No active key has that id")
+        with self.lock:
+            key.update(status="revoked", revoked_at=NOW)
+        return Reply(204)
 
     def _get_v1_ai_usage(self, params: dict, query: dict, body: dict, headers: dict) -> Reply:
         return Reply(200, {"days": int(query.get("days", 30)), "totals": [

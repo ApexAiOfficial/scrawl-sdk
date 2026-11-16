@@ -72,6 +72,48 @@ test("the proxy gate locks and unlocks", covers("GET /v1/proxy", "DELETE /v1/pro
   assert.equal(tested.host_ip_exposed, false);
 });
 
+test("the proxy pool", covers("GET /v1/proxy-pool", "POST /v1/proxy-pool",
+  "POST /v1/proxy-pool/{entry_ref}/test", "POST /v1/proxy-pool/{entry_ref}/enable",
+  "POST /v1/proxy-pool/{entry_ref}/disable", "DELETE /v1/proxy-pool/{entry_ref}",
+  "PUT /v1/proxy-pool/mode"), async (t) => {
+  if (!need(t, "SCRAWL_LIVE_PROXY_URL")) return;
+  const label = `sdk-live-${randomUUID().replaceAll("-", "").slice(0, 10)}`;
+  const originalMode = (await client.listProxyPool()).mode;
+  let added = false;
+  try {
+    await client.addProxyPoolEntry({ url: env.SCRAWL_LIVE_PROXY_URL, label });
+    added = true;
+    assert.equal((await client.testProxyPoolEntry(label)).entry.status, "ACTIVE");
+    assert.equal((await client.disableProxyPoolEntry(label)).status, "DISABLED");
+    assert.notEqual((await client.enableProxyPoolEntry(label)).status, "ACTIVE");
+    assert.equal((await client.testProxyPoolEntry(label)).entry.status, "ACTIVE");
+    assert.equal((await client.setProxyPoolMode("pool")).mode, "pool");
+  } finally {
+    await client.setProxyPoolMode(originalMode);
+    if (added) await client.removeProxyPoolEntry(label);
+  }
+});
+
+test("proxy health is advisory", covers("POST /v1/proxy/health"), async (t) => {
+  if (!need(t, "SCRAWL_LIVE_PROXY_URL")) return;
+  const report = await client.proxyHealth();
+  assert.equal(typeof report.reachable, "boolean");
+  assert.equal(typeof report.advice, "string");
+});
+
+test("list hosted API keys", covers("GET /v1/keys"), async (t) => {
+  if (!need(t, "SCRAWL_LIVE_KEYS")) return;
+  const result = await client.listApiKeys();
+  assert.equal(result.count, result.keys.length);
+  assert.ok(result.keys.every((item) => !("key" in item)));
+});
+
+test("revoke a hosted API key", covers("DELETE /v1/keys/{key_id}"), async (t) => {
+  const values = need(t, "SCRAWL_LIVE_REVOKE_KEY_ID");
+  if (!values) return;
+  assert.equal(await client.revokeApiKey(values[0]), null);
+});
+
 const page = once(async () => {
   let result = await client.scrape(env.SCRAWL_LIVE_TARGET_URL, { formats: ["markdown", "links"], waitSeconds: 60 });
   if (result.status === "pending") result = await client.waitForScrape(result.job_id, { timeoutMs: 300_000 });
@@ -124,6 +166,7 @@ test("scrape, its result, its job and its artifacts", covers("POST /v1/scrape", 
   if (!need(t, "SCRAWL_LIVE_TARGET_URL")) return;
   const scraped = await page();
   assert.ok(scraped.markdown && scraped.untrusted_external_content === true);
+  assert.equal(scraped.outcome, "ok");
   const again = await client.scrapeResult(scraped.job_id, { formats: ["links"] });
   assert.ok(Array.isArray(again.links));
   assert.equal((await client.getJob(scraped.job_id)).job_id, scraped.job_id);
@@ -138,6 +181,7 @@ test("map", covers("POST /v1/map"), async (t) => {
   if (!values) return;
   const site = await client.map(values[0], { limit: 20, waitSeconds: 60 });
   assert.ok(["completed", "pending"].includes(site.status));
+  assert.equal(site.outcome, site.status === "pending" ? null : "ok");
 });
 
 test("batch", covers("POST /v1/scrape/batch", "GET /v1/scrape/batch/{batch_id}"), async (t) => {
@@ -147,6 +191,7 @@ test("batch", covers("POST /v1/scrape/batch", "GET /v1/scrape/batch/{batch_id}")
   const done = await client.waitForBatch(started.batch_id, { timeoutMs: 300_000 });
   assert.equal(done.status, "completed");
   assert.equal(done.items[0].status, "completed");
+  assert.equal(done.outcomes.ok, 1);
 });
 
 test("cancel", covers("POST /v1/jobs/{job_id}/cancel"), async (t) => {

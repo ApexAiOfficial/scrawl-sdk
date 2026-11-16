@@ -5,6 +5,29 @@ versions follow [Semantic Versioning](https://semver.org/) (before 1.0, a minor 
 The Python package (`scrawl-sdk`) and the npm package (`@apexaiofficial/scrawl`) are released separately; each
 entry says which one it covers.
 
+## Python 0.1.3 and TypeScript 0.1.3 (2026-11-16)
+
+Built against contract digest
+`sha256:050c240215bf1710f7f9b460dcec1be6b7245667d971ceae0ac9ac518163c1b7`. TypeScript skips 0.1.2 so the
+two SDK versions line up again.
+
+### Added
+- Proxy-pool management (`list`, `add`, `test`, `enable`, `disable`, `remove`, `mode`) and the free advisory
+  proxy-health report in both clients and under `scrawl proxy pool ...` / `scrawl proxy health`. Pool proxy URLs
+  are read from an environment variable or stdin, never argv, and the CLI defensively masks proxy passwords.
+- Hosted API-key listing and revocation in both clients and under `scrawl keys list|revoke`. Keys are created in
+  Telegram with `/api_keys create`; there is deliberately no create method in either SDK.
+- Scrape and map outcomes (`ok`, `target_blocked`, `target_error`, `cancelled`, `pipeline_failed`) with block
+  reasons and hints, target `retry_after_s` on scrapes, and per-outcome batch counts. Refunds cover only
+  Scrawl's own failures (a job that never started, or `pipeline_failed`); target blocks/errors, customer-proxy
+  failures and cancellations after work starts remain charged.
+
+### Changed
+- A 429 with `Retry-After` above 60 seconds is raised immediately with the full value on `RateLimitError`, instead
+  of being capped to 60 seconds and retried. Short delays retain the existing automatic retry behavior.
+- `scrawl doctor` follows the account's proxy mode: `direct` still requires the single proxy to have passed its
+  test; `pool` and `required_pool` require at least one active pool entry that passed its test.
+
 ## Python 0.1.2 (2026-11-15)
 
 ### Changed

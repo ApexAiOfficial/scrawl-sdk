@@ -3,7 +3,7 @@
 import {
   BadRequestError, CONTRACT_DIGEST, ConfigurationError, ErrorCode, NotFoundError, RateLimitError, Scrawl, ScrawlError,
   type AssetClass, type AssetJob, type AssetQuote, type AssetResult, type QueryFilter, type ScrapeEngine,
-  type ScrapeResult, type SkippedAsset,
+  type ProxyHealth, type ProxyPool, type ScrapeOutcome, type ScrapeResult, type SkippedAsset,
 } from "@apexaiofficial/scrawl";
 
 const client = new Scrawl({ apiKey: "k", baseUrl: "https://scrawl.example", timeoutMs: 1000, maxRetries: 1 });
@@ -13,19 +13,25 @@ export async function usage(): Promise<void> {
   if (page.status === "pending") page = await client.waitForScrape(page.job_id, { timeoutMs: 1000 });
   const markdown: string | null | undefined = page.markdown;
   const status: string | null | undefined = page.http_status;
+  const outcome: ScrapeOutcome | null | undefined = page.outcome;
+  const blockReason: string | null | undefined = page.block_reason;
+  const retryAfter: number | null | undefined = page.retry_after_s;
+  const hint: string | null | undefined = page.hint;
   const newer: unknown = page.some_field_added_later;
   const rendered = await client.scrape("https://e.example", { engine: "browser", waitForMs: 500 });
   const engine: ScrapeEngine | undefined = rendered.engine;
   const settle: string | null | undefined = rendered.browser?.settle;
   const finalUrl: string | null | undefined = rendered.final_url;
-  console.log(engine, settle, finalUrl, CONTRACT_DIGEST);
+  console.log(engine, settle, finalUrl, outcome, blockReason, retryAfter, hint, CONTRACT_DIGEST);
   // @ts-expect-error: the engine is "static" or "browser"
   await client.scrape("https://e.example", { engine: "chrome" });
   const map = await client.map("https://e.example", { limit: 10, engine: "browser" });
   const mapEngine: ScrapeEngine | undefined = map.engine;
-  console.log(mapEngine);
+  const mapOutcome: ScrapeOutcome | null | undefined = map.outcome;
+  console.log(mapEngine, mapOutcome, map.block_reason, map.hint);
   const batch = await client.batchScrape(map.links ?? []);
   const done = await client.waitForBatch(batch.batch_id);
+  console.log(done.outcomes?.target_blocked);
   for (const item of done.items ?? []) console.log(item.url, item.result?.markdown);
   const filters: QueryFilter[] = [{ field: "price", op: "lt", value: 20 }, { field: "sku", op: "exists", value: true }];
   const rows = await client.queryDataset("d", filters, { limit: 5 });
@@ -47,6 +53,17 @@ export async function usage(): Promise<void> {
   console.log(profile.key_fingerprint, (await client.testAiProvider("p")).ok, (await client.aiUsage()).totals.length);
   const removed: null = await client.deleteAiProvider("p");
   console.log(removed);
+  const pool: ProxyPool = await client.listProxyPool();
+  const added: null = await client.addProxyPoolEntry({ url: "http://proxy.example:8000", label: "a" });
+  const testedPool = await client.testProxyPoolEntry("a");
+  await client.disableProxyPoolEntry(testedPool.entry.entry_id);
+  await client.enableProxyPoolEntry(testedPool.entry.entry_id);
+  await client.setProxyPoolMode("pool");
+  await client.removeProxyPoolEntry(testedPool.entry.entry_id);
+  const proxyHealth: ProxyHealth = await client.proxyHealth();
+  const keys = await client.listApiKeys();
+  if (keys.keys[0]) await client.revokeApiKey(keys.keys[0].key_id);
+  console.log(pool.mode, proxyHealth.reachable);
   const quote: AssetQuote = await client.quoteAssets("https://e.example/page", { classes: ["images", "documents"], maxCredits: 50 });
   const started: AssetJob = await client.extractAssets("https://e.example/page", { classes: ["video"], maxItems: 10,
     maxBytes: 1_000_000, idempotencyKey: "k" });

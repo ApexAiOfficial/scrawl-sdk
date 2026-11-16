@@ -26,6 +26,7 @@ import os
 import uuid
 from collections.abc import Callable, Iterator
 from typing import Any
+from urllib.parse import urlsplit
 
 import pytest
 
@@ -97,6 +98,52 @@ def test_the_proxy_gate_locks_and_unlocks(client: Scrawl, proxy: str | None) -> 
     assert tested.ok is True and tested.host_ip_exposed is False and tested.proxy.usable is True
 
 
+@covers("GET /v1/proxy-pool", "POST /v1/proxy-pool", "POST /v1/proxy-pool/{entry_ref}/test",
+        "POST /v1/proxy-pool/{entry_ref}/enable", "POST /v1/proxy-pool/{entry_ref}/disable",
+        "DELETE /v1/proxy-pool/{entry_ref}", "PUT /v1/proxy-pool/mode")
+def test_proxy_pool(client: Scrawl) -> None:
+    (url,) = need("SCRAWL_LIVE_PROXY_URL")
+    label = f"sdk-live-{uuid.uuid4().hex[:10]}"
+    original_mode = client.list_proxy_pool().mode
+    added = False
+    try:
+        client.add_proxy_pool_entry(url, label=label)
+        added = True
+        tested = client.test_proxy_pool_entry(label)
+        configured = urlsplit(url).password or ""
+        assert tested.entry.status == "ACTIVE" and (not configured or configured not in tested.entry.display)
+        assert client.disable_proxy_pool_entry(label).status == "DISABLED"
+        assert client.enable_proxy_pool_entry(label).status != "ACTIVE"
+        assert client.test_proxy_pool_entry(label).entry.status == "ACTIVE"
+        assert client.set_proxy_pool_mode("pool").mode == "pool"
+    finally:
+        client.set_proxy_pool_mode(original_mode)
+        if added:
+            client.remove_proxy_pool_entry(label)
+
+
+@covers("POST /v1/proxy/health")
+def test_proxy_health_is_advisory(client: Scrawl) -> None:
+    need("SCRAWL_LIVE_PROXY_URL")
+    report = client.proxy_health()
+    assert isinstance(report.reachable, bool) and isinstance(report.advice, str)
+
+
+@covers("GET /v1/keys")
+def test_list_hosted_api_keys(client: Scrawl) -> None:
+    need("SCRAWL_LIVE_KEYS")
+    result = client.list_api_keys()
+    assert result.count == len(result.keys)
+    for item in result.keys:                         # a listing never carries a key's secret value
+        assert "key" not in item and item.key_prefix and len(item.key_prefix) < 20
+
+
+@covers("DELETE /v1/keys/{key_id}")
+def test_revoke_hosted_api_key(client: Scrawl) -> None:
+    (key_id,) = need("SCRAWL_LIVE_REVOKE_KEY_ID")
+    assert client.revoke_api_key(key_id) is None
+
+
 @pytest.fixture(scope="module")
 def page(client: Scrawl) -> Any:
     """One completed scrape of the target page, shared by the tests that read its job."""
@@ -135,7 +182,7 @@ def test_an_unknown_id_is_a_404(client: Scrawl) -> None:
 @covers("POST /v1/scrape", "GET /v1/scrape/{job_id}/content", "GET /v1/jobs/{job_id}", "GET /v1/artifacts/{job_id}",
         "GET /v1/artifacts/{job_id}/{filename}")
 def test_scrape_result_job_and_artifacts(client: Scrawl, page: Any) -> None:
-    assert page.markdown and page.untrusted_external_content is True
+    assert page.markdown and page.untrusted_external_content is True and page.outcome == "ok"
     again = client.scrape_result(page.job_id, formats=["links"])
     assert again.status == "completed" and isinstance(again.links, list)
     assert client.get_job(page.job_id).job_id == page.job_id
@@ -151,6 +198,7 @@ def test_map(client: Scrawl) -> None:
     (target,) = need("SCRAWL_LIVE_TARGET_URL")
     site = client.map(target, limit=20, wait_seconds=60)
     assert site.status in ("completed", "pending") and isinstance(site.get("links") or [], list)
+    assert site.outcome is None if site.status == "pending" else site.outcome == "ok"
 
 
 @covers("POST /v1/scrape/batch", "GET /v1/scrape/batch/{batch_id}")
@@ -159,6 +207,7 @@ def test_batch(client: Scrawl) -> None:
     started = client.batch_scrape([target])
     done = client.wait_for_batch(started.batch_id, timeout=300)
     assert done.status == "completed" and done["items"][0].status == "completed"
+    assert done.outcomes.get("ok") == 1
 
 
 @covers("POST /v1/jobs/{job_id}/cancel")

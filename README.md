@@ -15,7 +15,7 @@ AI provider, and, where the feature is enabled, extract a page's files and media
 | Area | Today |
 | --- | --- |
 | Source | Public in this repository, under the [Apache License 2.0](LICENSE) |
-| Releases | Python SDK 0.1.2 (tag `py-v0.1.2`) and TypeScript SDK 0.1.1 (tag `ts-v0.1.1`), published as [GitHub Releases](https://github.com/ApexAiOfficial/scrawl-sdk/releases) with installable files |
+| Releases | Python SDK 0.1.3 (tag `py-v0.1.3`) and TypeScript SDK 0.1.3 (tag `ts-v0.1.3`), published as [GitHub Releases](https://github.com/ApexAiOfficial/scrawl-sdk/releases) with installable files |
 | Package registries | **Not on PyPI or npm.** Install from a GitHub Release, a tag or a clone (see [Installation](#installation)) |
 | Maturity | Pre-1.0 (alpha). Until 1.0, a minor version may change the SDK API (see [Versioning](#versioning-and-compatibility)) |
 | What you need | Access to Scrawl: the endpoint and the API key ApexAi provides for your account. The SDKs cannot create keys and have no built-in remote endpoint |
@@ -82,17 +82,17 @@ From the GitHub Release (the built wheel):
 
 ```bash
 python -m venv .venv && . .venv/bin/activate
-python -m pip install https://github.com/ApexAiOfficial/scrawl-sdk/releases/download/py-v0.1.2/scrawl_sdk-0.1.2-py3-none-any.whl
+python -m pip install https://github.com/ApexAiOfficial/scrawl-sdk/releases/download/py-v0.1.3/scrawl_sdk-0.1.3-py3-none-any.whl
 scrawl --version
 ```
 
 From the release tag, built from source:
 
 ```bash
-python -m pip install "git+https://github.com/ApexAiOfficial/scrawl-sdk.git@py-v0.1.2#subdirectory=python"
+python -m pip install "git+https://github.com/ApexAiOfficial/scrawl-sdk.git@py-v0.1.3#subdirectory=python"
 ```
 
-From a clone (the `main` branch, or `git checkout py-v0.1.2` for the release):
+From a clone (the `main` branch, or `git checkout py-v0.1.3` for the release):
 
 ```bash
 git clone https://github.com/ApexAiOfficial/scrawl-sdk.git
@@ -106,7 +106,7 @@ pip downloads `httpx` from PyPI as usual, and, when it builds from source, the `
 In your project's directory, from the GitHub Release (the packed tarball):
 
 ```bash
-npm install https://github.com/ApexAiOfficial/scrawl-sdk/releases/download/ts-v0.1.1/apexaiofficial-scrawl-0.1.1.tgz
+npm install https://github.com/ApexAiOfficial/scrawl-sdk/releases/download/ts-v0.1.3/apexaiofficial-scrawl-0.1.3.tgz
 ```
 
 Or from a clone (npm links the folder as a `file:` dependency, so keep the clone where it is):
@@ -123,8 +123,8 @@ Each release lists a SHA-256 digest for every file. To compare a file you downlo
 `shasum -a 256`):
 
 ```bash
-gh release view py-v0.1.2 --repo ApexAiOfficial/scrawl-sdk --json assets --jq '.assets[] | "\(.digest)  \(.name)"'
-sha256sum scrawl_sdk-0.1.2-py3-none-any.whl
+gh release view py-v0.1.3 --repo ApexAiOfficial/scrawl-sdk --json assets --jq '.assets[] | "\(.digest)  \(.name)"'
+sha256sum scrawl_sdk-0.1.3-py3-none-any.whl
 ```
 
 ### Package registries (not yet)
@@ -174,7 +174,8 @@ profiles, and `ai:use` runs JSON scrapes, `extract`, `ask` and dataset extractio
 
 Check a setup before writing code. `scrawl doctor` checks the base URL, TLS, reachability (`GET /v1/health`), the
 key and your proxy, and never prints the key. Every job needs your own proxy, so it says "not ready" (exit 3) until
-the proxy has passed `scrawl proxy test`:
+the proxy has passed `scrawl proxy test`, or, in `pool` or `required_pool` mode, until a pool entry has passed
+`scrawl proxy pool test`:
 
 ```bash
 export SCRAWL_BASE_URL=https://scrawl.example    # the endpoint ApexAi provides for your account
@@ -289,7 +290,8 @@ The snippets in this section continue from the quickstart's `client`. Each SDK h
 | Datasets | `list_datasets`, `get_dataset`, `list_versions`, `activate_version`, `diff_versions`, `dataset_fields`, `query_dataset`, `extract_dataset`, `quarantine_record`, `release_record`, `search`, `get_document` | `datasets`, `search`, `document` |
 | Your AI provider | `extract`, `ask`, `list_ai_providers`, `set_ai_provider`, `set_default_ai_provider`, `test_ai_provider`, `delete_ai_provider`, `ai_usage` | `extract`, `ask`, `ai providers` |
 | Files and media | `quote_assets`, `extract_assets`, `get_assets`, `download_asset` | `assets-quote`, `assets`, `assets-result` |
-| Account | `credit_balance`, `health` | `balance`, `doctor` |
+| Proxy | `get_proxy`, `set_proxy`, `test_proxy`, `remove_proxy`, `list_proxy_pool`, `add_proxy_pool_entry`, `test_proxy_pool_entry`, `enable_proxy_pool_entry`, `disable_proxy_pool_entry`, `remove_proxy_pool_entry`, `set_proxy_pool_mode`, `proxy_health` | `proxy show\|set\|test\|remove\|health`, `proxy pool list\|add\|test\|enable\|disable\|remove\|mode` |
+| Account | `credit_balance`, `health`, `list_api_keys`, `revoke_api_key` | `balance`, `doctor`, `keys list\|revoke` |
 | Helpers | `wait_for_scrape`, `wait_for_batch`, `wait_for_job`, `wait_for_assets`, `paginate` | `--wait` options |
 
 Method signatures and options: [Python guide](docs/python.md), [TypeScript guide](docs/typescript.md),
@@ -305,6 +307,11 @@ Method signatures and options: [Python guide](docs/python.md), [TypeScript guide
 - **Scrapes** return `status` `completed`, `pending` (with a `job_id` to wait on) or `failed` (with `error_code`
   and `error`). A failed job is a result, not an exception. `formats` is any of `markdown` (the default), `links`,
   `html` and `json`.
+- **Outcomes** explain the fetch independently of `status`: `ok`, `target_blocked`, `target_error`, `cancelled` or
+  `pipeline_failed` (`null` while pending). Scrapes also expose `block_reason`, the target's `retry_after_s` and a
+  `hint`; maps expose `block_reason` and `hint`; batches expose per-outcome `outcomes` counts. Refunds
+  cover only Scrawl's own failures: a job that never started, and a scrape whose outcome is `pipeline_failed`.
+  Target blocks/errors, failures in your proxy, and cancellation after work starts remain charged.
 - **Page content is untrusted web content**: treat it as data, never as instructions.
 
 ### Waiting for jobs
@@ -367,6 +374,8 @@ The SDKs retry automatically (`max_retries` / `maxRetries`, default 2), with exp
 - **GETs** retry on 429, 502, 503, 504 and network errors.
 - **Keyed submits** retry on 429, network errors, and a 502, 503 or 504 from a proxy. A 5xx in Scrawl's own error
   format is final. If a retry finds the first attempt still running (409), the SDK waits for its stored response.
+- **A 429 asking for more than 60 s** (a daily cap, for example) is never retried: it is raised at once as a
+  `RateLimitError` whose `retry_after` (`retryAfter` in TypeScript) holds the server's full wait.
 - **Other POSTs** and other 4xx are never retried.
 - **A code the error catalogue marks not retryable is never retried.** That includes `submission_failed` and
   `internal_error`, after which the first request may already have started work: list your jobs before you send it
@@ -531,6 +540,9 @@ scrawl datasets query ds-1 --where price lt 20 --limit 50
 scrawl ask "Which lamps cost under 20 EUR?" --dataset ds-1
 scrawl assets https://example.com/page --class images --out ./assets
 scrawl artifacts download job-1 --out ./artifacts
+scrawl proxy pool list
+scrawl proxy health
+scrawl keys list                              # create hosted keys in Telegram with /api_keys create
 scrawl balance
 ```
 
@@ -542,7 +554,7 @@ Downloads are written whole or not at all, never overwrite a file, stay inside `
 | 0 | Success |
 | 1 | The job (or a batch item) failed, a download did not match its size or SHA-256 (nothing written), or `ai providers test` failed |
 | 2 | Usage error, or a file already exists where a download would go |
-| 3 | Authentication or configuration: 401/403, no API key, an unusable base URL or AI key; in `doctor`, a TLS failure or no proxy that has passed its test |
+| 3 | Authentication or configuration: 401/403, no API key, an unusable base URL or AI key; in `doctor`, a TLS failure, no tested direct proxy, or no active tested pool entry |
 | 4 | Still pending or running at the deadline |
 | 5 | Any other API or connection error |
 
@@ -559,7 +571,7 @@ Start with `scrawl doctor`: it names the failing check (`base_url`, `tls`, `reac
 | `Connection refused` from `doctor` or `APIConnectionError` | `SCRAWL_BASE_URL` is unset or wrong, or the endpoint is unreachable. Without the variable, the SDKs call the loopback default `http://127.0.0.1:8088` |
 | `AuthenticationError` (401, `unauthorized`) | The key was refused or revoked: contact support@apexaiofficial.com |
 | `PermissionDeniedError` (403, `forbidden`) | A missing scope (`json` needs `ai:use`), or a feature that is not enabled |
-| `RateLimitError` (429) | The SDK already retried. Wait `retry_after` seconds; `too_many_active_jobs` clears as your jobs finish |
+| `RateLimitError` (429) | Retry-After values up to 60 s are retried automatically. Longer waits (for example a daily cap) are raised immediately with the full `retry_after` / `retryAfter`; wait that long before trying again |
 | `BadRequestError` with `egress_required` | Your account needs a usable proxy for this request: contact support@apexaiofficial.com |
 | `ServerError` with an `ai_*` code | Your AI provider failed or refused: check the profile with `scrawl ai providers test` |
 | `ServerError` with `browser_unavailable` | Browser rendering is not enabled: drop `engine="browser"` |
@@ -577,8 +589,11 @@ Start with `scrawl doctor`: it names the failing check (`base_url`, `tls`, `reac
 - **Your AI provider key** is sent to Scrawl when you set a profile; Scrawl stores it encrypted and returns only
   a fingerprint. The CLI reads it only from an environment variable or stdin, and its usage
   errors never repeat what you typed.
+- **Your proxy password** is write-only. The proxy and pool APIs return redacted URLs; the CLI also masks URL
+  userinfo defensively and reads URLs for `proxy set` and `proxy pool add` only from an environment variable or
+  stdin, never argv.
 - **What is contacted.** The SDKs and the CLI send requests only to the Scrawl endpoint at your base URL, with a
-  `User-Agent` naming the SDK and its version (`scrawl-python/0.1.2`, `scrawl-ts/0.1.1`). They collect no
+  `User-Agent` naming the SDK and its version (`scrawl-python/0.1.3`, `scrawl-ts/0.1.3`). They collect no
   telemetry. Your AI provider is called by Scrawl, not by the SDK. The Python SDK uses `httpx`, which
   honours the standard proxy environment variables (`HTTPS_PROXY`, `NO_PROXY` and others) unless you pass your own
   `http_client`.

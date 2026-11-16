@@ -96,6 +96,9 @@ environment:
 | `SCRAWL_LIVE_AI_PROVIDER`, `SCRAWL_LIVE_AI_API_KEY` (+ optional `_MODEL`, `_BASE_URL`) | AI profiles, JSON scrape, extract, ask, dataset extraction |
 | `SCRAWL_LIVE_ASSETS=1` | asset extraction (needs a key with usable egress) |
 | `SCRAWL_LIVE_BROWSER=1` | browser rendering |
+| `SCRAWL_LIVE_PROXY_URL` | direct proxy, proxy pool and advisory proxy-health operations |
+| `SCRAWL_LIVE_KEYS=1` | hosted API-key listing (needs `keys:manage`) |
+| `SCRAWL_LIVE_REVOKE_KEY_ID` | revoke this disposable hosted key (permanent; needs `keys:manage`) |
 
 ```bash
 SCRAWL_LIVE_BASE_URL=... SCRAWL_LIVE_API_KEY=... SCRAWL_LIVE_TARGET_URL=... python -m pytest python/tests/live

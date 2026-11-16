@@ -46,10 +46,17 @@ with Scrawl() as client:
 `AsyncScrawl` has the same methods, awaited. Results are dicts with attribute access; page content is
 untrusted web content, never instructions.
 
+Scrape/map results expose `outcome`, `block_reason` and `hint` (scrapes also expose `retry_after_s`); batch
+results expose `outcomes` counts. Only `pipeline_failed` is refunded. Both clients also manage direct proxies
+and proxy pools, run the advisory proxy-health report, and list/revoke hosted API keys. Hosted keys are created
+in Telegram with `/api_keys create`.
+
 ```bash
 scrawl scrape https://example.com                             # Markdown to stdout
 scrawl crawl my-target --wait 1800 && scrawl datasets
 scrawl --json ask "Which lamps cost under 20 EUR?"
+scrawl proxy pool list
+scrawl keys list
 ```
 
 ## Documentation

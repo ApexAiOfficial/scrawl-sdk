@@ -393,7 +393,7 @@
     },
     {
       "code": "rate_limited",
-      "description": "Too many requests for this account; wait Retry-After seconds, then retry.",
+      "description": "Too many requests: on ApexAPI for this API key, on MCP for this account; wait Retry-After seconds, then retry.",
       "http_status": 429,
       "retryable": true,
       "surfaces": [

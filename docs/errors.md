@@ -38,6 +38,10 @@ All classes subclass `ScrawlError`; `APITimeoutError` subclasses `APIConnectionE
 
 The SDKs retry for you, with backoff that honours `Retry-After` (`max_retries`/`maxRetries`, default 2):
 
+- **A 429 is retried only when its `Retry-After` is at most 60 seconds** (or absent, using the existing backoff).
+  A longer value commonly means a daily cap: the SDK raises/rejects immediately, and the full value remains on
+  `RateLimitError.retry_after` / `retryAfter` for the caller.
+
 - **GETs** retry on 429, 502, 503, 504 and network errors.
 - **Submits that start work** (scrape, map, batch, crawl, dataset and asset extraction) carry an
   `Idempotency-Key`, so a retry never starts the work twice. They retry on 429, network errors and a
@@ -86,7 +90,7 @@ Generated from the vendored error catalogue (`contracts/apexapi_errors.json`) an
 | `invalid_request` | 422 | no | API, MCP | `ValidationError` | `ErrorCode.INVALID_REQUEST` | The request is malformed or outside a documented bound; field errors never echo the submitted values. |
 | `unsafe_artifact_path` | 422 | no | API, MCP | `ValidationError` | `ErrorCode.UNSAFE_ARTIFACT_PATH` | The artifact name resolves outside its job's files. |
 | `ai_daily_budget_exceeded` | 429 | yes | API, MCP, result | `RateLimitError` | `ErrorCode.AI_DAILY_BUDGET_EXCEEDED` | Your daily AI token budget on this deployment is used up (cache tokens included); it resets at 00:00 UTC. Retry after Retry-After seconds. |
-| `rate_limited` | 429 | yes | API, MCP | `RateLimitError` | `ErrorCode.RATE_LIMITED` | Too many requests for this account; wait Retry-After seconds, then retry. |
+| `rate_limited` | 429 | yes | API, MCP | `RateLimitError` | `ErrorCode.RATE_LIMITED` | Too many requests: on ApexAPI for this API key, on MCP for this account; wait Retry-After seconds, then retry. |
 | `too_many_active_jobs` | 429 | yes | API, MCP | `RateLimitError` | `ErrorCode.TOO_MANY_ACTIVE_JOBS` | The caller already has the maximum number of running or queued jobs, or the browser renderer is busy; retry after Retry-After seconds. |
 | `internal_error` | 500 | no | API, result | `ServerError` | `ErrorCode.INTERNAL_ERROR` | An unexpected failure, possibly after work started: list your jobs before sending a job request again. Quote the request ID when reporting it. |
 | `submission_failed` | 500 | no | API | `ServerError` | `ErrorCode.SUBMISSION_FAILED` | The first request with this Idempotency-Key failed after it may have started work; list your jobs, then retry with a new key. |
@@ -140,6 +144,6 @@ SDKs nor the CLI ever resubmit a failed job; the Retryable column says whether r
 | 0 | Success |
 | 1 | The job (or a batch item) failed, or a downloaded file did not match its size or SHA-256 (it was not written) |
 | 2 | Usage error, or a file already exists where a download would go (nothing is overwritten) |
-| 3 | Authentication or configuration: 401/403, no API key, an unusable base URL or AI key; in `doctor`, a TLS failure or no proxy that has passed its test |
+| 3 | Authentication or configuration: 401/403, no API key, an unusable base URL or AI key; in `doctor`, a TLS failure or no proxy that has passed its test (in pool modes, no pool entry that has) |
 | 4 | Still pending or running at the deadline |
 | 5 | Any other API or connection error |

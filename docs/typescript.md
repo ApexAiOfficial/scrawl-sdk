@@ -17,6 +17,11 @@ own implementation) and `allowInsecureHttp`. See [authentication](authentication
 Responses are the API's JSON as-is, with snake_case fields (`page.job_id`, `batch.batch_id`); the documented
 fields are typed and any field the API adds later is still readable.
 
+Settled scrapes and maps expose `outcome`: `"ok"`, `"target_blocked"`, `"target_error"`, `"cancelled"` or
+`"pipeline_failed"` (`null` while pending). Scrapes also have `block_reason`, `retry_after_s` and `hint`; maps
+have `block_reason` and `hint`; batches have `outcomes` counts. Refunds are automatic and cover only Scrawl's own failures: a job that never started, and a scrape whose outcome is `pipeline_failed`. Target
+blocks/errors, failures in your proxy and cancellations after work starts remain charged.
+
 ## Methods
 
 The same surface as the Python SDK, in camelCase; [`coverage.json`](../coverage.json) is the authoritative map.
@@ -29,7 +34,8 @@ Every method returns a promise; options come last, as an object.
 | Crawls and jobs | `crawl`, `getJob`, `waitForJob`, `listJobs`, `cancelJob`, `listArtifacts`, `downloadArtifact` (→ `ArrayBuffer`) |
 | Datasets | `listDatasets`, `getDataset`, `listVersions`, `activateVersion`, `diffVersions`, `datasetFields`, `queryDataset`, `extractDataset`, `quarantineRecord`, `releaseRecord`, `search`, `getDocument` |
 | Assets | `quoteAssets`, `extractAssets`, `getAssets`, `waitForAssets`, `downloadAsset` (→ `ArrayBuffer`) |
-| Account | `creditBalance`, `health` |
+| Proxy | `getProxy`, `setProxy`, `testProxy`, `removeProxy`, `listProxyPool`, `addProxyPoolEntry`, `testProxyPoolEntry`, `enableProxyPoolEntry`, `disableProxyPoolEntry`, `removeProxyPoolEntry`, `setProxyPoolMode`, `proxyHealth` |
+| Account | `creditBalance`, `health`, `listApiKeys`, `revokeApiKey` |
 | Helpers | `paginate(method, ...args)` follows `next_cursor` for any list method |
 
 ```js
@@ -37,6 +43,10 @@ for await (const version of client.paginate(client.listVersions, datasetId, { li
   console.log(version.version_id);
 }
 ```
+
+Hosted API keys are created in Telegram with `/api_keys create`; the SDK deliberately has no create method.
+Listing and revoking need a key with `keys:manage`, made with `/api_keys create_manager`.
+`listApiKeys` and `revokeApiKey` need `keys:manage`.
 
 `downloadArtifact` and `downloadAsset` buffer the whole file; for very large exports, fetch the URL with your
 own streaming `fetch` and the same `Authorization: Bearer` header.
