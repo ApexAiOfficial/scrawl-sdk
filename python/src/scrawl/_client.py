@@ -117,6 +117,9 @@ class _Endpoints:
         ``engine="browser"`` renders the page in a sandboxed browser first (only where the server enables it), waiting
         ``wait_for_ms`` more after it settles. A finished result from a server that did not render it raises
         ``ScrawlError(code="render_not_supported")``.
+
+        A settled result's ``outcome`` distinguishes success, a target block/error, cancellation and a Scrawl
+        pipeline failure. Only ``pipeline_failed`` is refunded; target/proxy failures and cancellations are charged.
         """
         body = _clean({"url": url, "formats": formats or ["markdown"], "schema": schema,
                        "instruction": instruction, "profile": profile, "wait_seconds": self._wait(wait_seconds),
@@ -139,7 +142,7 @@ class _Endpoints:
         """Same-host URLs of a site: the start page's links plus its sitemap.
 
         ``engine="browser"`` renders the start page in a browser first, with the same downgrade guard as
-        ``scrape``.
+        ``scrape``. Its ``outcome``, ``block_reason`` and ``hint`` describe the start page.
         """
         body = {"url": url, "limit": limit, "wait_seconds": self._wait(wait_seconds), **_engine(engine, wait_for_ms)}
         return self._call(_Request("POST", "/v1/map", json=body, idempotency_key=_key(idempotency_key),
@@ -151,7 +154,8 @@ class _Endpoints:
         """Start a batch of up to 20 URLs; poll ``batch_status`` (or use ``wait_for_batch``).
 
         ``"json"`` in ``formats`` needs the ``ai:use`` scope as well as ``scrape:write``, as for ``scrape``.
-        ``engine="browser"`` renders every URL in a browser first, one at a time.
+        ``engine="browser"`` renders every URL in a browser first, one at a time. A settled batch reports its
+        per-outcome counts in ``outcomes``.
         """
         body = _clean({"urls": list(urls), "formats": formats or ["markdown"], "schema": schema,
                        "instruction": instruction, "profile": profile, **_engine(engine, wait_for_ms)})
@@ -225,6 +229,48 @@ class _Endpoints:
     def remove_proxy(self) -> Any:
         """Remove your proxy (scraping is locked again)."""
         return self._call(_Request("DELETE", "/v1/proxy"))
+
+    def list_proxy_pool(self) -> Any:
+        """Your proxy mode and redacted pool entries."""
+        return self._call(_Request("GET", "/v1/proxy-pool"))
+
+    def add_proxy_pool_entry(self, url: str, *, label: str | None = None, pool_id: str | None = None) -> Any:
+        """Add a proxy URL to the pool; it carries jobs only after :meth:`test_proxy_pool_entry` passes."""
+        return self._call(_Request("POST", "/v1/proxy-pool",
+                                   json=_clean({"url": url, "label": label, "pool_id": pool_id})))
+
+    def test_proxy_pool_entry(self, entry_ref: str) -> Any:
+        """Test a pool entry; a pass makes it active."""
+        return self._call(_Request("POST", f"/v1/proxy-pool/{_seg(entry_ref)}/test"))
+
+    def enable_proxy_pool_entry(self, entry_ref: str) -> Any:
+        """Enable an entry; it must pass another test before carrying jobs."""
+        return self._call(_Request("POST", f"/v1/proxy-pool/{_seg(entry_ref)}/enable"))
+
+    def disable_proxy_pool_entry(self, entry_ref: str) -> Any:
+        """Take a pool entry out of rotation without removing it."""
+        return self._call(_Request("POST", f"/v1/proxy-pool/{_seg(entry_ref)}/disable"))
+
+    def remove_proxy_pool_entry(self, entry_ref: str) -> Any:
+        """Permanently remove a pool entry."""
+        return self._call(_Request("DELETE", f"/v1/proxy-pool/{_seg(entry_ref)}"))
+
+    def set_proxy_pool_mode(self, mode: str) -> Any:
+        """Select ``direct``, ``pool`` or ``required_pool`` proxy routing."""
+        return self._call(_Request("PUT", "/v1/proxy-pool/mode", json={"mode": mode}))
+
+    def proxy_health(self) -> Any:
+        """Run the free advisory proxy-health report. This POST is never retried automatically."""
+        return self._call(_Request("POST", "/v1/proxy/health"))
+
+    # -- hosted API keys ---------------------------------------------------------------------------
+    def list_api_keys(self) -> Any:
+        """List account API keys (never values). Create keys in Telegram with ``/api_keys create``."""
+        return self._call(_Request("GET", "/v1/keys"))
+
+    def revoke_api_key(self, key_id: str) -> Any:
+        """Permanently revoke an API key by the id returned from :meth:`list_api_keys`."""
+        return self._call(_Request("DELETE", f"/v1/keys/{_seg(key_id)}"))
 
     # -- crawls and jobs -------------------------------------------------------------------------
     def crawl(self, crawl_target: str, *, export_format: str | None = None, max_items: int | None = None,
@@ -434,7 +480,7 @@ class _Transport:
         return request.method == "GET" or request.idempotency_key is not None
 
     def retry_response(self, request: _Request, response: httpx.Response) -> bool:
-        """429 always; 502/503/504 for GETs, and for submits only when a proxy (not Scrawl) answered.
+        """429 when Retry-After is at most 60 s; 502/503/504 according to method and responder.
 
         Never when the error code is one the catalogue marks not retryable, whatever the status: a resend
         after ``submission_failed`` or ``settlement_failed`` may charge twice. Scrawl's own 5xx on a keyed
@@ -447,7 +493,8 @@ class _Transport:
         if never_retry(code_of(body)):
             return False
         if response.status_code == 429:
-            return True
+            retry_after = _retry_after(response)
+            return retry_after is None or retry_after <= 60.0
         if response.status_code not in RETRY_STATUSES:
             return False
         return request.method == "GET" or not _is_error_envelope(body)

@@ -233,6 +233,56 @@ export class Scrawl {
     return this._call({ method: "DELETE", path: "/v1/proxy" });
   }
 
+  /** Your proxy mode and redacted pool entries. */
+  async listProxyPool() {
+    return this._call({ method: "GET", path: "/v1/proxy-pool" });
+  }
+
+  /** Add a proxy URL to the pool; it carries jobs only after testProxyPoolEntry() passes. */
+  async addProxyPoolEntry({ url, label, poolId } = {}) {
+    return this._call({ method: "POST", path: "/v1/proxy-pool", json: clean({ url, label, pool_id: poolId }) });
+  }
+
+  /** Test a pool entry; a pass makes it active. */
+  async testProxyPoolEntry(entryRef) {
+    return this._call({ method: "POST", path: `/v1/proxy-pool/${seg(entryRef)}/test` });
+  }
+
+  /** Enable an entry; it must pass another test before carrying jobs. */
+  async enableProxyPoolEntry(entryRef) {
+    return this._call({ method: "POST", path: `/v1/proxy-pool/${seg(entryRef)}/enable` });
+  }
+
+  /** Take a pool entry out of rotation without removing it. */
+  async disableProxyPoolEntry(entryRef) {
+    return this._call({ method: "POST", path: `/v1/proxy-pool/${seg(entryRef)}/disable` });
+  }
+
+  /** Permanently remove a pool entry. */
+  async removeProxyPoolEntry(entryRef) {
+    return this._call({ method: "DELETE", path: `/v1/proxy-pool/${seg(entryRef)}` });
+  }
+
+  /** Select direct, pool or required_pool proxy routing. */
+  async setProxyPoolMode(mode) {
+    return this._call({ method: "PUT", path: "/v1/proxy-pool/mode", json: { mode } });
+  }
+
+  /** Run the free advisory proxy-health report. This POST is never retried automatically. */
+  async proxyHealth() {
+    return this._call({ method: "POST", path: "/v1/proxy/health" });
+  }
+
+  /** List account API keys (never values). Create keys in Telegram with /api_keys create. */
+  async listApiKeys() {
+    return this._call({ method: "GET", path: "/v1/keys" });
+  }
+
+  /** Permanently revoke an API key by the id returned from listApiKeys(). */
+  async revokeApiKey(keyId) {
+    return this._call({ method: "DELETE", path: `/v1/keys/${seg(keyId)}` });
+  }
+
   // -- crawls and jobs ----------------------------------------------------------------------------
   /** Start a bounded crawl that publishes a new dataset version. */
   async crawl(crawlTarget, { exportFormat, maxItems, maxSeconds, idempotencyKey } = {}) {
@@ -498,7 +548,7 @@ export class Scrawl {
   }
 
   /**
-   * 429 always; 502/503/504 for GETs, and for submits only when a proxy (not Scrawl) answered. Never when the
+   * 429 when Retry-After is at most 60 s; 502/503/504 according to method and responder. Never when the
    * error code is one the catalogue marks not retryable, whatever the status: a resend after `submission_failed`
    * or `settlement_failed` may charge twice.
    */
@@ -506,7 +556,10 @@ export class Scrawl {
     if (response.status < 400) return false;
     const body = jsonBody(response.body);              // only error bodies are parsed here: they are small
     if (neverRetry(codeOf(body))) return false;
-    if (response.status === 429) return true;
+    if (response.status === 429) {
+      const retryAfter = retryAfterSeconds(response.headers);
+      return retryAfter === null || retryAfter <= 60;
+    }
     if (!RETRY_STATUSES.has(response.status)) return false;
     // Scrawl's own 5xx on a keyed submit is final: its key now stores that outcome, so a retry would
     // only replay a generic failure instead of this error.
