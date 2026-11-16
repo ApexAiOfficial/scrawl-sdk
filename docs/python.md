@@ -114,7 +114,8 @@ try:
 except NotFoundError:
     ...
 except RateLimitError as error:
-    time.sleep(error.retry_after or 5)
+    # A short wait was already retried for you; this one may be hours (a daily cap). Schedule, don't block.
+    retry_at = time.time() + (error.retry_after or 60)
 except ScrawlError as error:
     if error.code == ErrorCode.EGRESS_REQUIRED:
         ...

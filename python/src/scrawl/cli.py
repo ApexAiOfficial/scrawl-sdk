@@ -48,7 +48,9 @@ _C1 = re.compile(r"[\x7f-\x9f]")          # JSON escapes C0 controls itself, but
 _NAME_CONTROL = re.compile(r"[\x00-\x1f\x7f-\x9f]")
 _UNSAFE_NAME = re.compile(r"[^A-Za-z0-9._-]")
 _ENV_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]{0,127}")
-_PROXY_USERINFO = re.compile(r"\b((?:https?|socks5h?)://)[^/@\s]+@", re.I)
+#: A proxy URL's userinfo, up to the LAST "@" before the host (a password may contain "@"); with or without a scheme.
+_PROXY_USERINFO = re.compile(r"\b((?:https?|socks5h?)://)[^/\s]*@", re.I)
+_BARE_USERINFO = re.compile(r"(?<![/\w@.*-])[^\s/@\"':*]+:[^\s/\"']*@(?=[A-Za-z0-9.\[\]-]+:\d)")
 MAX_JSON_FILE_BYTES = 64 * 1024
 ASSET_CLASSES = ("images", "video", "audio", "documents", "data", "web_assets")
 FORMATS = ("markdown", "links", "html", "json")
@@ -106,7 +108,7 @@ def _redact_proxy_passwords(value: Any) -> Any:
     if isinstance(value, list):
         return [_redact_proxy_passwords(item) for item in value]
     if isinstance(value, str):
-        return _PROXY_USERINFO.sub(r"\1***:***@", value)
+        return _BARE_USERINFO.sub("***:***@", _PROXY_USERINFO.sub(r"\1***:***@", value))
     return value
 
 
@@ -799,7 +801,8 @@ def _doctor_proxy(client: Scrawl, add: Any) -> int:
             count = len(active)
             add("proxy", "ok", f"{mode} mode: {count} tested entr{'y' if count == 1 else 'ies'} active")
             return EXIT_OK
-        add("proxy", "fail", f"{mode} mode: no active tested entries; run scrawl proxy pool test ENTRY")
+        hint = "run scrawl proxy pool test ENTRY" if entries else "add one with scrawl proxy pool add, then test it"
+        add("proxy", "fail", f"{mode} mode: no active tested entries; {hint}")
         return EXIT_CONFIG
     if mode != "direct":
         add("proxy", "fail", f"GET /v1/proxy-pool returned unknown mode {mode!r}")
@@ -824,7 +827,8 @@ def _doctor_direct_proxy(client: Scrawl, add: Any) -> int:
         add("proxy", "fail", f"GET /v1/proxy: {exc}")
         return EXIT_ERROR
     if isinstance(proxy, dict) and proxy.get("usable"):
-        add("proxy", "ok", f"{proxy.get('sanitized_url')} passed its test {proxy.get('last_validated_at')}")
+        add("proxy", "ok", _redact_proxy_passwords(
+            f"{proxy.get('sanitized_url')} passed its test {proxy.get('last_validated_at')}"))
         return EXIT_OK
     state = proxy.get("validation_state") if isinstance(proxy, dict) else None
     add("proxy", "fail", f"the proxy is {state or 'not tested'}: run scrawl proxy test (jobs are refused until it "
@@ -1077,11 +1081,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(handler=_cmd_proxy_pool_mode)
 
     keys = sub.add_parser(
-        "keys", help="list or revoke hosted API keys; create them in Telegram with /api_keys create"
+        "keys", help="list or revoke hosted API keys (needs a keys:manage key: /api_keys create_manager in Telegram)"
     ).add_subparsers(dest="keys_command", required=True, metavar="ACTION")
-    p = keys.add_parser("list", help="list keys (never their secret values); create in Telegram with /api_keys create")
+    p = keys.add_parser("list", help="list keys (never their secret values); needs a key made in Telegram with "
+                                     "/api_keys create_manager")
     p.set_defaults(handler=_cmd_keys_list)
-    p = keys.add_parser("revoke", help="permanently revoke a key; create replacements in Telegram with /api_keys create")
+    p = keys.add_parser("revoke", help="permanently revoke a key; make replacements in Telegram with /api_keys create")
     p.add_argument("key_id", help="key id from `scrawl keys list`")
     p.set_defaults(handler=_cmd_keys_revoke)
 

@@ -291,11 +291,12 @@ class FakeApexAPI:
         if parts.scheme not in ("http", "https", "socks5", "socks5h") or not parts.hostname or not parts.port:
             return _error(422, "invalid_request", "The proxy was not added: give scheme://[user:pass@]host:port.")
         auth = "***:***@" if parts.username else ""
-        entry = {"entry_id": f"pe-{len(self.pool) + 1}", "label": body.get("label"),
+        entry = {"entry_id": "", "label": body.get("label"),
                  "pool_id": body.get("pool_id") or "pool-1", "status": "PENDING_LIVENESS",
                  "display": f"{parts.scheme}://{auth}{parts.hostname}:{parts.port}", "last_checked_at": None,
                  "last_check_status": None, "consecutive_failures": 0}
         with self.lock:
+            entry["entry_id"] = f"pe-{len(self.pool) + 1}"
             self.pool.append(entry)
         return Reply(201, entry)
 
