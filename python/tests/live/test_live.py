@@ -110,8 +110,8 @@ def test_proxy_pool(client: Scrawl) -> None:
         client.add_proxy_pool_entry(url, label=label)
         added = True
         tested = client.test_proxy_pool_entry(label)
-        secret = urlsplit(url).password or ""
-        assert tested.entry.status == "ACTIVE" and (not secret or secret not in tested.entry.display)
+        configured = urlsplit(url).password or ""
+        assert tested.entry.status == "ACTIVE" and (not configured or configured not in tested.entry.display)
         assert client.disable_proxy_pool_entry(label).status == "DISABLED"
         assert client.enable_proxy_pool_entry(label).status != "ACTIVE"
         assert client.test_proxy_pool_entry(label).entry.status == "ACTIVE"

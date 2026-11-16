@@ -372,10 +372,10 @@ The SDKs retry automatically (`max_retries` / `maxRetries`, default 2), with exp
 `Retry-After`:
 
 - **GETs** retry on 429, 502, 503, 504 and network errors.
-- **Keyed submits** retry on 429, network errors, and a 502, 503 or 504 from a proxy.
-- **A 429 asking for more than 60 s** (a daily cap, for example) is never retried: it is raised at once as a
-  `RateLimitError` whose `retry_after` (`retryAfter` in TypeScript) holds the server's full wait. A 5xx in Scrawl's own error
+- **Keyed submits** retry on 429, network errors, and a 502, 503 or 504 from a proxy. A 5xx in Scrawl's own error
   format is final. If a retry finds the first attempt still running (409), the SDK waits for its stored response.
+- **A 429 asking for more than 60 s** (a daily cap, for example) is never retried: it is raised at once as a
+  `RateLimitError` whose `retry_after` (`retryAfter` in TypeScript) holds the server's full wait.
 - **Other POSTs** and other 4xx are never retried.
 - **A code the error catalogue marks not retryable is never retried.** That includes `submission_failed` and
   `internal_error`, after which the first request may already have started work: list your jobs before you send it
