@@ -86,7 +86,7 @@ Generated from the vendored error catalogue (`contracts/apexapi_errors.json`) an
 | `invalid_request` | 422 | no | API, MCP | `ValidationError` | `ErrorCode.INVALID_REQUEST` | The request is malformed or outside a documented bound; field errors never echo the submitted values. |
 | `unsafe_artifact_path` | 422 | no | API, MCP | `ValidationError` | `ErrorCode.UNSAFE_ARTIFACT_PATH` | The artifact name resolves outside its job's files. |
 | `ai_daily_budget_exceeded` | 429 | yes | API, MCP, result | `RateLimitError` | `ErrorCode.AI_DAILY_BUDGET_EXCEEDED` | Your daily AI token budget on this deployment is used up (cache tokens included); it resets at 00:00 UTC. Retry after Retry-After seconds. |
-| `rate_limited` | 429 | yes | API, MCP | `RateLimitError` | `ErrorCode.RATE_LIMITED` | Too many requests for this account; wait Retry-After seconds, then retry. |
+| `rate_limited` | 429 | yes | API, MCP | `RateLimitError` | `ErrorCode.RATE_LIMITED` | Too many requests: on ApexAPI for this API key, on MCP for this account; wait Retry-After seconds, then retry. |
 | `too_many_active_jobs` | 429 | yes | API, MCP | `RateLimitError` | `ErrorCode.TOO_MANY_ACTIVE_JOBS` | The caller already has the maximum number of running or queued jobs, or the browser renderer is busy; retry after Retry-After seconds. |
 | `internal_error` | 500 | no | API, result | `ServerError` | `ErrorCode.INTERNAL_ERROR` | An unexpected failure, possibly after work started: list your jobs before sending a job request again. Quote the request ID when reporting it. |
 | `submission_failed` | 500 | no | API | `ServerError` | `ErrorCode.SUBMISSION_FAILED` | The first request with this Idempotency-Key failed after it may have started work; list your jobs, then retry with a new key. |
