@@ -118,6 +118,14 @@ test("the SDK records the digest of the contract bundle it was built against", (
   assert.equal(result.status, 0, result.stderr);
 });
 
+test("job warnings are an optional string array in the contract", () => {
+  const openapi = JSON.parse(readFileSync(join(REPO, "contracts", "apexapi_openapi.json"), "utf8"));
+  const job = openapi.components.schemas.JobResponse;
+  assert.equal(job.properties.warnings.type, "array");
+  assert.deepEqual(job.properties.warnings.items, { type: "string" });
+  assert.ok(!job.required.includes("warnings"));
+});
+
 test("the live suite exercises every covered operation", () => {
   const source = readFileSync(new URL("./live/live.test.js", import.meta.url), "utf8");
   const named = new Set();

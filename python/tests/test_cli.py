@@ -185,6 +185,26 @@ def test_cli_prints_markdown_and_maps_exit_codes(capsys) -> None:
                                                      max_retries=0)) == 5   # another API error -> 5
 
 
+def test_map_exits_failed_and_explains_a_blocked_start_page(capsys) -> None:
+    blocked = {"url": "https://e.example/", "status": "completed", "links": [], "outcome": "target_blocked",
+               "block_reason": "robots_disallowed", "hint": "check the site's robots policy"}
+    for argv in (["map", "https://e.example/"], ["--json", "map", "https://e.example/"]):
+        assert cli_main(argv, client=make_client(Recorder(httpx.Response(200, json=blocked)))) == cli.EXIT_FAILED
+        shown = capsys.readouterr()
+        assert "robots_disallowed" in shown.err and "check the site's robots policy" in shown.err
+        if "--json" in argv:
+            assert json.loads(shown.out)["outcome"] == "target_blocked"
+
+
+def test_job_output_includes_warnings_even_for_an_older_server(capsys) -> None:
+    response = {"job_id": "c1", "command": "crawl", "args": [], "status": "COMPLETED", "engine_id": "e",
+                "artifacts_url": "", "result_url": ""}
+    for warnings in (["crawl made zero requests"], None):
+        payload = {**response, **({"warnings": warnings} if warnings is not None else {})}
+        assert cli_main(["job", "c1"], client=make_client(Recorder(httpx.Response(200, json=payload)))) == 0
+        assert json.loads(capsys.readouterr().out)["warnings"] == (warnings or [])
+
+
 def test_cli_strips_terminal_control_characters(capsys) -> None:
     rec = Recorder(httpx.Response(200, json={"job_id": "j", "status": "completed", "url": "u",
                                              "markdown": "ok\x1b]8;;evil\x07 done"}))

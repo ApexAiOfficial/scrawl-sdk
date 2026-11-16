@@ -168,6 +168,45 @@ test("a long Retry-After is returned immediately instead of capped and retried",
   assert.deepEqual(sleeps, []);
 });
 
+test("Retry-After accepts HTTP dates and rejects invalid values", async (t) => {
+  let now = 1_445_412_475_000;
+  t.mock.method(Date, "now", () => now);
+  const future = { status: 429, body: { detail: "later" },
+    headers: { "Retry-After": "Wed, 21 Oct 2015 07:28:00 GMT" } };
+  const { client, fetch, sleeps } = makeClient([future, DONE]);
+  assert.equal((await client.getJob("j1")).status, "completed");
+  assert.equal(fetch.calls.length, 2);
+  assert.deepEqual(sleeps, [5000]);
+
+  now = 1_445_412_485_000;
+  for (const [value, expected] of [["Wed, 21 Oct 2015 07:28:00 GMT", 0], ["not a date", null]]) {
+    const response = { status: 429, body: { detail: "later" }, headers: { "Retry-After": value } };
+    const { client: noRetry } = makeClient([response], { maxRetries: 0 });
+    const error = await noRetry.getJob("j1").catch((exc) => exc);
+    assert.ok(error instanceof RateLimitError);
+    assert.equal(error.retryAfter, expected);
+  }
+});
+
+test("a 5xx Retry-After over the cap is returned without a retry", async (t) => {
+  t.mock.method(Date, "now", () => 1_445_412_480_000);
+  const response = { status: 503, body: { detail: "maintenance" },
+    headers: { "Retry-After": "Wed, 21 Oct 2015 07:30:00 GMT" } };
+  const { client, fetch, sleeps } = makeClient([response, DONE]);
+  const error = await client.getJob("j1").catch((exc) => exc);
+  assert.ok(error instanceof ServerError);
+  assert.equal(error.retryAfter, 120);
+  assert.equal(fetch.calls.length, 1);
+  assert.deepEqual(sleeps, []);
+
+  const atCap = makeClient([
+    { status: 503, body: { detail: "maintenance" }, headers: { "Retry-After": "60" } }, DONE,
+  ]);
+  assert.equal((await atCap.client.getJob("j1")).status, "completed");
+  assert.equal(atCap.fetch.calls.length, 2);
+  assert.deepEqual(atCap.sleeps, [60_000]);
+});
+
 test("idempotent submits and GETs retry 5xx and network errors with backoff", async () => {
   const { client, fetch, sleeps } = makeClient([{ status: 503, body: {} }, new TypeError("fetch failed"), DONE]);
   const result = await client.map("https://e.example", { idempotencyKey: "mine" });
@@ -556,6 +595,19 @@ test("waitForJob follows a job until it leaves PENDING or RUNNING", async () => 
   const slow = makeClient([job("RUNNING")]);
   assert.equal((await slow.client.waitForJob("c1", { timeoutMs: 0 })).status, "RUNNING");
   assert.equal(slow.fetch.calls.length, 1);
+});
+
+test("job warnings are exposed and default to an empty array", async () => {
+  const job = { job_id: "c1", command: "crawl", args: [], status: "COMPLETED", engine_id: "e",
+    artifacts_url: "", result_url: "" };
+  const { client } = makeClient([
+    { body: { ...job, warnings: ["crawl made zero requests"] } },
+    { body: job },
+    { body: { jobs: [job] } },
+  ]);
+  assert.deepEqual((await client.getJob("new")).warnings, ["crawl made zero requests"]);
+  assert.deepEqual((await client.getJob("old")).warnings, []);
+  assert.deepEqual((await client.listJobs()).jobs[0].warnings, []);
 });
 
 // -- the API key never reaches an error message -------------------------------------------------------

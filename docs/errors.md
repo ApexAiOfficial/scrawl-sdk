@@ -9,7 +9,7 @@ Every failed call raises (Python) or rejects with (TypeScript) a `ScrawlError`. 
 | Message | `message` | `message` | Human-readable; never contains your API key |
 | Request ID | `request_id` | `requestId` | From the `X-Request-ID` header, else from the error body; quote it when you report a problem |
 | Details | `details` | `details` | Extra structure, e.g. the fields a 422 rejected |
-| Retry after | `retry_after` | `retryAfter` | `RateLimitError` only: seconds, when the API says |
+| Retry after | `retry_after` | `retryAfter` | Seconds, on any error whose response supplied `Retry-After` |
 
 Compare codes with the `ErrorCode` constants (`error.code == ErrorCode.NOT_FOUND` in Python,
 `error.code === ErrorCode.NOT_FOUND` in TypeScript). `code` stays a plain string, so a code added by a newer
@@ -36,11 +36,13 @@ All classes subclass `ScrawlError`; `APITimeoutError` subclasses `APIConnectionE
 
 ## Retries
 
-The SDKs retry for you, with backoff that honours `Retry-After` (`max_retries`/`maxRetries`, default 2):
+The SDKs retry for you, with backoff that honours `Retry-After` in either delay-seconds or HTTP-date form
+(`max_retries`/`maxRetries`, default 2):
 
-- **A 429 is retried only when its `Retry-After` is at most 60 seconds** (or absent, using the existing backoff).
-  A longer value commonly means a daily cap: the SDK raises/rejects immediately, and the full value remains on
-  `RateLimitError.retry_after` / `retryAfter` for the caller.
+- **A retryable response is retried only when its `Retry-After` is at most 60 seconds** (or absent, using the
+  existing backoff). A longer value is never shortened: the SDK raises/rejects immediately, and the remaining
+  seconds stay on `ScrawlError.retry_after` / `retryAfter` for the caller. This applies to 429 and retryable
+  502/503/504 responses; 429 already followed this rule before 0.1.4.
 
 - **GETs** retry on 429, 502, 503, 504 and network errors.
 - **Submits that start work** (scrape, map, batch, crawl, dataset and asset extraction) carry an
@@ -142,7 +144,7 @@ SDKs nor the CLI ever resubmit a failed job; the Retryable column says whether r
 | Exit | Meaning |
 | --- | --- |
 | 0 | Success |
-| 1 | The job (or a batch item) failed, or a downloaded file did not match its size or SHA-256 (it was not written) |
+| 1 | The job (or a batch item) failed, a map's start page was blocked, or a downloaded file did not match its size or SHA-256 (it was not written) |
 | 2 | Usage error, or a file already exists where a download would go (nothing is overwritten) |
 | 3 | Authentication or configuration: 401/403, no API key, an unusable base URL or AI key; in `doctor`, a TLS failure or no proxy that has passed its test (in pool modes, no pool entry that has) |
 | 4 | Still pending or running at the deadline |

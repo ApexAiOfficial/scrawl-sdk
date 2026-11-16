@@ -38,6 +38,7 @@ export async function usage(): Promise<void> {
   console.log(rows.records[0]?.record_id, rows.records[0]?.provenance);
   const job = await client.getJob("j");
   const firstArg: string | undefined = job.args[0];
+  const jobWarnings: string[] = job.warnings;
   const launch = await client.crawl("target", { exportFormat: "csv" });
   const finished = await client.waitForJob(launch.job_id, { timeoutMs: 1000 });
   console.log(finished.status === "COMPLETED", launch.dataset_version_id);
@@ -47,7 +48,7 @@ export async function usage(): Promise<void> {
   const bytes: ArrayBuffer = await client.downloadArtifact("j", "f.html", { format: "markdown" });
   const listing = await client.listArtifacts("j");
   console.log(listing.artifacts.map((a) => `${a.name}:${a.size_bytes}`));
-  console.log(markdown, status, newer, rows.records.length, firstArg, bytes.byteLength);
+  console.log(markdown, status, newer, rows.records.length, firstArg, jobWarnings, bytes.byteLength);
   new Scrawl({ baseUrl: "http://scrawl-lan.test", allowInsecureHttp: true });
   const profile = await client.setAiProvider("p", { provider: "example", apiKey: "k" });
   console.log(profile.key_fingerprint, (await client.testAiProvider("p")).ok, (await client.aiUsage()).totals.length);

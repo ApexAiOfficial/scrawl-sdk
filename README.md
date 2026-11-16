@@ -15,7 +15,7 @@ AI provider, and, where the feature is enabled, extract a page's files and media
 | Area | Today |
 | --- | --- |
 | Source | Public in this repository, under the [Apache License 2.0](LICENSE) |
-| Releases | Python SDK 0.1.3 (tag `py-v0.1.3`) and TypeScript SDK 0.1.3 (tag `ts-v0.1.3`), published as [GitHub Releases](https://github.com/ApexAiOfficial/scrawl-sdk/releases) with installable files |
+| Releases | Python SDK 0.1.4 (tag `py-v0.1.4`) and TypeScript SDK 0.1.4 (tag `ts-v0.1.4`), published as [GitHub Releases](https://github.com/ApexAiOfficial/scrawl-sdk/releases) with installable files |
 | Package registries | **Not on PyPI or npm.** Install from a GitHub Release, a tag or a clone (see [Installation](#installation)) |
 | Maturity | Pre-1.0 (alpha). Until 1.0, a minor version may change the SDK API (see [Versioning](#versioning-and-compatibility)) |
 | What you need | Access to Scrawl: the endpoint and the API key ApexAi provides for your account. The SDKs cannot create keys and have no built-in remote endpoint |
@@ -82,17 +82,17 @@ From the GitHub Release (the built wheel):
 
 ```bash
 python -m venv .venv && . .venv/bin/activate
-python -m pip install https://github.com/ApexAiOfficial/scrawl-sdk/releases/download/py-v0.1.3/scrawl_sdk-0.1.3-py3-none-any.whl
+python -m pip install https://github.com/ApexAiOfficial/scrawl-sdk/releases/download/py-v0.1.4/scrawl_sdk-0.1.4-py3-none-any.whl
 scrawl --version
 ```
 
 From the release tag, built from source:
 
 ```bash
-python -m pip install "git+https://github.com/ApexAiOfficial/scrawl-sdk.git@py-v0.1.3#subdirectory=python"
+python -m pip install "git+https://github.com/ApexAiOfficial/scrawl-sdk.git@py-v0.1.4#subdirectory=python"
 ```
 
-From a clone (the `main` branch, or `git checkout py-v0.1.3` for the release):
+From a clone (the `main` branch, or `git checkout py-v0.1.4` for the release):
 
 ```bash
 git clone https://github.com/ApexAiOfficial/scrawl-sdk.git
@@ -106,7 +106,7 @@ pip downloads `httpx` from PyPI as usual, and, when it builds from source, the `
 In your project's directory, from the GitHub Release (the packed tarball):
 
 ```bash
-npm install https://github.com/ApexAiOfficial/scrawl-sdk/releases/download/ts-v0.1.3/apexaiofficial-scrawl-0.1.3.tgz
+npm install https://github.com/ApexAiOfficial/scrawl-sdk/releases/download/ts-v0.1.4/apexaiofficial-scrawl-0.1.4.tgz
 ```
 
 Or from a clone (npm links the folder as a `file:` dependency, so keep the clone where it is):
@@ -123,8 +123,8 @@ Each release lists a SHA-256 digest for every file. To compare a file you downlo
 `shasum -a 256`):
 
 ```bash
-gh release view py-v0.1.3 --repo ApexAiOfficial/scrawl-sdk --json assets --jq '.assets[] | "\(.digest)  \(.name)"'
-sha256sum scrawl_sdk-0.1.3-py3-none-any.whl
+gh release view py-v0.1.4 --repo ApexAiOfficial/scrawl-sdk --json assets --jq '.assets[] | "\(.digest)  \(.name)"'
+sha256sum scrawl_sdk-0.1.4-py3-none-any.whl
 ```
 
 ### Package registries (not yet)
@@ -304,6 +304,8 @@ Method signatures and options: [Python guide](docs/python.md), [TypeScript guide
   for fields that may be absent. Call `.to_dict()` before `json.dumps` (a batch's `items` field shadows
   `dict.items`). Downloads return `bytes`.
 - **TypeScript** returns the parsed JSON, typed for the documented fields. Downloads return an `ArrayBuffer`.
+- **Jobs** returned by `get_job` / `getJob` and the job wait helpers expose `warnings` as a string list/array,
+  defaulting to empty when an older server omits it. Job listings get the same default.
 - **Scrapes** return `status` `completed`, `pending` (with a `job_id` to wait on) or `failed` (with `error_code`
   and `error`). A failed job is a result, not an exception. `formats` is any of `markdown` (the default), `links`,
   `html` and `json`.
@@ -369,13 +371,14 @@ assert again.job_id == launch.job_id                      # the same job: nothin
 ```
 
 The SDKs retry automatically (`max_retries` / `maxRetries`, default 2), with exponential backoff that honours
-`Retry-After`:
+`Retry-After` in either delay-seconds or HTTP-date form:
 
 - **GETs** retry on 429, 502, 503, 504 and network errors.
 - **Keyed submits** retry on 429, network errors, and a 502, 503 or 504 from a proxy. A 5xx in Scrawl's own error
   format is final. If a retry finds the first attempt still running (409), the SDK waits for its stored response.
-- **A 429 asking for more than 60 s** (a daily cap, for example) is never retried: it is raised at once as a
-  `RateLimitError` whose `retry_after` (`retryAfter` in TypeScript) holds the server's full wait.
+- **A retryable response asking for more than 60 s** is never retried with a shorter wait: it is raised at once,
+  and its `retry_after` (`retryAfter` in TypeScript) holds the remaining seconds. This applies to 429 and
+  retryable 502/503/504 responses; 429 keeps its existing behavior.
 - **Other POSTs** and other 4xx are never retried.
 - **A code the error catalogue marks not retryable is never retried.** That includes `submission_failed` and
   `internal_error`, after which the first request may already have started work: list your jobs before you send it
@@ -477,8 +480,8 @@ items: after `batch_scrape(..., engine="browser")`, compare each finished item's
 ## Errors
 
 Every failed call raises (Python) or rejects with (TypeScript) a `ScrawlError` or one of its subclasses, carrying
-`status`, `code` (the API's stable machine code), `message`, `request_id` / `requestId` and `details`. Messages
-never contain your API key.
+`status`, `code` (the API's stable machine code), `message`, `request_id` / `requestId`, `details`, and
+`retry_after` / `retryAfter` when the response supplied `Retry-After`. Messages never contain your API key.
 
 | HTTP status | Class (both SDKs) | Typical codes |
 | --- | --- | --- |
@@ -490,7 +493,7 @@ never contain your API key.
 | 409 | `ConflictError` | `conflict` |
 | 422 | `ValidationError` | `invalid_request`, `budget_exceeded` |
 | 429 | `RateLimitError` (with `retry_after` / `retryAfter`) | `rate_limited`, `too_many_active_jobs` |
-| 5xx | `ServerError` | `internal_error`, `submission_failed`, `ai_*`, `unavailable`, `browser_unavailable` |
+| 5xx | `ServerError` (with `retry_after` / `retryAfter` when supplied) | `internal_error`, `submission_failed`, `ai_*`, `unavailable`, `browser_unavailable` |
 | no response | `APIConnectionError`, `APITimeoutError` | network, DNS, TLS, timeout |
 | not sent | `ConfigurationError` | no API key, a key an HTTP header cannot carry, or an unusable base URL |
 
@@ -552,7 +555,7 @@ Downloads are written whole or not at all, never overwrite a file, stay inside `
 | Exit code | Meaning |
 | --- | --- |
 | 0 | Success |
-| 1 | The job (or a batch item) failed, a download did not match its size or SHA-256 (nothing written), or `ai providers test` failed |
+| 1 | The job (or a batch item) failed, a map's start page was blocked, a download did not match its size or SHA-256 (nothing written), or `ai providers test` failed |
 | 2 | Usage error, or a file already exists where a download would go |
 | 3 | Authentication or configuration: 401/403, no API key, an unusable base URL or AI key; in `doctor`, a TLS failure, no tested direct proxy, or no active tested pool entry |
 | 4 | Still pending or running at the deadline |
@@ -571,7 +574,8 @@ Start with `scrawl doctor`: it names the failing check (`base_url`, `tls`, `reac
 | `Connection refused` from `doctor` or `APIConnectionError` | `SCRAWL_BASE_URL` is unset or wrong, or the endpoint is unreachable. Without the variable, the SDKs call the loopback default `http://127.0.0.1:8088` |
 | `AuthenticationError` (401, `unauthorized`) | The key was refused or revoked: contact support@apexaiofficial.com |
 | `PermissionDeniedError` (403, `forbidden`) | A missing scope (`json` needs `ai:use`), or a feature that is not enabled |
-| `RateLimitError` (429) | Retry-After values up to 60 s are retried automatically. Longer waits (for example a daily cap) are raised immediately with the full `retry_after` / `retryAfter`; wait that long before trying again |
+| `RateLimitError` (429) | Retry-After values up to 60 s are retried automatically. Longer waits (for example a daily cap) are raised immediately with `retry_after` / `retryAfter`; wait that long before trying again |
+| `ServerError` with `retry_after` / `retryAfter` | A retryable 502/503/504 asked for more than 60 s, so the SDK returned it immediately for the caller to schedule |
 | `BadRequestError` with `egress_required` | Your account needs a usable proxy for this request: contact support@apexaiofficial.com |
 | `ServerError` with an `ai_*` code | Your AI provider failed or refused: check the profile with `scrawl ai providers test` |
 | `ServerError` with `browser_unavailable` | Browser rendering is not enabled: drop `engine="browser"` |
@@ -593,7 +597,7 @@ Start with `scrawl doctor`: it names the failing check (`base_url`, `tls`, `reac
   userinfo defensively and reads URLs for `proxy set` and `proxy pool add` only from an environment variable or
   stdin, never argv.
 - **What is contacted.** The SDKs and the CLI send requests only to the Scrawl endpoint at your base URL, with a
-  `User-Agent` naming the SDK and its version (`scrawl-python/0.1.3`, `scrawl-ts/0.1.3`). They collect no
+  `User-Agent` naming the SDK and its version (`scrawl-python/0.1.4`, `scrawl-ts/0.1.4`). They collect no
   telemetry. Your AI provider is called by Scrawl, not by the SDK. The Python SDK uses `httpx`, which
   honours the standard proxy environment variables (`HTTPS_PROXY`, `NO_PROXY` and others) unless you pass your own
   `http_client`.

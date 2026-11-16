@@ -2720,6 +2720,13 @@
         "status": {
           "title": "Status",
           "type": "string"
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Warnings",
+          "type": "array"
         }
       },
       "required": [

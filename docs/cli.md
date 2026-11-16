@@ -54,6 +54,9 @@ while the selected content stays on stdout. Full scrape JSON and batch output in
 batch's `outcomes` counts. Refunds are automatic and cover only Scrawl's own failures: a job that never started, and a scrape whose outcome is `pipeline_failed`. Target blocks/errors, failures in your proxy and
 cancellations after work starts remain charged.
 
+If a map's start page has `outcome: target_blocked`, `scrawl map` prints the `block_reason` and any `hint` to
+stderr and exits 1, even though the settled map result itself has `status: completed`.
+
 ## Crawls, jobs, artifacts
 
 ```bash
@@ -65,6 +68,9 @@ scrawl artifacts list job_123
 scrawl artifacts download job_123 --out ./artifacts                 # every listed artifact
 scrawl artifacts download job_123 response.html --format markdown --out ./artifacts
 ```
+
+Detailed job output (`job`, a waited `crawl`, or a waited dataset extraction) includes `warnings`; it is an empty
+list when there are none or when an older server omitted the field.
 
 `artifacts download` checks each file against the job's artifact list (its size, and its SHA-256 when the
 server lists one), writes it whole or not at all, and never overwrites an existing file. Names are reduced to
@@ -163,7 +169,7 @@ revocation is permanent and a key may revoke itself.
 | Exit | Meaning |
 | --- | --- |
 | 0 | Success |
-| 1 | The job (or a batch item) failed, or a downloaded file did not match its size or SHA-256 (it was not written); `ai providers test` failed |
+| 1 | The job (or a batch item) failed, a map's start page was blocked, or a downloaded file did not match its size or SHA-256 (it was not written); `ai providers test` failed |
 | 2 | Usage error, or a file already exists where a download would go (nothing is overwritten) |
 | 3 | Authentication or configuration: 401/403, no API key, an unusable base URL or AI key; in `doctor`, a TLS failure or no proxy that has passed its test (in pool modes, no pool entry that has) |
 | 4 | Still pending or running at the deadline |
