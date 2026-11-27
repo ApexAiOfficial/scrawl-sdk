@@ -2,7 +2,7 @@
   "errors": [
     {
       "code": "account_not_active",
-      "description": "The key's hosted account is suspended, banned, or has not accepted the Trust Pledge.",
+      "description": "The key's hosted account is suspended, banned, or has not accepted the Trust Pledge (or the terms changed since it did: accept them again in Telegram).",
       "http_status": 403,
       "retryable": false,
       "surfaces": [
@@ -338,7 +338,7 @@
     },
     {
       "code": "key_revoked",
-      "description": "The key of an open listen stream was revoked; use an active key.",
+      "description": "The key was revoked: an open listen stream's, or the key a stdio MCP server was started with; use an active key.",
       "http_status": null,
       "retryable": false,
       "surfaces": [
