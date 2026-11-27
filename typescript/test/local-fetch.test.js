@@ -5,6 +5,8 @@ import { parseRobots, robotsAllow } from "../src/local_fetch.js";
 import { makeClient } from "./helpers.js";
 
 const PAGE = "<html><head><title>Members</title></head><body><p>12.50</p></body></html>";
+// Host names resolve without DNS in these tests: to a public documentation address (RFC 5737).
+const PUBLIC = async () => ["192.0.2.10"];
 
 /** A site's fetch: robots.txt (null: 404) and pages (path -> Response factory); the paths it was asked for. */
 function site(robots = "User-agent: *\nDisallow: /private/\n", pages = {}) {
@@ -23,7 +25,7 @@ test("localFetch fetches with its own fetch, honours robots and submits the body
   const { seen, fetchPage } = site();
   const { client, fetch } = makeClient([{ body: { job_id: "j1", status: "completed", url: "u", origin: "client_fetched",
     url_verified: false } }]);
-  const result = await client.localFetch("https://members.example/lamp", { fetchPage, formats: ["markdown"] });
+  const result = await client.localFetch("https://members.example/lamp", { resolve: PUBLIC, fetchPage, formats: ["markdown"] });
   assert.equal(result.origin, "client_fetched");
   assert.deepEqual(seen.map((call) => call.path), ["/robots.txt", "/lamp"]);
   assert.ok(seen.every((call) => !("Authorization" in call.headers) && call.headers["User-Agent"].startsWith("ScrawlSDK/")));
@@ -37,15 +39,15 @@ test("localFetch fetches with its own fetch, honours robots and submits the body
 test("robots.txt disallows by default; the opt-out is explicit; 5xx refuses; 404 allows", async () => {
   const { fetchPage } = site();
   const { client, fetch } = makeClient([{ body: { job_id: "j1", status: "completed", url: "u" } }]);
-  await assert.rejects(client.localFetch("https://members.example/private/x", { fetchPage }),
+  await assert.rejects(client.localFetch("https://members.example/private/x", { resolve: PUBLIC, fetchPage }),
     (error) => error.code === "robots_disallowed");
   assert.equal(fetch.calls.length, 0);
-  await client.localFetch("https://members.example/private/x", { fetchPage, respectRobots: false });
+  await client.localFetch("https://members.example/private/x", { resolve: PUBLIC, fetchPage, respectRobots: false });
   assert.equal(fetch.calls.length, 1);
   const down = async (url) => new URL(url).pathname === "/robots.txt" ? new Response("", { status: 503 }) : new Response(PAGE);
-  await assert.rejects(client.localFetch("https://members.example/lamp", { fetchPage: down }),
+  await assert.rejects(client.localFetch("https://members.example/lamp", { resolve: PUBLIC, fetchPage: down }),
     (error) => error.code === "robots_unavailable");
-  await client.localFetch("https://members.example/lamp", { fetchPage: site(null).fetchPage });
+  await client.localFetch("https://members.example/lamp", { resolve: PUBLIC, fetchPage: site(null).fetchPage });
   assert.equal(fetch.calls.length, 2);
 });
 
@@ -57,12 +59,12 @@ test("at most five redirects, each hop checked; the size limit before upload", a
   hops["/r6"] = () => new Response(PAGE, { headers: { "content-type": "text/html" } });
   const { fetchPage } = site(undefined, hops);
   const { client, fetch } = makeClient([{ body: { job_id: "j1", status: "completed", url: "u" } }]);
-  await assert.rejects(client.localFetch("https://members.example/r0", { fetchPage }),
+  await assert.rejects(client.localFetch("https://members.example/r0", { resolve: PUBLIC, fetchPage }),
     (error) => error.code === "too_many_redirects");
-  await client.localFetch("https://members.example/r1", { fetchPage });
+  await client.localFetch("https://members.example/r1", { resolve: PUBLIC, fetchPage });
   assert.equal(fetch.calls.at(-1).body.final_url, "https://members.example/r6");
   const big = site(undefined, { "/big": () => new Response("x".repeat(2048)) });
-  await assert.rejects(client.localFetch("https://members.example/big", { fetchPage: big.fetchPage, maxBytes: 1024 }),
+  await assert.rejects(client.localFetch("https://members.example/big", { resolve: PUBLIC, fetchPage: big.fetchPage, maxBytes: 1024 }),
     (error) => error.code === "payload_too_large");
   assert.equal(fetch.calls.length, 1);
 });
@@ -108,9 +110,9 @@ test("a redirect to another host is not followed with your own fetch; https to h
   const hosts = [];
   const watched = async (url, init) => { hosts.push(new URL(url).host); return fetchPage(url, init); };
   const { client, fetch } = makeClient([{ body: { job_id: "j1", status: "completed", url: "u" } }]);
-  await assert.rejects(client.localFetch("https://members.example/go", { fetchPage: watched }),
+  await assert.rejects(client.localFetch("https://members.example/go", { resolve: PUBLIC, fetchPage: watched }),
     (error) => error.code === "cross_origin_redirect" && error.message.includes("elsewhere.example"));
-  await assert.rejects(client.localFetch("https://members.example/down", { fetchPage: watched }),
+  await assert.rejects(client.localFetch("https://members.example/down", { resolve: PUBLIC, fetchPage: watched }),
     (error) => error.code === "insecure_redirect");
   assert.ok(hosts.every((host) => host === "members.example") && seen.length > 0);
   assert.equal(fetch.calls.length, 0);
@@ -120,7 +122,7 @@ test("a redirect this environment hides (a browser's opaque redirect) is refused
   const opaque = async (url) => (new URL(url).pathname === "/robots.txt" ? new Response("", { status: 404 })
     : { status: 0, type: "opaqueredirect", headers: new Headers(), body: null, arrayBuffer: async () => new ArrayBuffer(0) });
   const { client, fetch } = makeClient([{ body: { job_id: "j1", status: "completed", url: "u" } }]);
-  await assert.rejects(client.localFetch("https://members.example/moved", { fetchPage: opaque }),
+  await assert.rejects(client.localFetch("https://members.example/moved", { resolve: PUBLIC, fetchPage: opaque }),
     (error) => error.code === "redirect_hidden");
   assert.equal(fetch.calls.length, 0);
 });
@@ -175,7 +177,7 @@ test("robots.txt redirects get the same checks as every page hop", async () => {
     ["https://other.example/robots.txt", "cross_origin_redirect"]]) {
     const { seen, fetchPage } = robotsRedirectSite(location);
     const { client, fetch } = makeClient([]);
-    await assert.rejects(client.localFetch("https://members.example/lamp", { fetchPage }),
+    await assert.rejects(client.localFetch("https://members.example/lamp", { resolve: PUBLIC, fetchPage }),
       (error) => error.code === code);
     assert.deepEqual(seen, ["https://members.example/robots.txt"]);
     assert.equal(fetch.calls.length, 0);
@@ -185,7 +187,7 @@ test("robots.txt redirects get the same checks as every page hop", async () => {
 test("a same-host robots.txt redirect is followed and its rules apply", async () => {
   const { seen, fetchPage } = robotsRedirectSite("/moved-robots.txt");
   const { client, fetch } = makeClient([]);
-  await assert.rejects(client.localFetch("https://members.example/private/x", { fetchPage }),
+  await assert.rejects(client.localFetch("https://members.example/private/x", { resolve: PUBLIC, fetchPage }),
     (error) => error.code === "robots_disallowed");
   assert.deepEqual(seen, ["https://members.example/robots.txt", "https://members.example/moved-robots.txt"]);
   assert.equal(fetch.calls.length, 0);
@@ -195,7 +197,7 @@ test("robots.txt is read up to 500 KiB only", async () => {
   const robots = "User-agent: *\n" + `# ${"x".repeat(1022)}\n`.repeat(600) + "Disallow: /lamp\n";
   const { fetchPage } = site(robots);
   const { client, fetch } = makeClient([{ body: { job_id: "j1", status: "completed" } }]);
-  await client.localFetch("https://members.example/lamp", { fetchPage });
+  await client.localFetch("https://members.example/lamp", { resolve: PUBLIC, fetchPage });
   assert.equal(fetch.calls.length, 1);
 });
 
@@ -203,7 +205,7 @@ test("a network failure or a timeout of the fetch is a ScrawlError", async () =>
   for (const [failure, code] of [[new TypeError("fetch failed"), "fetch_failed"],
     [Object.assign(new Error("timed out"), { name: "TimeoutError" }), "fetch_timeout"]]) {
     const { client, fetch } = makeClient([]);
-    await assert.rejects(client.localFetch("https://members.example/lamp", { fetchPage: async () => { throw failure; } }),
+    await assert.rejects(client.localFetch("https://members.example/lamp", { resolve: PUBLIC, fetchPage: async () => { throw failure; } }),
       (error) => error.code === code);
     assert.equal(fetch.calls.length, 0);
   }
@@ -217,7 +219,7 @@ test("the fetch is bounded by the client's timeout", async () => {
       : new Response(PAGE, { headers: { "content-type": "text/html" } });
   };
   const { client } = makeClient([{ body: { job_id: "j1", status: "completed" } }]);
-  await client.localFetch("https://members.example/lamp", { fetchPage });
+  await client.localFetch("https://members.example/lamp", { resolve: PUBLIC, fetchPage });
   assert.equal(signals.length, 2);
   assert.ok(signals.every((signal) => signal instanceof AbortSignal));
 });
@@ -233,12 +235,81 @@ test("robots wildcards match in bounded time", () => {
 test("an empty page is refused before anything is sent, and an overlong type is sent as its media type", async () => {
   const empty = site(undefined, { "/lamp": () => new Response(null, { status: 204 }) });
   const first = makeClient([]);
-  await assert.rejects(first.client.localFetch("https://members.example/lamp", { fetchPage: empty.fetchPage }),
+  await assert.rejects(first.client.localFetch("https://members.example/lamp", { resolve: PUBLIC, fetchPage: empty.fetchPage }),
     (error) => error.code === "empty_body");
   assert.equal(first.fetch.calls.length, 0);
   const longType = "text/html; " + Array.from({ length: 60 }, (_, index) => `p${index}=v`).join("; ");
   const long = site(undefined, { "/lamp": () => new Response(PAGE, { headers: { "content-type": longType } }) });
   const second = makeClient([{ body: { job_id: "j1", status: "completed" } }]);
-  await second.client.localFetch("https://members.example/lamp", { fetchPage: long.fetchPage });
+  await second.client.localFetch("https://members.example/lamp", { resolve: PUBLIC, fetchPage: long.fetchPage });
   assert.equal(second.fetch.calls[0].body.content_type, "text/html");
+});
+
+// -- link-local and cloud-metadata destinations are refused by default (L0, 2026-11-27) -----------------------------
+
+const never = async (url) => { throw new Error(`no request may be made: ${url}`); };
+
+test("link-local and metadata destinations are refused before connecting", async () => {
+  for (const url of ["http://169.254.169.254/latest/meta-data/", "http://[fe80::1]/x", "http://[fd00:ec2::254]/x",
+    "http://[::ffff:169.254.169.254]/x", "http://metadata.google.internal/computeMetadata/v1/", "http://metadata/x",
+    "http://METADATA.Google.Internal./x"]) {
+    const { client, fetch } = makeClient([]);
+    await assert.rejects(client.localFetch(url, { resolve: PUBLIC, fetchPage: never }),
+      (error) => error.code === "link_local_refused" && /allowLinkLocal/.test(error.message), url);
+    assert.equal(fetch.calls.length, 0);
+  }
+});
+
+test("a name that resolves to a link-local address is refused", async () => {
+  for (const addresses of [["169.254.169.254"], ["192.0.2.10", "169.254.10.1"], ["fe80::1%2"], ["fd00:ec2::254"]]) {
+    const { client, fetch } = makeClient([]);
+    await assert.rejects(client.localFetch("https://innocent.example/lamp", { resolve: async () => addresses,
+      fetchPage: never }), (error) => error.code === "link_local_refused");
+    assert.equal(fetch.calls.length, 0);
+  }
+});
+
+test("every redirect hop is checked again before it is fetched", async () => {
+  const answers = [["192.0.2.10"], ["169.254.169.254"]];         // the name points elsewhere by the time of the hop
+  const seen = [];
+  const fetchPage = async (url) => {
+    seen.push(new URL(url).pathname);
+    return new Response(null, { status: 302, headers: { location: "/next" } });
+  };
+  const { client, fetch } = makeClient([]);
+  await assert.rejects(client.localFetch("https://members.example/lamp", { respectRobots: false, fetchPage,
+    resolve: async () => answers.shift() }), (error) => error.code === "link_local_refused");
+  assert.deepEqual(seen, ["/lamp"]);
+  assert.equal(fetch.calls.length, 0);
+});
+
+test("a robots.txt redirect to a metadata address is refused", async () => {
+  const { seen, fetchPage } = robotsRedirectSite("http://169.254.169.254/robots.txt");
+  const { client, fetch } = makeClient([]);
+  await assert.rejects(client.localFetch("http://members.example/lamp", { resolve: PUBLIC, fetchPage }),
+    (error) => error.code === "link_local_refused");
+  assert.deepEqual(seen, ["http://members.example/robots.txt"]);
+  assert.equal(fetch.calls.length, 0);
+});
+
+test("private and loopback destinations stay allowed, and allowLinkLocal is an explicit opt-in", async () => {
+  for (const addresses of [["10.0.0.5"], ["192.168.1.20"], ["127.0.0.1"], ["::1"], ["fd12:3456::1"]]) {
+    const { fetchPage } = site();
+    const { client, fetch } = makeClient([{ body: { job_id: "j1", status: "completed" } }]);
+    await client.localFetch("https://members.example/lamp", { resolve: async () => addresses, fetchPage });
+    assert.equal(fetch.calls.length, 1, addresses.join());
+  }
+  const { fetchPage } = site();
+  const { client, fetch } = makeClient([{ body: { job_id: "j1", status: "completed" } }]);
+  await client.localFetch("https://members.example/lamp", { resolve: async () => ["169.254.169.254"], fetchPage,
+    allowLinkLocal: true });
+  assert.equal(fetch.calls.length, 1);
+});
+
+test("a name that does not resolve is a fetch failure", async () => {
+  const { client, fetch } = makeClient([]);
+  await assert.rejects(client.localFetch("https://nowhere.example/lamp", { fetchPage: never,
+    resolve: async () => { throw Object.assign(new Error("getaddrinfo ENOTFOUND"), { code: "ENOTFOUND" }); } }),
+  (error) => error.code === "fetch_failed");
+  assert.equal(fetch.calls.length, 0);
 });

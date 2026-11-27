@@ -11,6 +11,22 @@ import pytest
 from scrawl import AsyncScrawl, Scrawl, ScrawlError
 
 PAGE = b"<html><head><title>Members</title></head><body><p>12.50</p></body></html>"
+#: What the test resolver answers for a name it is not told about: a public documentation address (RFC 5737).
+PUBLIC = "192.0.2.10"
+
+
+@pytest.fixture(autouse=True)
+def resolver(monkeypatch):  # type: ignore[no-untyped-def]
+    """Host names resolve without DNS in these tests: NAMES maps a host to its addresses, anything else is PUBLIC."""
+    names: dict[str, list[str]] = {}
+    asked: list[str] = []
+
+    def resolve(host: str, port: int) -> list[str]:
+        asked.append(host)
+        return names.get(host, [PUBLIC])
+
+    monkeypatch.setattr("scrawl._local_fetch._resolve", resolve)
+    return names, asked
 
 
 def _site(robots: str | None = "User-agent: *\nDisallow: /private/\n", pages: dict | None = None):  # type: ignore[no-untyped-def]
@@ -301,3 +317,98 @@ def test_an_overlong_content_type_is_sent_as_its_media_type() -> None:
     calls, client = _api()
     client.local_fetch("https://members.example/lamp", fetch_client=httpx.Client(transport=site))
     assert json.loads(calls[0].content)["content_type"] == "text/html"
+
+
+# -- link-local and cloud-metadata destinations are refused by default (L0, 2026-11-27) ------------------------------
+
+def _never(request: httpx.Request) -> httpx.Response:
+    raise AssertionError(f"no request may be made: {request.url}")
+
+
+@pytest.mark.parametrize("url", ["http://169.254.169.254/latest/meta-data/", "http://[fe80::1]/x",
+                                 "http://[fd00:ec2::254]/latest/meta-data/", "http://[::ffff:169.254.169.254]/x",
+                                 "http://metadata.google.internal/computeMetadata/v1/", "http://metadata/x",
+                                 "http://METADATA.Google.Internal./x"])
+def test_link_local_and_metadata_destinations_are_refused_before_connecting(url: str) -> None:
+    calls, client = _api()
+    with pytest.raises(ScrawlError) as refused:
+        client.local_fetch(url, fetch_client=httpx.Client(transport=httpx.MockTransport(_never)))
+    assert refused.value.code == "link_local_refused" and "allow_link_local" in str(refused.value)
+    assert calls == []
+
+
+@pytest.mark.parametrize("addresses", [["169.254.169.254"], [PUBLIC, "169.254.10.1"], ["fe80::1%2"],
+                                       ["fd00:ec2::254"]])
+def test_a_name_that_resolves_to_a_link_local_address_is_refused(resolver, addresses: list[str]) -> None:
+    names, _asked = resolver
+    names["innocent.example"] = addresses
+    calls, client = _api()
+    with pytest.raises(ScrawlError) as refused:
+        client.local_fetch("https://innocent.example/lamp", fetch_client=httpx.Client(transport=httpx.MockTransport(_never)))
+    assert refused.value.code == "link_local_refused" and calls == []
+
+
+def test_every_redirect_hop_is_checked_again_before_it_is_fetched(monkeypatch) -> None:
+    answers = iter([[PUBLIC], ["169.254.169.254"]])      # the name points elsewhere by the time of the hop
+    monkeypatch.setattr("scrawl._local_fetch._resolve", lambda host, port: next(answers))
+    pages = {"/lamp": httpx.Response(302, headers={"location": "/next"})}
+    seen, site = _site(robots=None, pages=pages)
+    calls, client = _api()
+    with pytest.raises(ScrawlError) as refused:
+        client.local_fetch("https://members.example/lamp", respect_robots=False, fetch_client=httpx.Client(transport=site))
+    assert refused.value.code == "link_local_refused" and calls == []
+    assert [request.url.path for request in seen] == ["/lamp"]                       # the hop was never requested
+
+
+def test_a_robots_txt_redirect_to_a_metadata_address_is_refused() -> None:
+    seen, site = _robots_redirect_site("http://169.254.169.254/robots.txt")
+    calls, client = _api()
+    with pytest.raises(ScrawlError) as refused:
+        client.local_fetch("http://members.example/lamp", fetch_client=httpx.Client(transport=site))
+    assert refused.value.code == "link_local_refused" and calls == []
+    assert [str(request.url) for request in seen] == ["http://members.example/robots.txt"]
+
+
+@pytest.mark.parametrize("addresses", [["10.0.0.5"], ["192.168.1.20"], ["172.16.4.4"], ["127.0.0.1"], ["::1"],
+                                       ["fd12:3456::1"]])
+def test_private_and_loopback_destinations_stay_allowed(resolver, addresses: list[str]) -> None:
+    names, _asked = resolver
+    names["members.example"] = addresses
+    _seen, site = _site()
+    calls, client = _api()
+    client.local_fetch("https://members.example/lamp", fetch_client=httpx.Client(transport=site))
+    assert len(calls) == 1
+
+
+def test_allow_link_local_is_an_explicit_opt_in(resolver) -> None:
+    names, _asked = resolver
+    names["members.example"] = ["169.254.169.254"]
+    _seen, site = _site()
+    calls, client = _api()
+    client.local_fetch("https://members.example/lamp", fetch_client=httpx.Client(transport=site), allow_link_local=True)
+    assert len(calls) == 1
+
+
+def test_a_name_that_does_not_resolve_is_a_fetch_failure(monkeypatch) -> None:
+    import socket
+
+    def unresolvable(host: str, port: int) -> list[str]:
+        raise socket.gaierror(-2, "Name or service not known")
+
+    monkeypatch.setattr("scrawl._local_fetch._resolve", unresolvable)
+    calls, client = _api()
+    with pytest.raises(ScrawlError) as failed:
+        client.local_fetch("https://nowhere.example/lamp", fetch_client=httpx.Client(transport=httpx.MockTransport(_never)))
+    assert failed.value.code == "fetch_failed" and calls == []
+
+
+@pytest.mark.asyncio
+async def test_the_async_client_refuses_the_same_destinations(resolver) -> None:
+    names, _asked = resolver
+    names["innocent.example"] = ["169.254.169.254"]
+    async with AsyncScrawl("sk-test", base_url="https://scrawl.test",
+                           http_client=httpx.AsyncClient(transport=httpx.MockTransport(_never))) as client:
+        with pytest.raises(ScrawlError) as refused:
+            await client.local_fetch("https://innocent.example/x",
+                                     fetch_client=httpx.AsyncClient(transport=httpx.MockTransport(_never)))
+    assert refused.value.code == "link_local_refused"

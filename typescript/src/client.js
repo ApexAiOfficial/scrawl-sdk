@@ -184,10 +184,11 @@ export class Scrawl {
    * is never followed; with your own `fetchPage` a redirect to another host is not either.
    */
   async localFetch(url, { respectRobots = true, maxRedirects = DEFAULT_MAX_REDIRECTS, maxBytes = DEFAULT_MAX_BYTES,
-    fetchPage: pageFetch, ...options } = {}) {
+    fetchPage: pageFetch, allowLinkLocal = false, resolve, ...options } = {}) {
     const fetchImpl = pageFetch ?? ((...args) => globalThis.fetch(...args));
     const page = await fetchPage(fetchImpl, url, { respectRobots, maxRedirects, maxBytes,
-      sameHostOnly: pageFetch !== undefined, timeoutMs: this.timeoutMs });
+      sameHostOnly: pageFetch !== undefined, timeoutMs: this.timeoutMs, allowLinkLocal,
+      ...(resolve ? { resolve } : {}) });
     return this.scrapeLocal(page.url, page.body, { ...options, httpStatus: page.status, contentType: page.contentType,
       finalUrl: page.finalUrl !== page.url ? page.finalUrl : undefined });
   }

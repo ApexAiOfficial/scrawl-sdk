@@ -16,6 +16,13 @@
 // The robots.txt request gets the same redirect checks as the page, and at most 500 KiB of it is read (RFC 9309
 // section 2.5). Each request is bounded by the client's timeout. A failure to reach the site is a ScrawlError
 // (fetch_failed, or fetch_timeout); an empty page is refused (empty_body) before anything is sent to Scrawl.
+//
+// Link-local and cloud-metadata destinations are refused (link_local_refused) unless `allowLinkLocal: true`:
+// 169.254.0.0/16, fe80::/10, fd00:ec2::254 and the names metadata.google.internal and metadata. Every request
+// (robots.txt, the page and each redirect hop) resolves its host and checks every address before connecting (in
+// Node; where there is no resolver, as in a browser, the literal addresses and the names). There is no scraping use for
+// those addresses, and a page fetched from one (a cloud instance's credentials) would be sent to Scrawl. Private
+// ranges and loopback stay allowed: an intranet page or a local development server is what local fetch is for.
 
 import { ScrawlError } from "./errors.js";
 import { VERSION } from "./version.js";
@@ -32,6 +39,77 @@ const MAX_CONTENT_TYPE = 200;
 
 function refuse(code, message) {
   return new ScrawlError(message, { code });
+}
+
+const METADATA_NAMES = new Set(["metadata.google.internal", "metadata"]);
+
+// The eight 16-bit groups of an IPv6 address (an embedded dotted IPv4 tail included), or null.
+function ipv6Groups(text) {
+  let s = text;
+  const tail = s.match(/(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
+  if (tail) {
+    const [a, b, c, d] = tail.slice(1).map(Number);
+    s = `${s.slice(0, -tail[0].length)}${((a << 8) | b).toString(16)}:${((c << 8) | d).toString(16)}`;
+  }
+  const halves = s.split("::");
+  if (halves.length > 2) return null;
+  const head = halves[0] ? halves[0].split(":") : [];
+  const rest = halves.length === 2 && halves[1] ? halves[1].split(":") : [];
+  const fill = halves.length === 2 ? 8 - head.length - rest.length : 0;
+  if (fill < 0) return null;
+  const groups = [...head, ...Array(fill).fill("0"), ...rest].map((group) => (/^[0-9a-f]{1,4}$/i.test(group)
+    ? parseInt(group, 16) : NaN));
+  return groups.length === 8 && groups.every((group) => Number.isInteger(group)) ? groups : null;
+}
+
+/** Whether ADDRESS (an IP literal, brackets and a zone allowed) is link-local or a cloud-metadata address. */
+export function isLinkLocal(address) {
+  const text = String(address).replace(/^\[|\]$/g, "").split("%")[0].toLowerCase();
+  const v4 = text.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
+  if (v4) return Number(v4[1]) === 169 && Number(v4[2]) === 254;
+  if (!text.includes(":")) return false;
+  const g = ipv6Groups(text);
+  if (!g) return false;
+  if ((g[0] & 0xffc0) === 0xfe80) return true;                                       // fe80::/10
+  if (g[0] === 0xfd00 && g[1] === 0x0ec2 && g.slice(2, 7).every((x) => x === 0) && g[7] === 0x254) return true;
+  if (g.slice(0, 5).every((x) => x === 0) && g[5] === 0xffff) return g[6] === ((169 << 8) | 254);   // ::ffff:v4
+  return false;
+}
+
+// The addresses HOSTNAME resolves to, in Node (null where there is no resolver, as in a browser).
+async function systemResolve(hostname) {
+  if (typeof process === "undefined" || !process.versions?.node) return null;
+  const { lookup } = await import("node:dns/promises");
+  return (await lookup(hostname, { all: true, verbatim: true })).map((entry) => entry.address);
+}
+
+function linkLocalRefused(url) {
+  return refuse("link_local_refused", `${url} is a link-local or cloud-metadata address: not fetched (pass `
+    + "allowLinkLocal: true only if you mean to send what it answers to Scrawl)");
+}
+
+// Refuse URL before connecting when its host is, or resolves to, a link-local or metadata address.
+async function checkDestination(url, { allowLinkLocal, resolve }) {
+  if (allowLinkLocal) return;
+  const host = new URL(url).hostname.replace(/\.$/, "").toLowerCase();
+  if (METADATA_NAMES.has(host)) throw linkLocalRefused(url);
+  let addresses = [host];
+  if (!host.startsWith("[") && !/^\d+\.\d+\.\d+\.\d+$/.test(host)) {
+    try {
+      addresses = (await resolve(host)) ?? [];
+    } catch {
+      throw refuse("fetch_failed", `Could not resolve ${host}: not fetched`);
+    }
+  }
+  if (addresses.some(isLinkLocal)) throw linkLocalRefused(url);
+}
+
+// The next hop of a redirect: its destination checked first, then nextHop's rules.
+async function redirect(current, location, sameHostOnly, guard) {
+  const target = new URL(location, current).toString();
+  checkUrl(target);
+  await checkDestination(target, guard);
+  return nextHop(current, location, sameHostOnly);
 }
 
 function checkUrl(url) {
@@ -174,9 +252,10 @@ async function request(fetchImpl, url, timeoutMs) {
 }
 
 // ORIGIN's robots.txt rules, its redirects checked as a page's are (at most five), at most 500 KiB read.
-async function readRobots(fetchImpl, origin, sameHostOnly, timeoutMs) {
+async function readRobots(fetchImpl, origin, sameHostOnly, timeoutMs, guard) {
   let current = `${origin}/robots.txt`;
   for (let hop = 0; hop <= DEFAULT_MAX_REDIRECTS; hop += 1) {
+    await checkDestination(current, guard);
     const res = await request(fetchImpl, current, timeoutMs);
     if (res.type === "opaqueredirect" || res.status === 0) {
       throw refuse("redirect_hidden", `${current} redirects, and this environment hides where to: robots.txt `
@@ -184,7 +263,7 @@ async function readRobots(fetchImpl, origin, sameHostOnly, timeoutMs) {
     }
     const location = res.headers.get("location");
     if (REDIRECTS.has(res.status) && location) {
-      current = nextHop(current, location, sameHostOnly);
+      current = await redirect(current, location, sameHostOnly, guard);
       continue;
     }
     if (res.status >= 500 || res.status === 429) {
@@ -263,19 +342,22 @@ function nextHop(current, location, sameHostOnly) {
 /** Fetch URL from this machine: { url, finalUrl, status, contentType, body } (robots, redirects, the size limit);
  * with SAME_HOST_ONLY (your own fetch) no redirect to another host. */
 export async function fetchPage(fetchImpl, url, { respectRobots = true, maxRedirects = DEFAULT_MAX_REDIRECTS,
-  maxBytes = DEFAULT_MAX_BYTES, sameHostOnly = false, timeoutMs = 0 } = {}) {
+  maxBytes = DEFAULT_MAX_BYTES, sameHostOnly = false, timeoutMs = 0, allowLinkLocal = false,
+  resolve = systemResolve } = {}) {
   checkUrl(url);
+  const guard = { allowLinkLocal, resolve };
   const rules = new Map();
   let current = url;
   for (let hop = 0; hop <= maxRedirects; hop += 1) {
     const origin = new URL(current).origin;
     if (respectRobots) {
-      if (!rules.has(origin)) rules.set(origin, await readRobots(fetchImpl, origin, sameHostOnly, timeoutMs));
+      if (!rules.has(origin)) rules.set(origin, await readRobots(fetchImpl, origin, sameHostOnly, timeoutMs, guard));
       if (!robotsAllow(rules.get(origin), current)) {
         throw refuse("robots_disallowed", `robots.txt disallows ${current}: not fetched (pass respectRobots: false `
           + "to fetch anyway, at your own responsibility)");
       }
     }
+    await checkDestination(current, guard);
     const res = await request(fetchImpl, current, timeoutMs);
     if (res.type === "opaqueredirect" || res.status === 0) {
       throw refuse("redirect_hidden", `${current} redirects, and this environment hides where to (a browser's fetch): `
@@ -283,7 +365,7 @@ export async function fetchPage(fetchImpl, url, { respectRobots = true, maxRedir
     }
     const location = res.headers.get("location");
     if (REDIRECTS.has(res.status) && location) {
-      current = nextHop(current, location, sameHostOnly);
+      current = await redirect(current, location, sameHostOnly, guard);
       continue;
     }
     const body = await readCapped(res, maxBytes);

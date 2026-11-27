@@ -68,8 +68,10 @@ const deduped = await client.curateDataset(site.dataset_id, "dedupe");  // a new
 A site crawl stays on the URL's host and reads robots.txt first. Each page is charged as a scrape, so `maxPages`
 is the most it can cost. `cancelJob(site.crawl_id)` stops it, and `resumeFrom` continues an ended crawl.
 `localFetch(url)` fetches the page from your machine (robots.txt honoured by default), then has Scrawl render it;
-Scrawl fetches nothing. The result says `origin: "client_fetched"` and `url_verified: false`. It reaches whatever
-your machine can reach, private addresses included, and sends what it gets to Scrawl: only fetch URLs you chose.
+Scrawl fetches nothing. The result says `origin: "client_fetched"` and `url_verified: false`. Link-local and
+cloud-metadata destinations are refused (`link_local_refused`) unless `allowLinkLocal: true`. In Node every request
+resolves its host and checks each address before connecting; in a browser only the literal addresses and names are
+checked. Private and loopback addresses stay reachable: only fetch URLs you chose.
 
 A job's `status` is passed through as the server sent it: the lower case (`completed`) from current servers, the
 upper case from older ones. `JobStatus` has both spellings, and the upper-case members are deprecated: compare

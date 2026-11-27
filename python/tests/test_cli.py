@@ -990,3 +990,20 @@ def test_local_fetch_file_must_be_a_regular_file_within_the_size_limit(tmp_path,
     assert cli_main(["local-fetch", PAGE, "--file", str(empty)], client=make_client(rec)) == 2
     assert rec.requests == []                                              # nothing was sent
     capsys.readouterr()
+
+
+def test_local_fetch_refuses_a_metadata_address_unless_allowed(monkeypatch, capsys) -> None:
+    rec = Recorder()
+    assert cli_main(["local-fetch", "http://169.254.169.254/latest/meta-data/"], client=make_client(rec)) == 5
+    assert "allow-link-local" in capsys.readouterr().err and rec.requests == []
+    seen: dict[str, Any] = {}
+
+    def fake_local_fetch(self: Scrawl, url: str, **options: Any) -> Any:
+        seen.update(options)
+        from scrawl._objects import wrap
+        return wrap(LOCAL)
+
+    monkeypatch.setattr(Scrawl, "local_fetch", fake_local_fetch)
+    assert cli_main(["local-fetch", "http://169.254.169.254/x", "--allow-link-local"], client=make_client(rec)) == 0
+    assert seen["allow_link_local"] is True
+    capsys.readouterr()

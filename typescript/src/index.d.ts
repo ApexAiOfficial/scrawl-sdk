@@ -551,6 +551,11 @@ export interface LocalFetchOptions extends Omit<ScrapeLocalOptions, "httpStatus"
   /** The fetch used for the page (default the global fetch); never the one that talks to Scrawl. With your own
    * fetch, a redirect to another host is refused (`cross_origin_redirect`), as it may carry your credentials. */
   fetchPage?: typeof fetch;
+  /** Fetch a link-local or cloud-metadata address (169.254.0.0/16, fe80::/10, fd00:ec2::254, metadata.google.internal,
+   * metadata): refused by default (`link_local_refused`), since what it answers would be sent to Scrawl. */
+  allowLinkLocal?: boolean;
+  /** How a host name is resolved for that check (default: the system resolver in Node; none in a browser). */
+  resolve?: (hostname: string) => Promise<string[]>;
 }
 
 export interface ScrapeOptions {

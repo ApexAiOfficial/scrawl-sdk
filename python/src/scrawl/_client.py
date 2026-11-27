@@ -678,7 +678,7 @@ class Scrawl(_Endpoints):
 
     def local_fetch(self, url: str, *, respect_robots: bool = True,
                     max_redirects: int = _local.DEFAULT_MAX_REDIRECTS, max_bytes: int = _local.DEFAULT_MAX_BYTES,
-                    fetch_client: httpx.Client | None = None, **options: Any) -> Any:
+                    fetch_client: httpx.Client | None = None, allow_link_local: bool = False, **options: Any) -> Any:
         """Fetch URL from your own machine, then have Scrawl render it (``scrape_local``); Scrawl fetches nothing.
 
         robots.txt is honoured by default (``respect_robots=False`` is your responsibility); at most
@@ -689,7 +689,8 @@ class Scrawl(_Endpoints):
         client = fetch_client or httpx.Client(timeout=self._t.timeout)
         try:
             page = _local.fetch(client, url, respect_robots=respect_robots, max_redirects=max_redirects,
-                                max_bytes=max_bytes, same_host_only=fetch_client is not None)
+                                max_bytes=max_bytes, same_host_only=fetch_client is not None,
+                                allow_link_local=allow_link_local)
         finally:
             if fetch_client is None:
                 client.close()
@@ -795,12 +796,14 @@ class AsyncScrawl(_Endpoints):
 
     async def local_fetch(self, url: str, *, respect_robots: bool = True,
                           max_redirects: int = _local.DEFAULT_MAX_REDIRECTS, max_bytes: int = _local.DEFAULT_MAX_BYTES,
-                          fetch_client: httpx.AsyncClient | None = None, **options: Any) -> Any:
+                          fetch_client: httpx.AsyncClient | None = None, allow_link_local: bool = False,
+                          **options: Any) -> Any:
         """``Scrawl.local_fetch``, async: fetch URL from your own machine, then have Scrawl render it."""
         client = fetch_client or httpx.AsyncClient(timeout=self._t.timeout)
         try:
             page = await _local.afetch(client, url, respect_robots=respect_robots, max_redirects=max_redirects,
-                                       max_bytes=max_bytes, same_host_only=fetch_client is not None)
+                                       max_bytes=max_bytes, same_host_only=fetch_client is not None,
+                                       allow_link_local=allow_link_local)
         finally:
             if fetch_client is None:
                 await client.aclose()

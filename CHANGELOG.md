@@ -26,6 +26,10 @@ Built against contract digest
   - The robots.txt request gets the page's redirect checks, and at most 500 KiB of it is read.
   - Every request is bounded by the client's timeout. A site that cannot be reached is a `ScrawlError`
     (`fetch_failed` or `fetch_timeout`). An empty page is refused before anything is sent (`empty_body`).
+  - Link-local and cloud-metadata destinations are refused by default (`link_local_refused`): 169.254.0.0/16,
+    fe80::/10, fd00:ec2::254, `metadata.google.internal` and `metadata`. Each resolved address is checked before
+    connecting, on every request and redirect hop. The opt-in is `allow_link_local` / `allowLinkLocal` /
+    `--allow-link-local`. Private ranges and loopback stay allowed.
   - The fetch never uses the client that carries your Scrawl key.
   - `scrape_local` / `scrapeLocal` sends a page you already have.
   - The result says `origin: client_fetched` and `url_verified: false`: the URL, status and type are your claims.

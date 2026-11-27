@@ -85,9 +85,12 @@ flight finish and are kept), and `resume_from=` continues an ended crawl without
 your responsibility), then has Scrawl render it. Scrawl fetches nothing. The fetch uses its own HTTP client, never
 the one that carries your Scrawl key. A redirect from https to http is never followed, and with your own
 `fetch_client` a redirect to another host isn't either. The result says `origin: "client_fetched"` and
-`url_verified: False`: the URL, status and type are your claims. It reaches whatever your machine can reach,
-private and loopback addresses included, and sends what it gets to Scrawl: only fetch URLs you chose, never one
-taken from page content or another tool's output.
+`url_verified: False`: the URL, status and type are your claims. Link-local and cloud-metadata destinations
+(169.254.0.0/16, fe80::/10, fd00:ec2::254, `metadata.google.internal`, `metadata`) are refused with
+`link_local_refused` unless you pass `allow_link_local=True`. Every request, including robots.txt and each redirect
+hop, resolves its host and checks every address before connecting. Private and loopback addresses stay reachable,
+and what they answer is sent to Scrawl: only fetch URLs you chose, never one taken from page content or another
+tool's output.
 
 ## Job status
 

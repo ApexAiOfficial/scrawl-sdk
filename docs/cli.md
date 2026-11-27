@@ -50,7 +50,9 @@ markdown keeps, on `scrape`, `batch`, `local-fetch`, `site-crawl` and `datasets 
 given, and the server validates them.
 
 `local-fetch` fetches the page from your machine (robots.txt honoured unless `--ignore-robots`, at most
-`--max-redirects` redirects and `--max-bytes` bytes), then has Scrawl render it; Scrawl fetches nothing. With
+`--max-redirects` redirects and `--max-bytes` bytes), then has Scrawl render it; Scrawl fetches nothing.
+Link-local and cloud-metadata addresses (169.254.0.0/16, fe80::/10, `metadata.google.internal`, ...) are refused,
+exit 5, unless `--allow-link-local`. With
 `--file` nothing is fetched at all: the file must be a page you saved (a regular file, not empty, at most
 `--max-bytes`), since whatever it holds is sent to Scrawl. `--content-type` and `--status` describe the file. The result's `origin`
 is `client_fetched` and `url_verified` is false: the URL, status and type are your claims. Exit codes are

@@ -15,10 +15,20 @@ asked for), a redirect to another host is not followed either: fetch that addres
 robots.txt request gets the same redirect checks as the page, and at most 500 KiB of it is read (RFC 9309 section
 2.5). A failure to reach the site is a ``ScrawlError`` (``fetch_failed``, or ``fetch_timeout``); an empty page is
 refused (``empty_body``) before anything is sent to Scrawl.
+
+Link-local and cloud-metadata destinations are refused (``link_local_refused``) unless ``allow_link_local=True``:
+169.254.0.0/16, fe80::/10, fd00:ec2::254 and the names ``metadata.google.internal`` and ``metadata``. Every request
+(robots.txt and the page, and each redirect hop) resolves its host and checks every address before connecting. There
+is no scraping use for those addresses, and a page fetched from one (a cloud instance's credentials) would be sent to
+Scrawl. Private ranges and loopback stay allowed: an intranet page or a local development server is what local fetch
+is for.
 """
 
 from __future__ import annotations
 
+import asyncio
+import ipaddress
+import socket
 from dataclasses import dataclass
 from urllib.parse import urljoin, urlsplit
 
@@ -39,6 +49,47 @@ _REDIRECTS = {301, 302, 303, 307, 308}
 ROBOTS_MAX_BYTES = 500 * 1024
 #: The longest Content-Type Scrawl accepts; a longer one is sent as its media type alone.
 MAX_CONTENT_TYPE = 200
+#: Refused unless allow_link_local: the cloud metadata names, and (with every link-local address) AWS's IPv6 one.
+_METADATA_NAMES = frozenset({"metadata.google.internal", "metadata"})
+_METADATA_ADDRESSES = frozenset({ipaddress.ip_address("fd00:ec2::254")})
+
+
+def _resolve(host: str, port: int) -> list[str]:
+    """The addresses HOST resolves to (the system resolver, as the HTTP client uses it)."""
+    return [str(info[4][0]) for info in socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)]
+
+
+def _link_local(address: str) -> bool:
+    ip = ipaddress.ip_address(address.split("%", 1)[0])
+    if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped is not None:
+        ip = ip.ipv4_mapped
+    return ip.is_link_local or ip in _METADATA_ADDRESSES
+
+
+def _link_local_refused(url: str) -> ScrawlError:
+    return ScrawlError(f"{url} is a link-local or cloud-metadata address: not fetched (pass allow_link_local=True, "
+                       "CLI --allow-link-local, only if you mean to send what it answers to Scrawl)",
+                       code="link_local_refused")
+
+
+def _check_destination(url: str, allow_link_local: bool) -> None:
+    """Refuse URL before connecting when its host is, or resolves to, a link-local or metadata address."""
+    if allow_link_local:
+        return
+    parts = urlsplit(url)
+    host = (parts.hostname or "").rstrip(".").lower()
+    if host in _METADATA_NAMES:
+        raise _link_local_refused(url)
+    try:
+        ipaddress.ip_address(host.split("%", 1)[0])
+        addresses = [host]
+    except ValueError:
+        try:
+            addresses = _resolve(host, parts.port or (443 if parts.scheme == "https" else 80))
+        except OSError:
+            raise _refuse("fetch_failed", f"Could not resolve {host}: not fetched") from None
+    if any(_link_local(address) for address in addresses):
+        raise _link_local_refused(url)
 
 
 @dataclass(frozen=True)
@@ -213,11 +264,13 @@ def _host(url: str) -> tuple[str, int]:
     return (parts.hostname or "").lower(), parts.port or (443 if parts.scheme == "https" else 80)
 
 
-def _next_hop(current: str, location: str, same_host_only: bool) -> str:
-    """Where a redirect from CURRENT to LOCATION leads, or a refusal: not http(s), a downgrade from https, or (with
-    your own client) another host. An upgrade to https on the same host is the same host."""
+def _next_hop(current: str, location: str, same_host_only: bool, allow_link_local: bool = False) -> str:
+    """Where a redirect from CURRENT to LOCATION leads, or a refusal: not http(s), a link-local or metadata
+    destination, a downgrade from https, or (with your own client) another host. An upgrade to https on the same host
+    is the same host."""
     target = urljoin(current, location)
     _check_url(target)
+    _check_destination(target, allow_link_local)
     if urlsplit(current).scheme == "https" and urlsplit(target).scheme == "http":
         raise _refuse("insecure_redirect", f"{current} redirects to {target}, from https to http: not followed")
     here, there = _host(current), _host(target)
@@ -262,7 +315,7 @@ def _too_large(max_bytes: int) -> ScrawlError:
 
 def fetch(client: httpx.Client, url: str, *, respect_robots: bool = True,
           max_redirects: int = DEFAULT_MAX_REDIRECTS, max_bytes: int = DEFAULT_MAX_BYTES,
-          same_host_only: bool = False) -> Fetched:
+          same_host_only: bool = False, allow_link_local: bool = False) -> Fetched:
     """Fetch URL with CLIENT (synchronously), honouring robots.txt, at most MAX_REDIRECTS, at most MAX_BYTES; with
     SAME_HOST_ONLY (your own client) no redirect to another host."""
     _check_url(url)
@@ -273,12 +326,13 @@ def fetch(client: httpx.Client, url: str, *, respect_robots: bool = True,
             if respect_robots:
                 origin = _robots_url(current)
                 if origin not in rules:
-                    rules[origin] = _read_robots(client, origin, same_host_only)
+                    rules[origin] = _read_robots(client, origin, same_host_only, allow_link_local)
                 if not _allowed(rules[origin], current):
                     raise _disallowed(current)
+            _check_destination(current, allow_link_local)
             with client.stream("GET", current, headers={"User-Agent": USER_AGENT}, follow_redirects=False) as response:
                 if response.status_code in _REDIRECTS and response.headers.get("location"):
-                    current = _next_hop(current, response.headers["location"], same_host_only)
+                    current = _next_hop(current, response.headers["location"], same_host_only, allow_link_local)
                     continue
                 body = bytearray()
                 for chunk in response.iter_bytes():
@@ -291,13 +345,15 @@ def fetch(client: httpx.Client, url: str, *, respect_robots: bool = True,
     raise _refuse("too_many_redirects", f"More than {max_redirects} redirects from {url}: not fetched")
 
 
-def _read_robots(client: httpx.Client, origin: str, same_host_only: bool) -> list[RobotsRule] | None:
+def _read_robots(client: httpx.Client, origin: str, same_host_only: bool,
+                 allow_link_local: bool = False) -> list[RobotsRule] | None:
     """ORIGIN's robots.txt rules, its redirects checked as a page's are (at most five), at most 500 KiB read."""
     current = origin
     for _hop in range(DEFAULT_MAX_REDIRECTS + 1):
+        _check_destination(current, allow_link_local)
         with client.stream("GET", current, headers={"User-Agent": USER_AGENT}, follow_redirects=False) as answer:
             if answer.status_code in _REDIRECTS and answer.headers.get("location"):
-                current = _next_hop(current, answer.headers["location"], same_host_only)
+                current = _next_hop(current, answer.headers["location"], same_host_only, allow_link_local)
                 continue
             body = bytearray()
             for chunk in answer.iter_bytes():
@@ -311,7 +367,7 @@ def _read_robots(client: httpx.Client, origin: str, same_host_only: bool) -> lis
 
 async def afetch(client: httpx.AsyncClient, url: str, *, respect_robots: bool = True,
                  max_redirects: int = DEFAULT_MAX_REDIRECTS, max_bytes: int = DEFAULT_MAX_BYTES,
-                 same_host_only: bool = False) -> Fetched:
+                 same_host_only: bool = False, allow_link_local: bool = False) -> Fetched:
     """``fetch``, with an async CLIENT."""
     _check_url(url)
     rules: dict[str, list[RobotsRule] | None] = {}
@@ -321,13 +377,15 @@ async def afetch(client: httpx.AsyncClient, url: str, *, respect_robots: bool = 
             if respect_robots:
                 origin = _robots_url(current)
                 if origin not in rules:
-                    rules[origin] = await _aread_robots(client, origin, same_host_only)
+                    rules[origin] = await _aread_robots(client, origin, same_host_only, allow_link_local)
                 if not _allowed(rules[origin], current):
                     raise _disallowed(current)
+            await asyncio.to_thread(_check_destination, current, allow_link_local)
             async with client.stream("GET", current, headers={"User-Agent": USER_AGENT},
                                      follow_redirects=False) as response:
                 if response.status_code in _REDIRECTS and response.headers.get("location"):
-                    current = _next_hop(current, response.headers["location"], same_host_only)
+                    location = response.headers["location"]
+                    current = await asyncio.to_thread(_next_hop, current, location, same_host_only, allow_link_local)
                     continue
                 body = bytearray()
                 async for chunk in response.aiter_bytes():
@@ -340,13 +398,16 @@ async def afetch(client: httpx.AsyncClient, url: str, *, respect_robots: bool = 
     raise _refuse("too_many_redirects", f"More than {max_redirects} redirects from {url}: not fetched")
 
 
-async def _aread_robots(client: httpx.AsyncClient, origin: str, same_host_only: bool) -> list[RobotsRule] | None:
+async def _aread_robots(client: httpx.AsyncClient, origin: str, same_host_only: bool,
+                        allow_link_local: bool = False) -> list[RobotsRule] | None:
     """``_read_robots``, with an async CLIENT."""
     current = origin
     for _hop in range(DEFAULT_MAX_REDIRECTS + 1):
+        await asyncio.to_thread(_check_destination, current, allow_link_local)
         async with client.stream("GET", current, headers={"User-Agent": USER_AGENT}, follow_redirects=False) as answer:
             if answer.status_code in _REDIRECTS and answer.headers.get("location"):
-                current = _next_hop(current, answer.headers["location"], same_host_only)
+                location = answer.headers["location"]
+                current = await asyncio.to_thread(_next_hop, current, location, same_host_only, allow_link_local)
                 continue
             body = bytearray()
             async for chunk in answer.aiter_bytes():

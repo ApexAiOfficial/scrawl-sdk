@@ -214,7 +214,8 @@ def _cmd_local_fetch(client: Scrawl, args: argparse.Namespace) -> int:
             raise ValueError("--content-type and --status describe a --file; without one the page is fetched")
         limits = {key: value for key, value in (("max_redirects", args.max_redirects), ("max_bytes", args.max_bytes))
                   if value is not None}
-        result = client.local_fetch(args.url, respect_robots=not args.ignore_robots, **limits, **options)
+        result = client.local_fetch(args.url, respect_robots=not args.ignore_robots,
+                                    allow_link_local=args.allow_link_local, **limits, **options)
     return _scrape_report(client, result, args, formats, None)
 
 
@@ -981,6 +982,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--status", type=int, default=200, help="with --file: the HTTP status it was served with")
     p.add_argument("--ignore-robots", action="store_true",
                    help="fetch even where robots.txt disallows it (your responsibility)")
+    p.add_argument("--allow-link-local", action="store_true",
+                   help="fetch a link-local or cloud-metadata address (169.254.0.0/16, fe80::/10, ...): refused "
+                        "otherwise, since what it answers would be sent to Scrawl")
     p.add_argument("--max-redirects", type=int, help="redirects to follow when fetching (default 5)")
     p.add_argument("--max-bytes", type=int, help="the most bytes to read when fetching, or to send with --file")
     p.add_argument("--format", action="append", choices=FORMATS)
