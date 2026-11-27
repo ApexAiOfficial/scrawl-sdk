@@ -100,7 +100,31 @@ def _argv(route: str, tmp: Path) -> list[str]:
         "POST /v1/assets/quote": ["assets-quote", PAGE, "--class", "documents", "--max-items", "3"],
         "GET /v1/assets/{job_id}": ["assets-result", "aj1", "--view", "skipped"],
         "GET /v1/assets/{job_id}/files/{asset_id}": ["assets-result", "aj1", "--out", str(tmp)],
+        "POST /v1/scrape/local": ["local-fetch", PAGE, "--file", str(_page_file(tmp)), "--content-type", "text/html",
+                                  "--wait", "5"],
+        "POST /v1/site-crawls": ["site-crawl", PAGE, "--max-pages", "5", "--max-depth", "1", "--full-page"],
+        "GET /v1/site-crawls/{crawl_id}": ["site-crawl-status", "c1", "--wait", "5", "--limit", "10"],
+        "POST /v1/datasets/{dataset_id}/curate": ["datasets", "curate", "d1", "dedupe", "--field", "source_url"],
+        "GET /v1/datasets/{dataset_id}/curations": ["datasets", "curations", "d1", "--limit", "5"],
+        "GET /v1/assets/{job_id}/files/{asset_id}/text": ["assets-result", "aj1", "--text",
+                                                          "0123456789abcdef01234567"],
     }[route]
+
+
+def _page_file(tmp: Path) -> Path:
+    page = tmp / "page.html"
+    page.write_bytes(b"<html><body><p>12.50</p></body></html>")
+    return page
+
+
+SITE_CRAWL = {"crawl_id": "c1", "status": "completed", "url": PAGE, "max_pages": 5, "max_depth": 1,
+              "dataset_id": "d1", "dataset_version_id": "v1", "done": True, "pages": [],
+              "counts": {"launched": 1, "ok": 1, "blocked": 0, "error": 0, "skipped": 0, "dropped": 0}}
+CURATION = {"curation_id": "cu1", "dataset_id": "d1", "source_version_id": "v1", "version_id": "v2",
+            "operation": "dedupe", "parameters": {"field": "source_url"}, "records_in": 3, "records_out": 2,
+            "stale": 0, "created_at": "2026-11-27T00:00:00Z"}
+LOCAL = {"job_id": "j9", "status": "completed", "url": PAGE, "markdown": "12.50", "origin": "client_fetched",
+         "url_verified": False}
 
 
 @pytest.mark.parametrize("route", sorted(COVERED))
@@ -123,6 +147,12 @@ def test_each_covered_operation_is_reachable_from_the_cli(route: str, tmp_path: 
         "POST /v1/proxy/health": httpx.Response(200, json={"reachable": True, "proxy": "http://proxy.example:8000"}),
         "GET /v1/keys": httpx.Response(200, json={"count": 1, "active": 1, "limit": 5, "keys": []}),
         "DELETE /v1/keys/{key_id}": httpx.Response(204),
+        "POST /v1/scrape/local": httpx.Response(200, json=LOCAL),
+        "POST /v1/site-crawls": httpx.Response(202, json={**SITE_CRAWL, "status": "pending", "done": False}),
+        "GET /v1/site-crawls/{crawl_id}": httpx.Response(200, json=SITE_CRAWL),
+        "POST /v1/datasets/{dataset_id}/curate": httpx.Response(201, json=CURATION),
+        "GET /v1/datasets/{dataset_id}/curations": httpx.Response(200, json={"curations": [CURATION]}),
+        "GET /v1/assets/{job_id}/files/{asset_id}/text": httpx.Response(200, content=b"# Report\n\n12.50\n"),
     }
     if route in new_routes:
         replies = new_routes[route] if isinstance(new_routes[route], list) else [new_routes[route]]
@@ -142,6 +172,12 @@ def test_each_covered_operation_is_reachable_from_the_cli(route: str, tmp_path: 
             "POST /v1/proxy/health": ("POST", "/v1/proxy/health"),
             "GET /v1/keys": ("GET", "/v1/keys"),
             "DELETE /v1/keys/{key_id}": ("DELETE", "/v1/keys/0123456789abcdef0123456789abcdef"),
+            "POST /v1/scrape/local": ("POST", "/v1/scrape/local"),
+            "POST /v1/site-crawls": ("POST", "/v1/site-crawls"),
+            "GET /v1/site-crawls/{crawl_id}": ("GET", "/v1/site-crawls/c1"),
+            "POST /v1/datasets/{dataset_id}/curate": ("POST", "/v1/datasets/d1/curate"),
+            "GET /v1/datasets/{dataset_id}/curations": ("GET", "/v1/datasets/d1/curations"),
+            "GET /v1/assets/{job_id}/files/{asset_id}/text": ("GET", "/v1/assets/aj1/files/0123456789abcdef01234567/text"),
         }[route]
         assert expected in [(request.method, request.url.path) for request in rec.requests]
         return
@@ -275,7 +311,101 @@ def test_crawl_starts_and_optionally_waits_for_the_job(capsys, monkeypatch) -> N
         assert cli_main(["crawl", "t", "--wait", "120"], client=make_client(rec)) == code, status
         assert len(rec.requests) == 2
         printed = json.loads(capsys.readouterr().out)
-        assert printed["job"]["status"] == status and printed["dataset_version_id"] == "v2"
+        # CC-1: whatever case the server sends, the SDK gives the job's status in the lower case.
+        assert printed["job"]["status"] == status.lower() and printed["dataset_version_id"] == "v2"
+
+
+# -- local fetch, site crawls, content options -------------------------------------------------------
+
+def test_local_fetch_with_a_file_sends_it_and_fetches_nothing(tmp_path, capsys) -> None:
+    import base64
+
+    rec = Recorder(httpx.Response(200, json=LOCAL))
+    page = _page_file(tmp_path)
+    argv = ["local-fetch", PAGE, "--file", str(page), "--content-type", "text/html", "--status", "200",
+            "--include-tag", "main", "--exclude-tag", "nav"]
+    assert cli_main(argv, client=make_client(rec)) == 0
+    assert capsys.readouterr().out.strip() == "12.50"
+    assert [request.url.path for request in rec.requests] == ["/v1/scrape/local"]
+    sent = body(rec.requests[0])
+    assert base64.b64decode(sent["body_base64"]) == page.read_bytes()
+    assert (sent["url"], sent["content_type"], sent["http_status"]) == (PAGE, "text/html", 200)
+    assert (sent["include_tags"], sent["exclude_tags"]) == (["main"], ["nav"]) and "only_main_content" not in sent
+    assert rec.requests[0].headers["Idempotency-Key"]
+
+
+def test_local_fetch_without_a_file_fetches_with_the_sdk(monkeypatch, capsys) -> None:
+    seen: dict[str, Any] = {}
+
+    def fake_local_fetch(self: Scrawl, url: str, **options: Any) -> Any:
+        seen.update(url=url, **options)
+        from scrawl._objects import wrap
+        return wrap({**LOCAL, "status": "pending"})
+
+    monkeypatch.setattr(Scrawl, "local_fetch", fake_local_fetch)
+    code = cli_main(["local-fetch", PAGE, "--ignore-robots", "--max-bytes", "1000", "--max-redirects", "2",
+                     "--full-page", "--wait", "0"], client=make_client(Recorder()))
+    assert code == 4 and "scrawl result j9" in capsys.readouterr().err
+    assert seen["url"] == PAGE and seen["respect_robots"] is False
+    assert (seen["max_bytes"], seen["max_redirects"], seen["only_main_content"]) == (1000, 2, False)
+
+
+def test_scrape_and_batch_send_the_content_options_only_when_given(capsys) -> None:
+    rec = Recorder(httpx.Response(200, json={"status": "completed", "markdown": "m"}),
+                   httpx.Response(200, json={"status": "completed", "markdown": "m"}))
+    assert cli_main(["scrape", PAGE], client=make_client(rec)) == 0
+    assert cli_main(["scrape", PAGE, "--full-page", "--include-tag", "article", "--include-tag", ".post",
+                     "--exclude-tag", "nav"], client=make_client(rec)) == 0
+    plain, chosen = body(rec.requests[0]), body(rec.requests[1])
+    assert not {"only_main_content", "include_tags", "exclude_tags"} & set(plain)
+    assert (chosen["only_main_content"], chosen["include_tags"], chosen["exclude_tags"]) == (
+        False, ["article", ".post"], ["nav"])
+    rec = Recorder(httpx.Response(202, json={"batch_id": "b1", "status": "pending", "items": []}))
+    cli_main(["batch", PAGE, "--exclude-tag", "aside", "--wait", "0"], client=make_client(rec))
+    assert body(rec.requests[0])["exclude_tags"] == ["aside"]
+    capsys.readouterr()
+
+
+def test_site_crawl_starts_and_optionally_waits_with_its_exit_codes(capsys, monkeypatch) -> None:
+    started = {**SITE_CRAWL, "status": "pending", "done": False}
+    rec = Recorder(httpx.Response(202, json=started))
+    assert cli_main(["site-crawl", PAGE, "--max-pages", "5", "--resume-from", "c0"], client=make_client(rec)) == 0
+    assert json.loads(capsys.readouterr().out)["crawl_id"] == "c1"
+    sent = body(rec.requests[0])
+    assert sent == {"url": PAGE, "max_pages": 5, "resume_from": "c0"} and rec.requests[0].headers["Idempotency-Key"]
+    clock = iter(range(0, 10**6, 100))
+    monkeypatch.setattr("scrawl._client.time.monotonic", lambda: next(clock))
+    for status, done, code in (("completed", True, 0), ("COMPLETED", True, 0), ("failed", True, 1),
+                               ("cancelled", True, 1), ("running", False, 4)):
+        rec = Recorder(httpx.Response(202, json=started), httpx.Response(200, json={**SITE_CRAWL, "status": status,
+                                                                                    "done": done}))
+        assert cli_main(["site-crawl", PAGE, "--wait", "120"], client=make_client(rec)) == code, status
+        assert json.loads(capsys.readouterr().out)["status"] == status.lower()
+    rec = Recorder(httpx.Response(200, json={**SITE_CRAWL, "status": "running", "done": False}))
+    assert cli_main(["site-crawl-status", "c1"], client=make_client(rec)) == 4
+    assert rec.requests[0].url.path == "/v1/site-crawls/c1"
+    capsys.readouterr()
+
+
+def test_datasets_curate_and_curations(capsys) -> None:
+    rec = Recorder(httpx.Response(201, json=CURATION), httpx.Response(200, json={"curations": [CURATION]}))
+    argv = ["datasets", "curate", "d1", "remove", "--record-id", "r1", "--record-id", "r2", "--version", "v1"]
+    assert cli_main(argv, client=make_client(rec)) == 0
+    assert body(rec.requests[0]) == {"operation": "remove", "record_ids": ["r1", "r2"], "version_id": "v1"}
+    assert json.loads(capsys.readouterr().out)["curation_id"] == "cu1"
+    assert cli_main(["datasets", "curations", "d1"], client=make_client(rec)) == 0
+    assert json.loads(capsys.readouterr().out)["curations"][0]["records_out"] == 2
+    with pytest.raises(SystemExit):
+        cli_main(["datasets", "curate", "d1", "shuffle"], client=make_client(rec))
+    capsys.readouterr()
+
+
+def test_assets_result_text_prints_the_document_markdown_safely(capsys) -> None:
+    rec = Recorder(httpx.Response(200, content="# Report\n\x1b[31m12.50\n".encode()))
+    assert cli_main(["assets-result", "aj1", "--text", "a1"], client=make_client(rec)) == 0
+    out = capsys.readouterr().out
+    assert "# Report" in out and "12.50" in out and "\x1b" not in out
+    assert rec.requests[0].url.path == "/v1/assets/aj1/files/a1/text"
 
 
 # -- datasets -------------------------------------------------------------------------------------------

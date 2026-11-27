@@ -39,7 +39,21 @@ scrawl batch https://example.com/a https://example.com/b --wait 300
 scrawl batch-status batch_123 --wait 60
 scrawl batch-status batch_123 --browser                             # the batch asked for --browser: keep the guard
 scrawl extract job_123 --instruction "the product name"             # JSON from a finished job's artifact
+scrawl scrape https://example.com/blog --include-tag article --exclude-tag nav   # only the article
+scrawl scrape https://example.com --full-page                       # the whole body, not only the main content
+scrawl local-fetch https://example.com                              # fetched from this machine, rendered by Scrawl
+scrawl local-fetch https://example.com/page --file page.html --content-type text/html   # a page you saved
 ```
+
+`--full-page`, `--include-tag SELECTOR` and `--exclude-tag SELECTOR` (each repeatable, at most 20) choose what the
+markdown keeps, on `scrape`, `batch`, `site-crawl` and `datasets curate ... reextract`. They are sent only when
+given, and the server validates them.
+
+`local-fetch` fetches the page from your machine (robots.txt honoured unless `--ignore-robots`, at most
+`--max-redirects` redirects and `--max-bytes` bytes), then has Scrawl render it; Scrawl fetches nothing. With
+`--file` nothing is fetched at all, and `--content-type` and `--status` describe the file. The result's `origin`
+is `client_fetched` and `url_verified` is false: the URL, status and type are your claims. Exit codes are
+`scrape`'s.
 
 JSON output (`--format json`, or `--instruction` / `--schema` on `scrape`) runs on your own AI provider: the key
 needs `ai:use` as well as `scrape:write`. `cancel` needs the scope that starts that kind of job (see
@@ -61,13 +75,23 @@ stderr and exits 1, even though the settled map result itself has `status: compl
 
 ```bash
 scrawl crawl my-target --max-items 500 --wait 1800                  # waits for the job; prints dataset ids
-scrawl jobs --limit 20 --status RUNNING
+scrawl site-crawl https://example.com/docs/ --max-pages 50 --max-depth 2 --wait 1800   # a URL -> a dataset version
+scrawl site-crawl-status crawl_123 --wait 60
+scrawl jobs --limit 20 --status running
 scrawl job job_123 --wait 60
 scrawl cancel job_123
 scrawl artifacts list job_123
 scrawl artifacts download job_123 --out ./artifacts                 # every listed artifact
 scrawl artifacts download job_123 response.html --format markdown --out ./artifacts
 ```
+
+A site crawl stays on the URL's host and reads robots.txt first. Each page is charged as a scrape, so
+`--max-pages` is the most it can cost. `cancel crawl_123` stops it, and `--resume-from crawl_123` continues an
+ended crawl. `site-crawl --wait` and `site-crawl-status` exit 0 once the dataset version is final and the crawl
+completed, 1 if it failed or was cancelled, and 4 while it still runs.
+
+A job's `status` is one lower-case word (`pending`, `running`, `completed`, `failed`, `cancelled`, `orphaned`).
+The CLI also reads the upper case older servers sent, and `--status` accepts either.
 
 Detailed job output (`job`, a waited `crawl`, or a waited dataset extraction) includes `warnings`; it is an empty
 list when there are none or when an older server omitted the field.
@@ -91,6 +115,10 @@ scrawl datasets activate ds_123 v_1                                 # roll back 
 scrawl datasets extract ds_123 --schema product.schema.json --max-records 50 --wait 900
 scrawl datasets quarantine ds_123 rec_9 --reason "duplicate"
 scrawl datasets release ds_123 rec_9
+scrawl datasets curate ds_123 dedupe --field source_url             # a new version: no fetch, no charge
+scrawl datasets curate ds_123 remove --record-id rec_9 --record-id rec_12
+scrawl datasets curate ds_123 reextract --include-tag article       # re-render each page's markdown
+scrawl datasets curations ds_123
 scrawl search "desk lamp" --limit 10
 scrawl document doc_123
 scrawl ask "Which lamps cost under 20 EUR?" --dataset ds_123        # the answer, then its sources
@@ -148,7 +176,11 @@ scrawl assets-quote https://example.com/page --class images --max-credits 50
 scrawl assets https://example.com/page --class images --class documents --wait 300 --out ./assets
 scrawl assets-result job_123 --wait 60 --view skipped
 scrawl assets-result job_123 --out ./assets                          # download a finished job's files later
+scrawl assets-result job_123 --text asset_abc                       # a stored document's text, as Markdown
 ```
+
+`--text ASSET_ID` prints one stored document's text (the asset's `text_url`). It is untrusted content, like the
+document, and terminal control characters are stripped.
 
 `--out DIR` writes `DIR/<class>/<asset_id[:12]>-<name>`: only SHA-256-verified files, never overwriting.
 

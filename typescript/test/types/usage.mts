@@ -2,7 +2,7 @@
 // errors, so the declarations cannot silently loosen.
 import {
   BadRequestError, CONTRACT_DIGEST, ConfigurationError, ErrorCode, NotFoundError, RateLimitError, Scrawl, ScrawlError,
-  type AssetClass, type AssetJob, type AssetQuote, type AssetResult, type QueryFilter, type ScrapeEngine,
+  type AssetClass, type AssetJob, type AssetQuote, type AssetResult, type JobStatus, type QueryFilter, type ScrapeEngine,
   type ProxyHealth, type ProxyPool, type ScrapeOutcome, type ScrapeResult, type SkippedAsset,
 } from "@apexaiofficial/scrawl";
 
@@ -23,6 +23,16 @@ export async function usage(): Promise<void> {
   const settle: string | null | undefined = rendered.browser?.settle;
   const finalUrl: string | null | undefined = rendered.final_url;
   console.log(engine, settle, finalUrl, outcome, blockReason, retryAfter, hint, CONTRACT_DIGEST);
+  const trimmed = await client.scrape("https://e.example", { onlyMainContent: false, includeTags: ["article", ".post"],
+    excludeTags: ["nav"] });
+  console.log(trimmed.markdown);
+  await client.batchScrape(["https://e.example"], { onlyMainContent: true, includeTags: null, excludeTags: ["aside"] });
+  // @ts-expect-error: onlyMainContent is a boolean
+  await client.scrape("https://e.example", { onlyMainContent: "no" });
+  // @ts-expect-error: the tag options are lists of selectors
+  await client.scrape("https://e.example", { includeTags: "article" });
+  // @ts-expect-error: the camelCase names are the SDK's; the snake_case ones are the wire format
+  await client.scrape("https://e.example", { include_tags: ["article"] });
   // @ts-expect-error: the engine is "static" or "browser"
   await client.scrape("https://e.example", { engine: "chrome" });
   const map = await client.map("https://e.example", { limit: 10, engine: "browser" });
@@ -30,6 +40,13 @@ export async function usage(): Promise<void> {
   const mapOutcome: ScrapeOutcome | null | undefined = map.outcome;
   console.log(mapEngine, mapOutcome, map.block_reason, map.hint);
   const batch = await client.batchScrape(map.links ?? []);
+  const jobStatus: JobStatus = job.status;
+  const crawlStatus: JobStatus = (await client.crawl("target")).status;
+  const cancelStatus: JobStatus = (await client.cancelJob("j")).status;
+  const versionStatus: JobStatus | undefined = (await client.getDataset("d")).versions[0]?.status;
+  const extractStatus: JobStatus = (await client.extractDataset("d", { instruction: "titles" })).status;
+  await client.listJobs({ status: "COMPLETED" });                     // either case filters
+  console.log(jobStatus, crawlStatus, cancelStatus, versionStatus, extractStatus);
   const done = await client.waitForBatch(batch.batch_id);
   console.log(done.outcomes?.target_blocked);
   for (const item of done.items ?? []) console.log(item.url, item.result?.markdown);
@@ -114,5 +131,16 @@ export async function usage(): Promise<void> {
   const code: number | null = page.http_status;
   // @ts-expect-error - not a known code constant
   const unknownCode: ErrorCode = "made_up";
-  console.log(code, unknownCode);
+  // ADR C-7: a pending or paged result names its next call (method, path, query or body) and when to poll.
+  const next = page.next_call;
+  if (next) {
+    const route: string = `${next.method} ${next.path}`;
+    const wait: number | null | undefined = page.poll_after_seconds;
+    console.log(route, wait, next.query, page.docs_url, (page.next_actions ?? []).map((action) => action.why));
+  }
+  // @ts-expect-error - poll_after_seconds is a number
+  const later: string | null | undefined = page.poll_after_seconds;
+  // @ts-expect-error - a job's status has one spelling, the lower case
+  const shouted: "COMPLETED" = (await client.getJob("j")).status;
+  console.log(code, unknownCode, shouted, later);
 }

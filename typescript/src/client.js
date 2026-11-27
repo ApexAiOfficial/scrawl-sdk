@@ -11,16 +11,31 @@
 import {
   APIConnectionError, APITimeoutError, ConfigurationError, ErrorCode, ScrawlError, codeOf, errorFor, neverRetry,
 } from "./errors.js";
+import { DEFAULT_MAX_BYTES, DEFAULT_MAX_REDIRECTS, fetchPage } from "./local_fetch.js";
 import { VERSION } from "./version.js";
 
 export const DEFAULT_BASE_URL = "http://127.0.0.1:8088"; // loopback; set SCRAWL_BASE_URL to your Scrawl endpoint
 const RETRY_STATUSES = new Set([429, 502, 503, 504]);
-const LIST_KEYS = ["datasets", "versions", "jobs", "entries", "records", "results", "items", "assets", "skipped"];
+const LIST_KEYS = ["datasets", "versions", "jobs", "entries", "records", "results", "items", "assets", "skipped",
+  "pages", "curations"];
 const ASSETS_ACTIVE = new Set(["pending", "running"]);
 const JOBS_ACTIVE = new Set(["PENDING", "RUNNING"]);
+// A job's status has one spelling, the lower case (the API's JobStatus). Servers before it sent the upper case from
+// the job and dataset routes; the SDK reads either until the next minor release.
+const JOB_STATUSES = ["pending", "running", "completed", "failed", "cancelled", "orphaned"];
+const OLD_JOB_STATUS = new Map(JOB_STATUSES.map((status) => [status.toUpperCase(), status]));
 const API_KEYS = new WeakMap(); // the key never lives on the instance, so logging a client cannot print it
 // What an API key may contain: visible ASCII, the characters an HTTP header value can carry as a token.
 const KEY_CHARS = /^[\x21-\x7e]+$/;
+
+function toBase64(bytes) {
+  if (typeof Buffer !== "undefined") return Buffer.from(bytes).toString("base64");
+  let binary = "";
+  for (let index = 0; index < bytes.length; index += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(index, index + 0x8000));
+  }
+  return btoa(binary);
+}
 
 function clean(values) {
   return Object.fromEntries(Object.entries(values).filter(([, value]) => value !== undefined && value !== null));
@@ -134,12 +149,49 @@ export class Scrawl {
    * Scrape one URL. `status` is `completed`, `pending` (poll `scrapeResult`) or `failed`. `engine: "browser"`
    * renders the page in a sandboxed browser first (only where the server enables it), waiting `waitForMs` more after it
    * settles; a finished result from a server that did not render it throws `render_not_supported`.
+   *
+   * The markdown is the page's main content by default; `onlyMainContent: false` keeps the whole body.
+   * `includeTags` keeps only what these CSS selectors match (in page order) instead of the main content, and
+   * `excludeTags` drops what its selectors match first (each at most 20 selectors of 200 characters). They are sent
+   * only when set; the server validates the selectors and answers 422 `invalid_request`.
    */
-  async scrape(url, { formats, schema, instruction, profile, waitSeconds = 30, engine, waitForMs, idempotencyKey } = {}) {
+  async scrape(url, { formats, schema, instruction, profile, waitSeconds = 30, engine, waitForMs, onlyMainContent,
+    includeTags, excludeTags, idempotencyKey } = {}) {
     const json = clean({ url, formats: formats || ["markdown"], schema, instruction, profile,
-      wait_seconds: this._serverWait(waitSeconds), engine, wait_for_ms: waitForMs });
+      wait_seconds: this._serverWait(waitSeconds), engine, wait_for_ms: waitForMs,
+      only_main_content: onlyMainContent, include_tags: includeTags, exclude_tags: excludeTags });
     return checkEngine(engine,
       await this._call({ method: "POST", path: "/v1/scrape", json, idempotencyKey: newKey(idempotencyKey) }));
+  }
+
+  /**
+   * Have Scrawl render a page or document you already fetched (`POST /v1/scrape/local`); Scrawl fetches nothing. The
+   * result is a scrape's, with `origin: "client_fetched"` and `url_verified: false` (URL, status and type are your
+   * claims). `body` is a Uint8Array or a string. `localFetch` fetches the page for you first, honouring robots.txt.
+   */
+  async scrapeLocal(url, body, { httpStatus = 200, contentType, finalUrl, formats, schema, instruction, profile,
+    waitSeconds = 30, onlyMainContent, includeTags, excludeTags, idempotencyKey } = {}) {
+    const bytes = typeof body === "string" ? new TextEncoder().encode(body) : body;
+    const json = clean({ url, body_base64: toBase64(bytes), http_status: httpStatus, content_type: contentType || undefined,
+      final_url: finalUrl, formats: formats || ["markdown"], schema, instruction, profile,
+      wait_seconds: this._serverWait(waitSeconds), only_main_content: onlyMainContent, include_tags: includeTags,
+      exclude_tags: excludeTags });
+    return this._call({ method: "POST", path: "/v1/scrape/local", json, idempotencyKey: newKey(idempotencyKey) });
+  }
+
+  /**
+   * Fetch `url` from your own machine, then have Scrawl render it (`scrapeLocal`). robots.txt is honoured by default
+   * (`respectRobots: false` is your responsibility); at most `maxRedirects` redirects and `maxBytes` bytes. The fetch
+   * is its own (`fetchPage`, or the global fetch): it never carries your Scrawl API key. A redirect from https to http
+   * is never followed; with your own `fetchPage` a redirect to another host is not either.
+   */
+  async localFetch(url, { respectRobots = true, maxRedirects = DEFAULT_MAX_REDIRECTS, maxBytes = DEFAULT_MAX_BYTES,
+    fetchPage: pageFetch, ...options } = {}) {
+    const fetchImpl = pageFetch ?? ((...args) => globalThis.fetch(...args));
+    const page = await fetchPage(fetchImpl, url, { respectRobots, maxRedirects, maxBytes,
+      sameHostOnly: pageFetch !== undefined });
+    return this.scrapeLocal(page.url, page.body, { ...options, httpStatus: page.status, contentType: page.contentType,
+      finalUrl: page.finalUrl !== page.url ? page.finalUrl : undefined });
   }
 
   /**
@@ -159,10 +211,15 @@ export class Scrawl {
       await this._call({ method: "POST", path: "/v1/map", json, idempotencyKey: newKey(idempotencyKey) }));
   }
 
-  /** Start a batch of up to 20 URLs; poll `batchStatus` (or use `waitForBatch`). Browser items render one at a time. */
-  async batchScrape(urls, { formats, schema, instruction, profile, engine, waitForMs, idempotencyKey } = {}) {
+  /**
+   * Start a batch of up to 20 URLs; poll `batchStatus` (or use `waitForBatch`). Browser items render one at a time.
+   * `onlyMainContent`, `includeTags` and `excludeTags` apply to every URL's markdown, as for `scrape`.
+   */
+  async batchScrape(urls, { formats, schema, instruction, profile, engine, waitForMs, onlyMainContent, includeTags,
+    excludeTags, idempotencyKey } = {}) {
     const json = clean({ urls: [...urls], formats: formats || ["markdown"], schema, instruction, profile, engine,
-      wait_for_ms: waitForMs });
+      wait_for_ms: waitForMs, only_main_content: onlyMainContent, include_tags: includeTags,
+      exclude_tags: excludeTags });
     return this._call({ method: "POST", path: "/v1/scrape/batch", json, idempotencyKey: newKey(idempotencyKey) });
   }
 
@@ -295,25 +352,47 @@ export class Scrawl {
   async crawl(crawlTarget, { exportFormat, maxItems, maxSeconds, idempotencyKey } = {}) {
     const json = clean({ crawl_target: crawlTarget, export_format: exportFormat, max_items: maxItems,
       max_seconds: maxSeconds });
-    return this._call({ method: "POST", path: "/v1/crawls", json, idempotencyKey: newKey(idempotencyKey) });
+    return jobStatus(await this._call({ method: "POST", path: "/v1/crawls", json,
+      idempotencyKey: newKey(idempotencyKey) }));
+  }
+
+  /**
+   * Crawl a site from `url` into a new dataset version: its host only, breadth first, within the bounds. robots.txt
+   * is read first (a page it disallows is never fetched). Each page is a scrape, charged as one, so `maxPages` is
+   * the most it can cost. Follow it with `siteCrawlStatus` or `waitForSiteCrawl`; cancel with `cancelJob(crawlId)`.
+   * `resumeFrom` continues an ended crawl of the same URL.
+   */
+  async crawlSite(url, { maxPages, maxDepth, engine, waitForMs, onlyMainContent, includeTags, excludeTags, resumeFrom,
+    idempotencyKey } = {}) {
+    const json = clean({ url, max_pages: maxPages, max_depth: maxDepth, engine, wait_for_ms: waitForMs,
+      only_main_content: onlyMainContent, include_tags: includeTags, exclude_tags: excludeTags,
+      resume_from: resumeFrom });
+    return jobStatus(await this._call({ method: "POST", path: "/v1/site-crawls", json,
+      idempotencyKey: newKey(idempotencyKey) }));
+  }
+
+  /** A site crawl's status, counts, charge, dataset version and one page of its pages (`next_cursor`). */
+  async siteCrawlStatus(crawlId, { waitSeconds = 0, limit, cursor } = {}) {
+    return jobStatus(await this._call({ method: "GET", path: `/v1/site-crawls/${seg(crawlId)}`,
+      params: { wait_seconds: this._serverWait(waitSeconds) || undefined, limit, cursor } }));
   }
 
   /** A job's state; `waitSeconds` (<= 60) returns as soon as it finishes. */
   async getJob(jobId, { waitSeconds = 0 } = {}) {
-    return jobWithDefaults(await this._call({ method: "GET", path: `/v1/jobs/${seg(jobId)}`,
-      params: { wait_seconds: this._serverWait(waitSeconds) || undefined } }));
+    return jobWithDefaults(jobStatus(await this._call({ method: "GET", path: `/v1/jobs/${seg(jobId)}`,
+      params: { wait_seconds: this._serverWait(waitSeconds) || undefined } })));
   }
 
   /** Your jobs, newest first (`next_cursor` pages). */
   async listJobs({ limit, status, cursor } = {}) {
-    const page = await this._call({ method: "GET", path: "/v1/jobs", params: { limit, status, cursor } });
+    const page = jobStatus(await this._call({ method: "GET", path: "/v1/jobs", params: { limit, status, cursor } }));
     if (Array.isArray(page?.jobs)) for (const job of page.jobs) jobWithDefaults(job);
     return page;
   }
 
   /** Cancel a pending or running job (another process's job: `cancelled` false, requested). */
   async cancelJob(jobId) {
-    return this._call({ method: "POST", path: `/v1/jobs/${seg(jobId)}/cancel` });
+    return jobStatus(await this._call({ method: "POST", path: `/v1/jobs/${seg(jobId)}/cancel` }));
   }
 
   /** A job's artifacts. */
@@ -351,6 +430,14 @@ export class Scrawl {
     return this._call({ method: "GET", path: `/v1/assets/${seg(jobId)}/files/${seg(assetId)}`, raw: true });
   }
 
+  /** A stored document's text (the Markdown behind an asset's `text_url`): untrusted external content, 404 when the
+   * asset has none. */
+  async downloadAssetText(jobId, assetId) {
+    const body = await this._call({ method: "GET", path: `/v1/assets/${seg(jobId)}/files/${seg(assetId)}/text`,
+      raw: true });
+    return new TextDecoder("utf-8").decode(body);
+  }
+
   // -- datasets -----------------------------------------------------------------------------------
   /** Your datasets (`next_cursor` pages). */
   async listDatasets({ limit, cursor } = {}) {
@@ -359,12 +446,13 @@ export class Scrawl {
 
   /** A dataset's manifest and active version. */
   async getDataset(datasetId) {
-    return this._call({ method: "GET", path: `/v1/datasets/${seg(datasetId)}` });
+    return jobStatus(await this._call({ method: "GET", path: `/v1/datasets/${seg(datasetId)}` }));
   }
 
   /** A dataset's versions, newest first. */
   async listVersions(datasetId, { limit, cursor, status } = {}) {
-    return this._call({ method: "GET", path: `/v1/datasets/${seg(datasetId)}/versions`, params: { limit, cursor, status } });
+    return jobStatus(await this._call({ method: "GET", path: `/v1/datasets/${seg(datasetId)}/versions`,
+      params: { limit, cursor, status } }));
   }
 
   /** Make a completed version the active one. */
@@ -393,8 +481,24 @@ export class Scrawl {
   /** Extract a structured dataset version from a dataset with your own AI provider (a job). */
   async extractDataset(datasetId, { schema, instruction, profile, versionId, maxRecords, idempotencyKey } = {}) {
     const json = clean({ schema, instruction, profile, version_id: versionId, max_records: maxRecords });
-    return this._call({ method: "POST", path: `/v1/datasets/${seg(datasetId)}/extract`, json,
-      idempotencyKey: newKey(idempotencyKey) });
+    return jobStatus(await this._call({ method: "POST", path: `/v1/datasets/${seg(datasetId)}/extract`, json,
+      idempotencyKey: newKey(idempotencyKey) }));
+  }
+
+  /**
+   * A new version of a dataset without a crawl (no fetch, no charge): `remove` `recordIds`, `dedupe` by `field`
+   * (`content_hash` by default), or `reextract` each page's markdown with new content options.
+   */
+  async curateDataset(datasetId, operation, { versionId, recordIds, field, onlyMainContent, includeTags,
+    excludeTags } = {}) {
+    const json = clean({ operation, version_id: versionId, record_ids: recordIds, field,
+      only_main_content: onlyMainContent, include_tags: includeTags, exclude_tags: excludeTags });
+    return this._call({ method: "POST", path: `/v1/datasets/${seg(datasetId)}/curate`, json });
+  }
+
+  /** A dataset's curations, newest first (`next_cursor` pages). */
+  async listCurations(datasetId, { limit, cursor } = {}) {
+    return this._call({ method: "GET", path: `/v1/datasets/${seg(datasetId)}/curations`, params: { limit, cursor } });
   }
 
   /** Hide a record from retrieval (reversible with `releaseRecord`). */
@@ -445,6 +549,15 @@ export class Scrawl {
     for (;;) {
       const status = await this.batchStatus(batchId, { waitSeconds: waitFor(deadline) });
       if (status?.status === "completed" || Date.now() >= deadline) return status;
+    }
+  }
+
+  /** Wait until a site crawl is done (its dataset version final), or the timeout. */
+  async waitForSiteCrawl(crawlId, { timeoutMs = 3_900_000 } = {}) {
+    const deadline = Date.now() + timeoutMs;
+    for (;;) {
+      const status = await this.siteCrawlStatus(crawlId, { waitSeconds: waitFor(deadline) });
+      if (status?.done || Date.now() >= deadline) return status;
     }
   }
 
@@ -575,6 +688,19 @@ export class Scrawl {
     // only replay a generic failure instead of this error.
     return method === "GET" || !isErrorEnvelope(body);
   }
+}
+
+/** RESULT with an upper-case job status (an older server's) in the lower case: top level, `jobs` and `versions`. */
+function jobStatus(result) {
+  if (!isPlainObject(result)) return result;
+  const items = [result];
+  for (const key of ["jobs", "versions"]) if (Array.isArray(result[key])) items.push(...result[key]);
+  for (const item of items) {
+    if (isPlainObject(item) && typeof item.status === "string") {
+      item.status = OLD_JOB_STATUS.get(item.status) ?? item.status;
+    }
+  }
+  return result;
 }
 
 /** The downgrade guard: `browser` was asked for, but a finished result says another engine rendered it. */

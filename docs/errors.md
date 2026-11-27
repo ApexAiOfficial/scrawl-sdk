@@ -80,7 +80,7 @@ Generated from the vendored error catalogue (`contracts/apexapi_errors.json`) an
 | `invalid_token` | 401 | no | MCP | - | `ErrorCode.INVALID_TOKEN` | MCP over HTTP: the bearer key was not accepted. |
 | `unauthorized` | 401 | no | API, MCP | `AuthenticationError` | `ErrorCode.UNAUTHORIZED` | No credential was sent, or the API key or admin token was not accepted. |
 | `insufficient_credits` | 402 | no | API, MCP | `PaymentRequiredError` | `ErrorCode.INSUFFICIENT_CREDITS` | The account does not have the credits this job needs. |
-| `account_not_active` | 403 | no | API, MCP | `PermissionDeniedError` | `ErrorCode.ACCOUNT_NOT_ACTIVE` | The key's hosted account is suspended, banned, or has not accepted the Trust Pledge. |
+| `account_not_active` | 403 | no | API, MCP | `PermissionDeniedError` | `ErrorCode.ACCOUNT_NOT_ACTIVE` | The key's hosted account is suspended, banned, or has not accepted the Trust Pledge (or the terms changed since it did: accept them again in Telegram). |
 | `forbidden` | 403 | no | API, MCP | `PermissionDeniedError` | `ErrorCode.FORBIDDEN` | The key is valid but may not do this: a missing scope, a disabled endpoint or command, or a key not bound to a hosted account. |
 | `not_found` | 404 | no | API, MCP | `NotFoundError` | `ErrorCode.NOT_FOUND` | The resource does not exist or is not the caller's (the two are never distinguished), or there is no such route. |
 | `method_not_allowed` | 405 | no | API | `ScrawlError` | `ErrorCode.METHOD_NOT_ALLOWED` | The route does not accept this HTTP method. |
@@ -117,7 +117,7 @@ Generated from the vendored error catalogue (`contracts/apexapi_errors.json`) an
 | `internal` | none | no | MCP | - | `ErrorCode.INTERNAL` | An MCP tool failed unexpectedly, possibly after it started work; the details are only in the server log. |
 | `interrupted` | none | yes | result | - | `ErrorCode.INTERRUPTED` | The job stopped before it finished, for example on a service restart. |
 | `job_timeout` | none | yes | result | - | `ErrorCode.JOB_TIMEOUT` | The job did not finish within its time limit. |
-| `key_revoked` | none | no | MCP | - | `ErrorCode.KEY_REVOKED` | The key of an open listen stream was revoked; use an active key. |
+| `key_revoked` | none | no | MCP | - | `ErrorCode.KEY_REVOKED` | The key was revoked: an open listen stream's, or the key a stdio MCP server was started with; use an active key. |
 | `listen_expired` | none | yes | MCP | - | `ErrorCode.LISTEN_EXPIRED` | A listen stream reached its lifetime; listen again. |
 | `preflight_denied` | none | no | result | - | `ErrorCode.PREFLIGHT_DENIED` | The destination policy refused the page before any fetch. |
 | `render_interrupted` | none | yes | result | - | `ErrorCode.RENDER_INTERRUPTED` | A scrape's JSON step was interrupted; scrape the URL again, or extract from the job. |

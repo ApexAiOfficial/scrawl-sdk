@@ -31,10 +31,11 @@ Every method returns a promise; options come last, as an object.
 | Area | Methods |
 | --- | --- |
 | Scrape | `scrape`, `scrapeResult`, `waitForScrape`, `map`, `batchScrape`, `batchStatus`, `waitForBatch` |
+| Local fetch | `localFetch(url, { respectRobots, maxRedirects, maxBytes, fetchPage, ...scrapeOptions })`, `scrapeLocal(url, body, { httpStatus, contentType, finalUrl, ... })` |
 | AI (your provider) | `extract`, `ask`, `listAiProviders`, `setAiProvider`, `deleteAiProvider`, `setDefaultAiProvider`, `testAiProvider`, `aiUsage` |
-| Crawls and jobs | `crawl`, `getJob`, `waitForJob`, `listJobs`, `cancelJob`, `listArtifacts`, `downloadArtifact` (→ `ArrayBuffer`) |
-| Datasets | `listDatasets`, `getDataset`, `listVersions`, `activateVersion`, `diffVersions`, `datasetFields`, `queryDataset`, `extractDataset`, `quarantineRecord`, `releaseRecord`, `search`, `getDocument` |
-| Assets | `quoteAssets`, `extractAssets`, `getAssets`, `waitForAssets`, `downloadAsset` (→ `ArrayBuffer`) |
+| Crawls and jobs | `crawl`, `crawlSite`, `siteCrawlStatus`, `waitForSiteCrawl`, `getJob`, `waitForJob`, `listJobs`, `cancelJob`, `listArtifacts`, `downloadArtifact` (→ `ArrayBuffer`) |
+| Datasets | `listDatasets`, `getDataset`, `listVersions`, `activateVersion`, `diffVersions`, `datasetFields`, `queryDataset`, `extractDataset`, `curateDataset`, `listCurations`, `quarantineRecord`, `releaseRecord`, `search`, `getDocument` |
+| Assets | `quoteAssets`, `extractAssets`, `getAssets`, `waitForAssets`, `downloadAsset` (→ `ArrayBuffer`), `downloadAssetText` (a document's Markdown, → `string`) |
 | Proxy | `getProxy`, `setProxy`, `testProxy`, `removeProxy`, `listProxyPool`, `addProxyPoolEntry`, `testProxyPoolEntry`, `enableProxyPoolEntry`, `disableProxyPoolEntry`, `removeProxyPoolEntry`, `setProxyPoolMode`, `proxyHealth` |
 | Account | `creditBalance`, `health`, `listApiKeys`, `revokeApiKey` |
 | Helpers | `paginate(method, ...args)` follows `next_cursor` for any list method |
@@ -51,6 +52,26 @@ Listing and revoking need a key with `keys:manage`, made with `/api_keys create_
 
 `downloadArtifact` and `downloadAsset` buffer the whole file; for very large exports, fetch the URL with your
 own streaming `fetch` and the same `Authorization: Bearer` header.
+
+## Content, site crawls and local fetch
+
+`scrape`, `batchScrape`, `crawlSite` and a `reextract` curation take `onlyMainContent` (`false` keeps the whole
+body), `includeTags` (keep only what these CSS selectors match) and `excludeTags` (drop what they match first).
+Each list takes at most 20 selectors. They are sent only when set, and the server validates them.
+
+```js
+let site = await client.crawlSite("https://example.com/docs/", { maxPages: 50, maxDepth: 2 });
+site = await client.waitForSiteCrawl(site.crawl_id);                    // done: the version is final
+const deduped = await client.curateDataset(site.dataset_id, "dedupe");  // a new version, no fetch, no charge
+```
+
+A site crawl stays on the URL's host and reads robots.txt first. Each page is charged as a scrape, so `maxPages`
+is the most it can cost. `cancelJob(site.crawl_id)` stops it, and `resumeFrom` continues an ended crawl.
+`localFetch(url)` fetches the page from your machine (robots.txt honoured by default), then has Scrawl render it;
+Scrawl fetches nothing. The result says `origin: "client_fetched"` and `url_verified: false`.
+
+A job's `status` is one lower-case word (`JobStatus`). The SDK also reads the upper case older servers sent, and
+gives it to you in the lower case.
 
 ## A full flow
 

@@ -40,14 +40,15 @@ map. Submits that start work take an optional `idempotency_key` (one is generate
 
 | Area | Methods |
 | --- | --- |
-| Scrape | `scrape(url, formats=, schema=, instruction=, profile=, wait_seconds=30, engine=, wait_for_ms=)`, `scrape_result(job_id, wait_seconds=, formats=, engine=)`, `map(url, limit=100, wait_seconds=30, engine=, wait_for_ms=)`, `batch_scrape(urls, ...)`, `batch_status(batch_id, wait_seconds=)` |
+| Scrape | `scrape(url, formats=, schema=, instruction=, profile=, wait_seconds=30, engine=, wait_for_ms=, only_main_content=, include_tags=, exclude_tags=)`, `scrape_result(job_id, wait_seconds=, formats=, engine=)`, `map(url, limit=100, wait_seconds=30, engine=, wait_for_ms=)`, `batch_scrape(urls, ...)`, `batch_status(batch_id, wait_seconds=)` |
+| Local fetch | `local_fetch(url, respect_robots=True, max_redirects=, max_bytes=, fetch_client=, **scrape_options)`, `scrape_local(url, body, http_status=200, content_type=, final_url=, ...)` |
 | AI (your provider) | `extract(job_id, artifact="response.html", schema=, instruction=, profile=)`, `ask(question, dataset_id=, profile=)`, `list_ai_providers()`, `set_ai_provider(profile, provider=, api_key=, model=, base_url=)`, `delete_ai_provider(profile)`, `set_default_ai_provider(profile)`, `test_ai_provider(profile)`, `ai_usage(days=30)` |
-| Crawls and jobs | `crawl(crawl_target, export_format=, max_items=, max_seconds=)`, `get_job(job_id, wait_seconds=)`, `list_jobs(limit=, status=, cursor=)`, `cancel_job(job_id)`, `list_artifacts(job_id)`, `download_artifact(job_id, filename, format=)` (bytes) |
-| Datasets | `list_datasets`, `get_dataset`, `list_versions`, `activate_version`, `diff_versions`, `dataset_fields`, `query_dataset(dataset_id, filters, version_id=, limit=, cursor=)`, `extract_dataset`, `quarantine_record`, `release_record`, `search`, `get_document` |
-| Assets | `quote_assets(url, classes=, max_items=, max_bytes=, max_credits=)`, `extract_assets(...)`, `get_assets(job_id, view=, limit=, cursor=, wait_seconds=)`, `download_asset(job_id, asset_id)` (bytes) |
+| Crawls and jobs | `crawl(crawl_target, export_format=, max_items=, max_seconds=)`, `crawl_site(url, max_pages=, max_depth=, engine=, wait_for_ms=, only_main_content=, include_tags=, exclude_tags=, resume_from=)`, `site_crawl_status(crawl_id, wait_seconds=, limit=, cursor=)`, `get_job(job_id, wait_seconds=)`, `list_jobs(limit=, status=, cursor=)`, `cancel_job(job_id)`, `list_artifacts(job_id)`, `download_artifact(job_id, filename, format=)` (bytes) |
+| Datasets | `list_datasets`, `get_dataset`, `list_versions`, `activate_version`, `diff_versions`, `dataset_fields`, `query_dataset(dataset_id, filters, version_id=, limit=, cursor=)`, `extract_dataset`, `curate_dataset(dataset_id, operation, version_id=, record_ids=, field=, only_main_content=, include_tags=, exclude_tags=)`, `list_curations(dataset_id, limit=, cursor=)`, `quarantine_record`, `release_record`, `search`, `get_document` |
+| Assets | `quote_assets(url, classes=, max_items=, max_bytes=, max_credits=)`, `extract_assets(...)`, `get_assets(job_id, view=, limit=, cursor=, wait_seconds=)`, `download_asset(job_id, asset_id)` (bytes), `download_asset_text(job_id, asset_id)` (a document's Markdown, as UTF-8 bytes) |
 | Proxy | `get_proxy`, `set_proxy`, `test_proxy`, `remove_proxy`, `list_proxy_pool`, `add_proxy_pool_entry`, `test_proxy_pool_entry`, `enable_proxy_pool_entry`, `disable_proxy_pool_entry`, `remove_proxy_pool_entry`, `set_proxy_pool_mode`, `proxy_health` |
 | Account | `credit_balance()`, `health()`, `list_api_keys()`, `revoke_api_key(key_id)` |
-| Helpers | `wait_for_scrape(job_id, timeout=300, engine=)`, `wait_for_batch(batch_id, timeout=600)`, `wait_for_assets(job_id, timeout=600)`, `wait_for_job(job_id, timeout=1800)`, `paginate(method, *args, **kwargs)` |
+| Helpers | `wait_for_scrape(job_id, timeout=300, engine=)`, `wait_for_batch(batch_id, timeout=600)`, `wait_for_assets(job_id, timeout=600)`, `wait_for_job(job_id, timeout=1800)`, `wait_for_site_crawl(crawl_id, timeout=3900)`, `paginate(method, *args, **kwargs)` |
 
 The `wait_for_*` helpers use server-side waits (up to 60 s per request, kept inside your `timeout`), never
 tight polling. `paginate` follows `next_cursor` for any list method:
@@ -62,6 +63,35 @@ for record in client.paginate(client.query_dataset, dataset_id, [{"field": "pric
 Hosted API keys are created in Telegram with `/api_keys create`; the SDK deliberately has no create method.
 Listing and revoking need a key with `keys:manage`, made with `/api_keys create_manager`.
 `list_api_keys` and `revoke_api_key` need `keys:manage`.
+
+## Content, site crawls and local fetch
+
+By default the markdown is the page's main content. `only_main_content=False` keeps the whole body,
+`include_tags=["article", ".post"]` keeps only what those CSS selectors match (in page order), and
+`exclude_tags=["nav", "#cookie-banner"]` drops what they match first. Each list takes at most 20 selectors of 200
+characters. They are sent only when set, and the server validates them (422 `invalid_request`).
+
+```python
+site = client.crawl_site("https://example.com/docs/", max_pages=50, max_depth=2)   # a URL -> a dataset version
+site = client.wait_for_site_crawl(site.crawl_id)                                   # done: the version is final
+deduped = client.curate_dataset(site.dataset_id, "dedupe")                         # a new version, no fetch, no charge
+```
+
+A site crawl stays on the URL's host and reads robots.txt first; a page it disallows is never fetched. Each page
+is charged as a scrape, so `max_pages` is the most a crawl can cost. `cancel_job(site.crawl_id)` stops it (pages in
+flight finish and are kept), and `resume_from=` continues an ended crawl without fetching its pages again.
+
+`local_fetch(url)` fetches the page from your machine, honouring robots.txt (`respect_robots=False` makes that
+your responsibility), then has Scrawl render it. Scrawl fetches nothing. The fetch uses its own HTTP client, never
+the one that carries your Scrawl key. A redirect from https to http is never followed, and with your own
+`fetch_client` a redirect to another host isn't either. The result says `origin: "client_fetched"` and
+`url_verified: False`: the URL, status and type are your claims.
+
+## Job status
+
+A job's `status` is `pending`, `running`, `completed`, `failed`, `cancelled` or `orphaned` (its process was lost
+before it finished). Servers before this spelling sent the same words in upper case; the SDK reads either and gives
+you the lower case. This release and the next minor release still read the upper case.
 
 ## Datasets
 

@@ -41,6 +41,31 @@ export type ScrapeStatus = "completed" | "pending" | "failed";
 /** The settled fetch outcome; null while pending. Of these, only pipeline_failed is refunded (and a job that never started). */
 export type ScrapeOutcome = "ok" | "target_blocked" | "target_error" | "cancelled" | "pipeline_failed";
 
+/** The call to make next, as the API names it: a route this key may call, ids filled in. */
+export interface NextCall extends ApiObject {
+  method: string;
+  path: string;
+  query?: Record<string, unknown> | null;
+  body?: Record<string, unknown> | null;
+}
+
+/** A call that usually comes after a result (`METHOD /path`), and why. */
+export interface NextAction extends ApiObject {
+  name: string;
+  why: string;
+}
+
+/**
+ * Machine-readable next steps on pending, running or paged results (and the usual next calls on finished
+ * ones). Absent or null when there is no follow-up; never a call the key's scopes do not allow.
+ */
+export interface NextStepInfo {
+  next_call?: NextCall | null;
+  poll_after_seconds?: number | null;
+  docs_url?: string | null;
+  next_actions?: NextAction[];
+}
+
 export interface AiUsageInfo extends ApiObject {
   provider?: string;
   model?: string;
@@ -61,7 +86,7 @@ export interface ProxyInfo extends ApiObject {
   has_credentials: boolean;
   label: string;
   enabled: boolean;
-  /** unverified, valid, invalid or external_blocked */
+  /** unverified, valid, invalid, external_blocked or unopenable (stored, but the deployment's key cannot open it) */
   validation_state: string;
   /** True once a test has passed: scraping is unlocked. */
   usable: boolean;
@@ -159,10 +184,14 @@ export interface BrowserRenderInfo extends ApiObject {
   failure?: string | null;
 }
 
-export interface ScrapeResult extends ApiObject {
+export interface ScrapeResult extends ApiObject, NextStepInfo {
   job_id: string;
   status: ScrapeStatus;
   url: string;
+  /** `"client_fetched"` for a page your own client fetched (scrapeLocal, localFetch); absent otherwise. */
+  origin?: "client_fetched" | null;
+  /** `false` for a client-fetched page: its URL, status and type are your claims. */
+  url_verified?: boolean | null;
   /** The engine that fetched it (servers before the browser engine omit it). */
   engine?: ScrapeEngine;
   /** Browser only: the page's URL after redirects. */
@@ -192,7 +221,7 @@ export interface ScrapeResult extends ApiObject {
   untrusted_external_content?: boolean;
 }
 
-export interface MapResult extends ApiObject {
+export interface MapResult extends ApiObject, NextStepInfo {
   url: string;
   status: ScrapeStatus;
   /** The engine that fetched the start page. */
@@ -219,7 +248,7 @@ export interface BatchItem extends ApiObject {
   error?: string | null;
 }
 
-export interface BatchStatus extends ApiObject {
+export interface BatchStatus extends ApiObject, NextStepInfo {
   batch_id: string;
   /** `completed` once every item has settled. */
   status: "running" | "completed";
@@ -231,14 +260,17 @@ export interface BatchStatus extends ApiObject {
   untrusted_external_content?: boolean;
 }
 
-/** Job states (the API reports them upper-case). */
-export type JobStatus = "PENDING" | "RUNNING" | "COMPLETED" | "FAILED" | "CANCELLED" | "ORPHANED";
+/**
+ * A job's status, the one spelling every response uses. The SDK also reads the upper case older servers sent
+ * (`COMPLETED`) and gives it to you in this spelling.
+ */
+export type JobStatus = "pending" | "running" | "completed" | "failed" | "cancelled" | "orphaned";
 
-export interface Job extends ApiObject {
+export interface Job extends ApiObject, NextStepInfo {
   job_id: string;
   command: string;
   args: string[];
-  status: JobStatus | (string & {});
+  status: JobStatus;
   engine_id: string;
   artifacts_url: string;
   result_url: string;
@@ -250,7 +282,79 @@ export interface Job extends ApiObject {
   warnings: string[];
 }
 
-export interface Page<T> extends ApiObject {
+export interface CancelResult extends ApiObject {
+  job_id: string;
+  /** False when the job had already ended, or when another process runs it (then `status` is `running`). */
+  cancelled: boolean;
+  status: JobStatus;
+  message?: string | null;
+}
+
+/** One version of a dataset; `status` is the status of the job that produced it. */
+export interface DatasetVersion extends ApiObject {
+  version_id: string;
+  dataset_id: string;
+  job_id: string;
+  status: JobStatus;
+  record_count: number;
+  skipped_count: number;
+  validation_state: string;
+  is_published: boolean;
+  created_at: string;
+  finalized_at?: string | null;
+}
+
+export interface DatasetManifest extends ApiObject {
+  dataset: DatasetInfo;
+  versions: DatasetVersion[];
+}
+
+export interface SiteCrawlPage extends ApiObject {
+  url: string;
+  depth: number;
+  job_id?: string | null;
+  outcome?: "ok" | "target_blocked" | "target_error" | "cancelled" | "pipeline_failed" | null;
+  /** robots_disallowed, or the code that refused the page before it was fetched (nothing was charged). */
+  skip_reason?: string | null;
+  error?: string | null;
+}
+
+/** A site crawl's progress; `crawl_id` is its job id (cancel it with `cancelJob`). */
+export interface SiteCrawl extends ApiObject, NextStepInfo {
+  crawl_id: string;
+  status: JobStatus;
+  url: string;
+  max_pages: number;
+  max_depth: number;
+  dataset_id: string;
+  dataset_version_id: string;
+  counts: { launched: number; ok: number; blocked: number; error: number; skipped: number; dropped: number };
+  /** What this crawl's own pages' holds were consumed for (carried pages and later refunds not counted); null when unmetered. */
+  credits_charged?: number | null;
+  stop_reason?: "max_pages" | "frontier_exhausted" | "credits_exhausted" | "deadline" | "cancelled" | "interrupted"
+    | "refused" | null;
+  /** True once the dataset version is final. */
+  done: boolean;
+  resumed_from?: string | null;
+  pages: SiteCrawlPage[];
+  next_cursor?: string | null;
+}
+
+/** One curation: the new version it made from which version, how, and what it counted. */
+export interface DatasetCuration extends ApiObject {
+  curation_id: string;
+  dataset_id: string;
+  source_version_id: string;
+  version_id: string;
+  operation: "remove" | "dedupe" | "reextract";
+  parameters: Record<string, Json>;
+  records_in: number;
+  records_out: number;
+  stale: number;
+  created_at: string;
+}
+
+export interface Page<T> extends ApiObject, NextStepInfo {
   next_cursor?: string | null;
   items?: T[];
 }
@@ -274,12 +378,28 @@ export interface AskResult extends ApiObject {
   provider?: string;
   model?: string;
   sources_considered?: number;
+  /** whole_dataset: a figure over every record; partial: a figure that leaves records out; sample: retrieved records only. */
+  coverage?: "whole_dataset" | "partial" | "sample";
+  /** The computation behind a figure; null when none was computed. */
+  aggregate?: {
+    operation: "count" | "sum" | "average" | "min" | "max" | "most_common";
+    field: string | null;
+    filters: { field: string; op: string; value: unknown }[];
+    value: unknown;
+    top?: [unknown, number][] | null;
+    records_scanned: number;
+    records_matched: number;
+    skipped: number;
+    truncated: boolean;
+    dataset_id: string;
+    version_id: string;
+  } | null;
   untrusted_external_content?: boolean;
 }
 
-export interface CrawlLaunch extends ApiObject {
+export interface CrawlLaunch extends ApiObject, NextStepInfo {
   job_id: string;
-  status: string;
+  status: JobStatus;
   crawl_target: string;
   dataset_id: string;
   dataset_version_id: string;
@@ -288,13 +408,6 @@ export interface CrawlLaunch extends ApiObject {
   max_items: number;
   max_seconds: number;
   links: Record<string, string>;
-}
-
-export interface CancelResult extends ApiObject {
-  job_id: string;
-  cancelled: boolean;
-  status: string;
-  message?: string | null;
 }
 
 export interface ArtifactEntry extends ApiObject {
@@ -353,21 +466,6 @@ export interface DatasetInfo extends ApiObject {
   updated_at: string;
 }
 
-export interface DatasetVersion extends ApiObject {
-  version_id: string;
-  dataset_id: string;
-  job_id: string;
-  status: string;
-  record_count: number;
-  is_published: boolean;
-  created_at: string;
-}
-
-export interface DatasetManifest extends ApiObject {
-  dataset: DatasetInfo;
-  versions: DatasetVersion[];
-}
-
 export interface DatasetFields extends ApiObject {
   fields: { path: string; types: string[]; present: number; examples: Json[] }[];
   truncated: boolean;
@@ -380,9 +478,9 @@ export interface DatasetDiff extends ApiObject {
   next_cursor?: string | null;
 }
 
-export interface DatasetExtraction extends ApiObject {
+export interface DatasetExtraction extends ApiObject, NextStepInfo {
   job_id: string;
-  status: string;
+  status: JobStatus;
   source_dataset_id: string;
   source_version_id: string;
   target_dataset_id: string;
@@ -414,7 +512,7 @@ export interface QueryRecord extends ApiObject {
   provenance: ApiObject;
 }
 
-export interface QueryResult extends ApiObject {
+export interface QueryResult extends ApiObject, NextStepInfo {
   records: QueryRecord[];
   scanned?: number;
   next_cursor?: string | null;
@@ -431,6 +529,28 @@ export interface QuarantineResult extends ApiObject {
   reason?: string | null;
 }
 
+export interface ScrapeLocalOptions extends Omit<ScrapeOptions, "engine" | "waitForMs"> {
+  /** The status your client received (default 200). */
+  httpStatus?: number;
+  /** The Content-Type your client received. */
+  contentType?: string;
+  /** The URL after redirects, when it differs. */
+  finalUrl?: string;
+  idempotencyKey?: string;
+}
+
+export interface LocalFetchOptions extends Omit<ScrapeLocalOptions, "httpStatus" | "contentType" | "finalUrl"> {
+  /** Honour the site's robots.txt (default true); `false` is your responsibility. */
+  respectRobots?: boolean;
+  /** At most this many redirects (default 5). */
+  maxRedirects?: number;
+  /** At most this many bytes of body (default 5 MiB). */
+  maxBytes?: number;
+  /** The fetch used for the page (default the global fetch); never the one that talks to Scrawl. With your own
+   * fetch, a redirect to another host is refused (`cross_origin_redirect`), as it may carry your credentials. */
+  fetchPage?: typeof fetch;
+}
+
 export interface ScrapeOptions {
   /** Default `["markdown"]`. `"json"` uses YOUR AI provider and needs the `ai:use` scope as well as `scrape:write`. */
   formats?: ScrapeFormat[];
@@ -445,6 +565,15 @@ export interface ScrapeOptions {
   engine?: ScrapeEngine;
   /** Browser only: wait this many more milliseconds after the page settles (0-10000). */
   waitForMs?: number;
+  /** Markdown only: the page's main content (the server's default is `true`); `false` keeps the whole body. */
+  onlyMainContent?: boolean;
+  /**
+   * Markdown only: keep only what these CSS selectors match, in page order, instead of the main content (at most
+   * 20 selectors of 200 characters; the server validates them and answers 422 `invalid_request`).
+   */
+  includeTags?: string[] | null;
+  /** Markdown only: drop what these CSS selectors match first (the same subset and bounds as `includeTags`). */
+  excludeTags?: string[] | null;
   /** Reuse to make a retried submit return the original response (generated when omitted). */
   idempotencyKey?: string;
 }
@@ -481,7 +610,7 @@ export interface AssetQuote extends ApiObject {
   egress_ready: boolean;
 }
 
-export interface AssetJob extends ApiObject {
+export interface AssetJob extends ApiObject, NextStepInfo {
   job_id: string;
   status: "pending";
   url: string;
@@ -533,9 +662,9 @@ export interface AssetBilling extends ApiObject {
   state: "active" | "consumed" | "released" | "expired" | "unmetered" | "unknown";
 }
 
-export interface AssetResult extends ApiObject {
+export interface AssetResult extends ApiObject, NextStepInfo {
   job_id: string;
-  status: "pending" | "running" | "completed" | "failed" | "cancelled" | "orphaned";
+  status: JobStatus;
   url: string;
   classes: AssetClass[];
   /** A completed job that stopped early (e.g. its deadline); what it stored is still delivered. */
@@ -569,6 +698,13 @@ export declare class Scrawl {
 
   scrape(url: string, options?: ScrapeOptions): Promise<ScrapeResult>;
   scrapeResult(jobId: string, options?: { waitSeconds?: number; formats?: RenderFormat[]; engine?: ScrapeEngine }):
+  /** Render a page or document you already fetched (`POST /v1/scrape/local`); Scrawl fetches nothing. */
+  scrapeLocal(url: string, body: Uint8Array | string, options?: ScrapeLocalOptions): Promise<ScrapeResult>;
+  /**
+   * Fetch `url` from your own machine (robots.txt honoured by default, at most 5 redirects, the size limit), then
+   * render it with `scrapeLocal`. The fetch never carries your Scrawl API key.
+   */
+  localFetch(url: string, options?: LocalFetchOptions): Promise<ScrapeResult>;
     Promise<ScrapeResult>;
   map(url: string, options?: { limit?: number; waitSeconds?: number; engine?: ScrapeEngine; waitForMs?: number;
     idempotencyKey?: string }): Promise<MapResult>;
@@ -607,7 +743,13 @@ export declare class Scrawl {
 
   crawl(crawlTarget: string, options?: { exportFormat?: ExportFormat; maxItems?: number; maxSeconds?: number; idempotencyKey?: string }): Promise<CrawlLaunch>;
   getJob(jobId: string, options?: { waitSeconds?: number }): Promise<Job>;
-  listJobs(options?: { limit?: number; status?: string; cursor?: string }): Promise<{ jobs: Job[]; next_cursor?: string | null } & ApiObject>;
+  /** `status` filters by a job status; either case is accepted. */
+  listJobs(options?: { limit?: number; status?: JobStatus | Uppercase<JobStatus>; cursor?: string }): Promise<{ jobs: Job[]; next_cursor?: string | null } & ApiObject>;
+  curateDataset(datasetId: string, operation: "remove" | "dedupe" | "reextract", options?: { versionId?: string; recordIds?: string[]; field?: string; onlyMainContent?: boolean; includeTags?: string[]; excludeTags?: string[] }): Promise<DatasetCuration>;
+  listCurations(datasetId: string, options?: { limit?: number; cursor?: string }): Promise<Page<DatasetCuration> & { curations: DatasetCuration[] }>;
+  crawlSite(url: string, options?: { maxPages?: number; maxDepth?: number; engine?: ScrapeEngine; waitForMs?: number; onlyMainContent?: boolean; includeTags?: string[]; excludeTags?: string[]; resumeFrom?: string; idempotencyKey?: string }): Promise<SiteCrawl>;
+  siteCrawlStatus(crawlId: string, options?: { waitSeconds?: number; limit?: number; cursor?: string }): Promise<SiteCrawl>;
+  waitForSiteCrawl(crawlId: string, options?: { timeoutMs?: number }): Promise<SiteCrawl>;
   /** Needs the scope that starts that kind of job: `ai:use` for a dataset extraction, else `scrape:write`. */
   cancelJob(jobId: string): Promise<CancelResult>;
   listArtifacts(jobId: string): Promise<ArtifactList>;
@@ -616,7 +758,7 @@ export declare class Scrawl {
 
   listDatasets(options?: { limit?: number; cursor?: string }): Promise<{ count: number; datasets: DatasetInfo[]; next_cursor?: string | null } & ApiObject>;
   getDataset(datasetId: string): Promise<DatasetManifest>;
-  listVersions(datasetId: string, options?: { limit?: number; cursor?: string; status?: string }): Promise<{ count: number; versions: DatasetVersion[]; next_cursor?: string | null } & ApiObject>;
+  listVersions(datasetId: string, options?: { limit?: number; cursor?: string; status?: JobStatus | Uppercase<JobStatus> }): Promise<{ count: number; versions: DatasetVersion[]; next_cursor?: string | null } & ApiObject>;
   activateVersion(datasetId: string, versionId: string): Promise<{ dataset: DatasetInfo } & ApiObject>;
   diffVersions(datasetId: string, fromVersion: string, toVersion: string, options?: { limit?: number; cursor?: string }): Promise<DatasetDiff>;
   datasetFields(datasetId: string, options?: { version?: string }): Promise<DatasetFields>;
@@ -633,6 +775,8 @@ export declare class Scrawl {
   getAssets(jobId: string, options?: { view?: "assets" | "skipped"; limit?: number; cursor?: string; waitSeconds?: number }): Promise<AssetResult>;
   /** One stored asset's bytes, buffered in memory: untrusted content, compare its `sha256`. */
   downloadAsset(jobId: string, assetId: string): Promise<ArrayBuffer>;
+  /** A stored document's text (its Markdown, behind `text_url`): untrusted external content. */
+  downloadAssetText(jobId: string, assetId: string): Promise<string>;
 
   creditBalance(): Promise<ApiObject>;
   health(): Promise<ApiObject>;

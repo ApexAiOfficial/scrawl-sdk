@@ -140,6 +140,25 @@ def _engine_options(args: argparse.Namespace) -> dict:
     return {"engine": "browser", "wait_for_ms": args.wait_for} if args.browser else {}
 
 
+def _content_options(args: argparse.Namespace) -> dict:
+    """``--full-page``, ``--include-tag`` and ``--exclude-tag`` as SDK options; only the ones given."""
+    options: dict[str, Any] = {}
+    if getattr(args, "full_page", False):
+        options["only_main_content"] = False
+    if getattr(args, "include_tag", None):
+        options["include_tags"] = args.include_tag
+    if getattr(args, "exclude_tag", None):
+        options["exclude_tags"] = args.exclude_tag
+    return options
+
+
+def _site_crawl_exit(result: Any) -> int:
+    """0 when the crawl's version is final and it completed; 4 while it runs; 1 when it failed or was cancelled."""
+    if not result.get("done"):
+        return EXIT_PENDING
+    return EXIT_OK if str(result.get("status") or "").lower() == "completed" else EXIT_FAILED
+
+
 def _job_exit(job: Any) -> int:
     status = str(job.get("status") or "").upper()
     if status == "COMPLETED":
@@ -178,11 +197,33 @@ def _cmd_scrape(client: Scrawl, args: argparse.Namespace) -> int:
     formats = args.format or (["json"] if (args.schema or args.instruction) else ["markdown"])
     engine = _engine_options(args)
     result = client.scrape(args.url, formats=formats, schema=_schema(args.schema), instruction=args.instruction,
-                           profile=args.profile, wait_seconds=min(args.wait, 60), **engine)
+                           profile=args.profile, wait_seconds=min(args.wait, 60), **engine, **_content_options(args))
+    return _scrape_report(client, result, args, formats, engine.get("engine"))
+
+
+def _cmd_local_fetch(client: Scrawl, args: argparse.Namespace) -> int:
+    """Fetch the page from this machine (or send ``--file``), then have Scrawl render it; Scrawl fetches nothing."""
+    formats = args.format or (["json"] if (args.schema or args.instruction) else ["markdown"])
+    options = dict(formats=formats, schema=_schema(args.schema), instruction=args.instruction, profile=args.profile,
+                   wait_seconds=min(args.wait, 60), **_content_options(args))
+    if args.file:
+        result = client.scrape_local(args.url, Path(args.file).read_bytes(), http_status=args.status,
+                                     content_type=args.content_type or "", **options)
+    else:
+        if args.content_type is not None or args.status != 200:
+            raise ValueError("--content-type and --status describe a --file; without one the page is fetched")
+        limits = {key: value for key, value in (("max_redirects", args.max_redirects), ("max_bytes", args.max_bytes))
+                  if value is not None}
+        result = client.local_fetch(args.url, respect_robots=not args.ignore_robots, **limits, **options)
+    return _scrape_report(client, result, args, formats, None)
+
+
+def _scrape_report(client: Scrawl, result: Any, args: argparse.Namespace, formats: list[str],
+                   engine: str | None) -> int:
     if result.status == "pending" and args.wait > 60:
-        result = client.wait_for_scrape(result.job_id, timeout=args.wait - 60, engine=engine.get("engine"))
+        result = client.wait_for_scrape(result.job_id, timeout=args.wait - 60, engine=engine)
     if result.status == "pending":
-        follow = f"scrawl result {result.job_id}" + (" --browser" if args.browser else "")
+        follow = f"scrawl result {result.job_id}" + (" --browser" if engine == "browser" else "")
         print(_safe(f"pending: job {result.job_id} ({follow})"), file=sys.stderr)
         return EXIT_PENDING
     if not args.json and result.get("outcome") is not None:
@@ -224,7 +265,8 @@ def _cmd_map(client: Scrawl, args: argparse.Namespace) -> int:
 
 def _cmd_batch(client: Scrawl, args: argparse.Namespace) -> int:
     started = client.batch_scrape(args.urls, formats=args.format or ["markdown"], schema=_schema(args.schema),
-                                  instruction=args.instruction, profile=args.profile, **_engine_options(args))
+                                  instruction=args.instruction, profile=args.profile, **_engine_options(args),
+                                  **_content_options(args))
     result = client.wait_for_batch(started.batch_id, timeout=args.wait) if args.wait else started
     return _batch_report(result, browser=args.browser)
 
@@ -268,6 +310,24 @@ def _cmd_crawl(client: Scrawl, args: argparse.Namespace) -> int:
     launch["job"] = job
     _emit(launch, as_json=True)
     return _job_exit(job)
+
+
+def _cmd_site_crawl(client: Scrawl, args: argparse.Namespace) -> int:
+    started = client.crawl_site(args.url, max_pages=args.max_pages, max_depth=args.max_depth,
+                                resume_from=args.resume_from, **_engine_options(args), **_content_options(args))
+    if not args.wait:
+        _emit(started, as_json=True)
+        return EXIT_OK
+    result = client.wait_for_site_crawl(started.crawl_id, timeout=args.wait)
+    _emit(result, as_json=True)
+    return _site_crawl_exit(result)
+
+
+def _cmd_site_crawl_status(client: Scrawl, args: argparse.Namespace) -> int:
+    result = client.site_crawl_status(args.crawl_id, wait_seconds=min(args.wait, 60), limit=args.limit,
+                                      cursor=args.cursor)
+    _emit(result, as_json=True)
+    return _site_crawl_exit(result)
 
 
 def _cmd_job(client: Scrawl, args: argparse.Namespace) -> int:
@@ -444,6 +504,11 @@ def _cmd_assets_quote(client: Scrawl, args: argparse.Namespace) -> int:
 
 
 def _cmd_assets_result(client: Scrawl, args: argparse.Namespace) -> int:
+    if args.text:
+        if args.out or args.view != "assets" or args.wait:
+            raise ValueError("--text prints one document's text: it cannot be combined with --out, --view or --wait")
+        print(_safe(client.download_asset_text(args.job_id, args.text).decode("utf-8", errors="replace")))
+        return EXIT_OK
     if args.out and args.view != "assets":
         raise ValueError("--out downloads stored assets: it cannot be combined with --view skipped")
     result = client.wait_for_assets(args.job_id, timeout=args.wait) if args.wait else None
@@ -522,6 +587,17 @@ def _cmd_datasets_extract(client: Scrawl, args: argparse.Namespace) -> int:
     launch["job"] = job
     _emit(launch, as_json=True)
     return _job_exit(job)
+
+
+def _cmd_datasets_curate(client: Scrawl, args: argparse.Namespace) -> int:
+    _emit(client.curate_dataset(args.dataset_id, args.operation, version_id=args.version, record_ids=args.record_id,
+                                field=args.field, **_content_options(args)), as_json=True)
+    return EXIT_OK
+
+
+def _cmd_datasets_curations(client: Scrawl, args: argparse.Namespace) -> int:
+    _emit(client.list_curations(args.dataset_id, limit=args.limit, cursor=args.cursor), as_json=True)
+    return EXIT_OK
 
 
 def _cmd_datasets_quarantine(client: Scrawl, args: argparse.Namespace) -> int:
@@ -859,6 +935,14 @@ def build_parser() -> argparse.ArgumentParser:
         p.add_argument("--wait-for", dest="wait_for", type=int, metavar="MS",
                        help="with --browser: wait this many more milliseconds after the page settles (0-10000)")
 
+    def content_options(p: argparse.ArgumentParser) -> None:
+        p.add_argument("--full-page", action="store_true",
+                       help="the whole page body in the markdown, not only its main content")
+        p.add_argument("--include-tag", action="append", metavar="SELECTOR",
+                       help="keep only what this CSS selector matches (repeatable, at most 20)")
+        p.add_argument("--exclude-tag", action="append", metavar="SELECTOR",
+                       help="drop what this CSS selector matches first (repeatable, at most 20)")
+
     def ai_options(p: argparse.ArgumentParser) -> None:
         p.add_argument("--schema", help="JSON Schema file for the json format (.json, at most 64 KiB)")
         p.add_argument("--instruction", help="what to extract (json format)")
@@ -869,8 +953,24 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--format", action="append", choices=FORMATS)
     p.add_argument("--wait", type=int, default=60, help="seconds to wait for the result (default 60)")
     engine_options(p)
+    content_options(p)
     ai_options(p)
     p.set_defaults(handler=_cmd_scrape)
+
+    p = sub.add_parser("local-fetch", help="fetch a page from this machine, then have Scrawl render it")
+    p.add_argument("url", help="the page's URL (with --file: the URL the file came from)")
+    p.add_argument("--file", help="send this file as the page instead of fetching it (nothing is fetched)")
+    p.add_argument("--content-type", help="with --file: the file's content type, e.g. text/html")
+    p.add_argument("--status", type=int, default=200, help="with --file: the HTTP status it was served with")
+    p.add_argument("--ignore-robots", action="store_true",
+                   help="fetch even where robots.txt disallows it (your responsibility)")
+    p.add_argument("--max-redirects", type=int, help="redirects to follow when fetching (default 5)")
+    p.add_argument("--max-bytes", type=int, help="the most bytes to read when fetching")
+    p.add_argument("--format", action="append", choices=FORMATS)
+    p.add_argument("--wait", type=int, default=60, help="seconds to wait for the result (default 60)")
+    content_options(p)
+    ai_options(p)
+    p.set_defaults(handler=_cmd_local_fetch)
 
     p = sub.add_parser("result", help="a scrape job's result")
     p.add_argument("job_id")
@@ -891,6 +991,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--format", action="append", choices=FORMATS)
     p.add_argument("--wait", type=int, default=300, help="seconds to wait for every item (0: return at once)")
     engine_options(p)
+    content_options(p)
     ai_options(p)
     p.set_defaults(handler=_cmd_batch)
 
@@ -920,6 +1021,24 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--max-seconds", type=int)
     p.add_argument("--wait", type=int, default=0, help="seconds to wait for the crawl job to finish (0: return at once)")
     p.set_defaults(handler=_cmd_crawl)
+
+    p = sub.add_parser("site-crawl", help="crawl a site from a URL into a new dataset version (each page a scrape)")
+    p.add_argument("url")
+    p.add_argument("--max-pages", type=int, help="the most pages (and so the most scrapes charged)")
+    p.add_argument("--max-depth", type=int, help="the most links away from the start page")
+    p.add_argument("--resume-from", metavar="CRAWL_ID", help="continue an ended crawl of the same URL")
+    p.add_argument("--wait", type=int, default=0,
+                   help="seconds to wait for the dataset version to be final (0: return at once)")
+    engine_options(p)
+    content_options(p)
+    p.set_defaults(handler=_cmd_site_crawl)
+
+    p = sub.add_parser("site-crawl-status", help="a site crawl's status, counts and pages")
+    p.add_argument("crawl_id")
+    p.add_argument("--wait", type=int, default=0, help="seconds the server waits for it to finish (max 60)")
+    p.add_argument("--limit", type=int, help="pages per page of the listing")
+    p.add_argument("--cursor")
+    p.set_defaults(handler=_cmd_site_crawl_status)
 
     p = sub.add_parser("job", help="a job's state")
     p.add_argument("job_id")
@@ -991,6 +1110,19 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--limit", type=int)
     p.add_argument("--cursor")
     p.set_defaults(handler=_cmd_datasets_query)
+    p = datasets.add_parser("curate", help="a new version without a crawl: remove, dedupe or re-extract")
+    p.add_argument("dataset_id")
+    p.add_argument("operation", choices=("remove", "dedupe", "reextract"))
+    p.add_argument("--version", help="the version to curate (default: the active one)")
+    p.add_argument("--record-id", action="append", help="with remove: a record to remove (repeatable)")
+    p.add_argument("--field", help="with dedupe: the field to compare (default content_hash)")
+    content_options(p)
+    p.set_defaults(handler=_cmd_datasets_curate)
+    p = datasets.add_parser("curations", help="a dataset's curations, newest first")
+    p.add_argument("dataset_id")
+    p.add_argument("--limit", type=int)
+    p.add_argument("--cursor")
+    p.set_defaults(handler=_cmd_datasets_curations)
     p = datasets.add_parser("extract", help="extract a structured version with your AI provider (a job)")
     p.add_argument("dataset_id")
     ai_options(p)
@@ -1119,6 +1251,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--wait", type=int, default=0)
     p.add_argument("--view", choices=["assets", "skipped"], default="assets")
     p.add_argument("--out", help="write every stored asset, sha256-verified, under this directory")
+    p.add_argument("--text", metavar="ASSET_ID",
+                   help="print one stored document's text (its Markdown; untrusted content) instead")
     p.set_defaults(handler=_cmd_assets_result)
 
     p = sub.add_parser("balance", help="your credit balance")

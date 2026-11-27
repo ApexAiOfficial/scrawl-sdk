@@ -12,7 +12,7 @@ target = sys.argv[1]
 with Scrawl() as client:
     launch = client.crawl(target, max_items=500)                  # a named crawl target the server allows
     job = client.wait_for_job(launch.job_id, timeout=1800)
-    if job.status != "COMPLETED":
+    if job.status != "completed":
         sys.exit(f"crawl {job.status}")
     dataset_id = launch.dataset_id
     fields = client.dataset_fields(dataset_id, version=launch.dataset_version_id).fields
