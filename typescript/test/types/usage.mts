@@ -2,7 +2,7 @@
 // errors, so the declarations cannot silently loosen.
 import {
   BadRequestError, CONTRACT_DIGEST, ConfigurationError, ErrorCode, NotFoundError, RateLimitError, Scrawl, ScrawlError,
-  type AssetClass, type AssetJob, type AssetQuote, type AssetResult, type QueryFilter, type ScrapeEngine,
+  type AssetClass, type AssetJob, type AssetQuote, type AssetResult, type JobStatus, type QueryFilter, type ScrapeEngine,
   type ProxyHealth, type ProxyPool, type ScrapeOutcome, type ScrapeResult, type SkippedAsset,
 } from "@apexaiofficial/scrawl";
 
@@ -23,6 +23,16 @@ export async function usage(): Promise<void> {
   const settle: string | null | undefined = rendered.browser?.settle;
   const finalUrl: string | null | undefined = rendered.final_url;
   console.log(engine, settle, finalUrl, outcome, blockReason, retryAfter, hint, CONTRACT_DIGEST);
+  const trimmed = await client.scrape("https://e.example", { onlyMainContent: false, includeTags: ["article", ".post"],
+    excludeTags: ["nav"] });
+  console.log(trimmed.markdown);
+  await client.batchScrape(["https://e.example"], { onlyMainContent: true, includeTags: null, excludeTags: ["aside"] });
+  // @ts-expect-error: onlyMainContent is a boolean
+  await client.scrape("https://e.example", { onlyMainContent: "no" });
+  // @ts-expect-error: the tag options are lists of selectors
+  await client.scrape("https://e.example", { includeTags: "article" });
+  // @ts-expect-error: the camelCase names are the SDK's; the snake_case ones are the wire format
+  await client.scrape("https://e.example", { include_tags: ["article"] });
   // @ts-expect-error: the engine is "static" or "browser"
   await client.scrape("https://e.example", { engine: "chrome" });
   const map = await client.map("https://e.example", { limit: 10, engine: "browser" });
@@ -38,10 +48,23 @@ export async function usage(): Promise<void> {
   console.log(rows.records[0]?.record_id, rows.records[0]?.provenance);
   const job = await client.getJob("j");
   const firstArg: string | undefined = job.args[0];
+  // A status is passed through as the server sent it: 0.1.4 code comparing with the upper case still compiles, and
+  // the lower case (the API's spelling today) is accepted everywhere a JobStatus is.
+  const lowerCase: JobStatus = "completed";
+  const upperCase: JobStatus = "COMPLETED";                            // deprecated, still a JobStatus
+  const jobStatus: string = job.status;
+  const crawlStatus: JobStatus = (await client.crawl("target")).status;
+  const cancelled: boolean = (await client.cancelJob("j")).status === "cancelled";
+  const versionDone = (await client.getDataset("d")).versions[0]?.status === "COMPLETED";
+  const extracting = (await client.extractDataset("d", { instruction: "titles" })).status === "pending";
+  const siteDone: boolean = (await client.siteCrawlStatus("c")).status === "completed";
+  await client.listJobs({ status: "COMPLETED" });                     // either case filters
+  await client.listJobs({ status: "running" });
+  console.log(lowerCase, upperCase, jobStatus, crawlStatus, cancelled, versionDone, extracting, siteDone);
   const jobWarnings: string[] = job.warnings;
   const launch = await client.crawl("target", { exportFormat: "csv" });
   const finished = await client.waitForJob(launch.job_id, { timeoutMs: 1000 });
-  console.log(finished.status === "COMPLETED", launch.dataset_version_id);
+  console.log(finished.status === "COMPLETED", finished.status === "completed", launch.dataset_version_id);
   for await (const version of client.paginate(client.listVersions, "d", { limit: 2 })) console.log(version);
   const versions = await client.listVersions("d");
   console.log(versions.versions.map((v) => v.version_id));
@@ -105,7 +128,7 @@ export async function usage(): Promise<void> {
   // @ts-expect-error - export formats are an enum
   await client.crawl("t", { exportFormat: "jsonlines-gz" });
   // @ts-expect-error - not an asset class
-  await client.extractAssets("https://e.example/page", { classes: ["archives"] });
+  await client.extractAssets("https://e.example/page", { classes: ["fonts"] });
   // @ts-expect-error - a quote starts nothing, so it takes no idempotency key
   await client.quoteAssets("https://e.example/page", { idempotencyKey: "k" });
   // @ts-expect-error - views are an enum
@@ -114,5 +137,14 @@ export async function usage(): Promise<void> {
   const code: number | null = page.http_status;
   // @ts-expect-error - not a known code constant
   const unknownCode: ErrorCode = "made_up";
-  console.log(code, unknownCode);
+  // ADR C-7: a pending or paged result names its next call (method, path, query or body) and when to poll.
+  const next = page.next_call;
+  if (next) {
+    const route: string = `${next.method} ${next.path}`;
+    const wait: number | null | undefined = page.poll_after_seconds;
+    console.log(route, wait, next.query, page.docs_url, (page.next_actions ?? []).map((action) => action.why));
+  }
+  // @ts-expect-error - poll_after_seconds is a number
+  const later: string | null | undefined = page.poll_after_seconds;
+  console.log(code, unknownCode, later);
 }

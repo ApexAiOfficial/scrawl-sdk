@@ -119,6 +119,14 @@
     {
       "auth": "api_key",
       "method": "GET",
+      "path": "/v1/assets/{job_id}/files/{asset_id}/text",
+      "scopes_any_of": [
+        "artifacts:read"
+      ]
+    },
+    {
+      "auth": "api_key",
+      "method": "GET",
       "path": "/v1/commands",
       "scopes_any_of": [
         "commands:read"
@@ -162,6 +170,22 @@
       "path": "/v1/datasets/{dataset_id}/active-version",
       "scopes_any_of": [
         "scrape:write"
+      ]
+    },
+    {
+      "auth": "api_key",
+      "method": "POST",
+      "path": "/v1/datasets/{dataset_id}/curate",
+      "scopes_any_of": [
+        "scrape:write"
+      ]
+    },
+    {
+      "auth": "api_key",
+      "method": "GET",
+      "path": "/v1/datasets/{dataset_id}/curations",
+      "scopes_any_of": [
+        "artifacts:read"
       ]
     },
     {
@@ -446,6 +470,14 @@
     {
       "auth": "api_key",
       "method": "POST",
+      "path": "/v1/scrape/local",
+      "scopes_any_of": [
+        "scrape:write"
+      ]
+    },
+    {
+      "auth": "api_key",
+      "method": "POST",
       "path": "/v1/scrape/parse",
       "scopes_any_of": [
         "scrape:write"
@@ -498,6 +530,22 @@
       "scopes_any_of": [
         "artifacts:read"
       ]
+    },
+    {
+      "auth": "api_key",
+      "method": "POST",
+      "path": "/v1/site-crawls",
+      "scopes_any_of": [
+        "scrape:write"
+      ]
+    },
+    {
+      "auth": "api_key",
+      "method": "GET",
+      "path": "/v1/site-crawls/{crawl_id}",
+      "scopes_any_of": [
+        "jobs:read"
+      ]
     }
   ],
   "default_key_scopes": [
@@ -535,6 +583,12 @@
         ]
       },
       {
+        "name": "apex_scrapy_asset_text",
+        "scopes_any_of": [
+          "artifacts:read"
+        ]
+      },
+      {
         "name": "apex_scrapy_batch_scrape",
         "scopes_any_of": [
           "scrape:write"
@@ -560,9 +614,21 @@
         ]
       },
       {
+        "name": "apex_scrapy_crawl_site",
+        "scopes_any_of": [
+          "scrape:write"
+        ]
+      },
+      {
         "name": "apex_scrapy_credit_balance",
         "scopes_any_of": [
           "credits:read"
+        ]
+      },
+      {
+        "name": "apex_scrapy_curate_dataset",
+        "scopes_any_of": [
+          "scrape:write"
         ]
       },
       {
@@ -612,6 +678,12 @@
         "scopes_any_of": []
       },
       {
+        "name": "apex_scrapy_list_dataset_curations",
+        "scopes_any_of": [
+          "artifacts:read"
+        ]
+      },
+      {
         "name": "apex_scrapy_list_dataset_fields",
         "scopes_any_of": [
           "artifacts:read"
@@ -643,6 +715,12 @@
       },
       {
         "name": "apex_scrapy_map_url",
+        "scopes_any_of": [
+          "scrape:write"
+        ]
+      },
+      {
+        "name": "apex_scrapy_parse_content",
         "scopes_any_of": [
           "scrape:write"
         ]
@@ -687,6 +765,12 @@
         "name": "apex_scrapy_set_record_quarantine",
         "scopes_any_of": [
           "scrape:write"
+        ]
+      },
+      {
+        "name": "apex_scrapy_site_crawl_status",
+        "scopes_any_of": [
+          "jobs:read"
         ]
       },
       {

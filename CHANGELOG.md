@@ -5,6 +5,53 @@ versions follow [Semantic Versioning](https://semver.org/) (before 1.0, a minor 
 The Python package (`scrawl-sdk`) and the npm package (`@apexaiofficial/scrawl`) are released separately; each
 entry says which one it covers.
 
+## Python 0.1.5 and TypeScript 0.1.5 (2026-11-27)
+
+Built against contract digest
+`sha256:82f0f7c18a3c44d38ff7c74594fa73af898dfedde04933921f3dec7b6cdfdde5`.
+
+### Added
+- Site crawls: `crawl_site` / `crawlSite` crawls a site from a URL into a new dataset version. It stays on the URL's
+  host, goes breadth first within `max_pages` and `max_depth`, and reads robots.txt first (a page it disallows is
+  never fetched). Each page is a scrape and is charged as one, so `max_pages` is the most a crawl can cost.
+  `site_crawl_status` / `siteCrawlStatus` and `wait_for_site_crawl` / `waitForSiteCrawl` follow it, `cancel_job`
+  stops it, and `resume_from` continues an ended crawl. CLI: `scrawl site-crawl`, `scrawl site-crawl-status`.
+- Curation: `curate_dataset` / `curateDataset` makes a new version of a dataset without a crawl, so nothing is
+  fetched and nothing is charged. It can `remove` records, `dedupe` by a field, or `reextract` each page's markdown
+  with new content options. `list_curations` / `listCurations` lists a dataset's curations. CLI: `scrawl datasets
+  curate`, `scrawl datasets curations`.
+- Local fetch: `local_fetch` / `localFetch` fetches a page from your own machine, then has Scrawl render it, so
+  Scrawl itself fetches nothing.
+  - robots.txt is honoured by default, and redirects and size are bounded.
+  - The robots.txt request gets the page's redirect checks, and at most 500 KiB of it is read.
+  - Every request is bounded by the client's timeout. A site that cannot be reached is a `ScrawlError`
+    (`fetch_failed` or `fetch_timeout`). An empty page is refused before anything is sent (`empty_body`).
+  - Link-local and cloud-metadata destinations are refused by default (`link_local_refused`): 169.254.0.0/16,
+    fe80::/10, fd00:ec2::254, `metadata.google.internal` and `metadata`. Each resolved address is checked before
+    connecting, on every request and redirect hop. The opt-in is `allow_link_local` / `allowLinkLocal` /
+    `--allow-link-local`. Private ranges and loopback stay allowed.
+  - The fetch never uses the client that carries your Scrawl key.
+  - `scrape_local` / `scrapeLocal` sends a page you already have.
+  - The result says `origin: client_fetched` and `url_verified: false`: the URL, status and type are your claims.
+  - CLI: `scrawl local-fetch` (`--file` sends a saved page).
+- Content options on `scrape`, `batch_scrape`, `crawl_site` and `reextract`: `only_main_content` /
+  `onlyMainContent`, `include_tags` / `includeTags` and `exclude_tags` / `excludeTags`. CLI: `--full-page`,
+  `--include-tag`, `--exclude-tag`. They are sent only when set, and the server validates the selectors.
+- A stored document's text: `download_asset_text` / `downloadAssetText` returns its Markdown. CLI: `scrawl
+  assets-result JOB --text ASSET_ID`.
+- TypeScript: the next-step fields (`next_call`, `poll_after_seconds`, `docs_url`, `next_actions`) on job,
+  extraction and crawl results, and types for site crawls and curations.
+
+### Changed
+- A job's status: current servers send the lower case (`pending`, `running`, `completed`, `failed`, `cancelled`,
+  `orphaned`); servers before them sent the upper case. The SDKs pass it through as sent, as 0.1.4 did, and their
+  waits and the CLI's exit codes read either spelling. The TypeScript `JobStatus` type now has both spellings; the
+  upper-case members are deprecated, so compare with the lower case. A later minor release may drop the upper case.
+  Nothing that compiled or ran with 0.1.4 changes.
+
+### Fixed
+- `scrawl assets --class` and the TypeScript `AssetClass` include `archives`, the opt-in class the API offers.
+
 ## Python 0.1.4 and TypeScript 0.1.4 (2026-11-16)
 
 Built against contract digest

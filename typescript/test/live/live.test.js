@@ -194,6 +194,40 @@ test("batch", covers("POST /v1/scrape/batch", "GET /v1/scrape/batch/{batch_id}")
   assert.equal(done.outcomes.ok, 1);
 });
 
+test("local fetch renders a page this machine fetched", covers("POST /v1/scrape/local"), async (t) => {
+  const values = need(t, "SCRAWL_LIVE_TARGET_URL");
+  if (!values) return;
+  let result = await client.localFetch(values[0], { waitSeconds: 60 });
+  if (result.status === "pending") result = await client.waitForScrape(result.job_id);
+  assert.equal(result.status, "completed");
+  assert.ok(result.markdown);
+  assert.equal(result.origin, "client_fetched");
+  assert.equal(result.url_verified, false);
+});
+
+test("site crawl into a dataset version", covers("POST /v1/site-crawls", "GET /v1/site-crawls/{crawl_id}"),
+  async (t) => {
+    const values = need(t, "SCRAWL_LIVE_TARGET_URL");
+    if (!values) return;
+    const started = await client.crawlSite(values[0], { maxPages: 2, maxDepth: 1 });
+    assert.ok(started.crawl_id && started.dataset_id);
+    const done = await client.waitForSiteCrawl(started.crawl_id, { timeoutMs: 900_000 });
+    assert.equal(done.done, true);
+    assert.ok(["completed", "failed", "cancelled"].includes(done.status), done.status);
+    assert.ok(done.counts.launched <= 2 && Array.isArray(done.pages));
+  });
+
+test("curate a dataset without a crawl", covers("POST /v1/datasets/{dataset_id}/curate",
+  "GET /v1/datasets/{dataset_id}/curations"), async (t) => {
+  if (!need(t, "SCRAWL_LIVE_CRAWL_TARGET")) return;
+  const { datasetId } = await dataset();
+  const curation = await client.curateDataset(datasetId, "dedupe");
+  assert.equal(curation.operation, "dedupe");
+  assert.ok(curation.records_out <= curation.records_in);
+  const listed = (await client.listCurations(datasetId, { limit: 5 })).curations;
+  assert.ok(listed.some((item) => item.curation_id === curation.curation_id));
+});
+
 test("cancel", covers("POST /v1/jobs/{job_id}/cancel"), async (t) => {
   const values = need(t, "SCRAWL_LIVE_TARGET_URL");
   if (!values) return;
@@ -273,7 +307,8 @@ test("AI over datasets: extraction and cited answers", covers("POST /v1/datasets
 });
 
 test("assets: quote, extract, list, download verified", covers("POST /v1/assets/quote", "POST /v1/assets",
-  "GET /v1/assets/{job_id}", "GET /v1/assets/{job_id}/files/{asset_id}"), async (t) => {
+  "GET /v1/assets/{job_id}", "GET /v1/assets/{job_id}/files/{asset_id}",
+  "GET /v1/assets/{job_id}/files/{asset_id}/text"), async (t) => {
   const values = need(t, "SCRAWL_LIVE_TARGET_URL", "SCRAWL_LIVE_ASSETS");
   if (!values) return;
   const quote = await client.quoteAssets(values[0], { classes: ["images", "documents"], maxItems: 5 });
@@ -283,6 +318,11 @@ test("assets: quote, extract, list, download verified", covers("POST /v1/assets/
   for await (const asset of client.paginate(client.getAssets, job.job_id)) {
     const bytes = await client.downloadAsset(job.job_id, asset.asset_id);
     assert.equal(createHash("sha256").update(Buffer.from(bytes)).digest("hex"), asset.sha256);
+    break;
+  }
+  for await (const asset of client.paginate(client.getAssets, job.job_id)) {
+    if (!asset.text_url) continue;                     // a document with text: its Markdown
+    assert.equal(typeof (await client.downloadAssetText(job.job_id, asset.asset_id)), "string");
     break;
   }
 });

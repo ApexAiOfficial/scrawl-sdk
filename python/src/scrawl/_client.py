@@ -13,6 +13,7 @@ loopback address (``http://127.0.0.1:8088``). There is no built-in remote defaul
 from __future__ import annotations
 
 import asyncio
+import base64
 import os
 import random
 import re
@@ -37,14 +38,18 @@ from ._errors import (
     error_for,
     never_retry,
 )
+from . import _local_fetch as _local
 from ._objects import ScrawlObject, wrap
 from ._version import __version__
 
 DEFAULT_BASE_URL = "http://127.0.0.1:8088"      # loopback; set SCRAWL_BASE_URL to your Scrawl endpoint
 RETRY_STATUSES = frozenset({429, 502, 503, 504})
-_LIST_KEYS = ("datasets", "versions", "jobs", "entries", "records", "results", "items", "assets", "skipped")
+_LIST_KEYS = ("datasets", "versions", "jobs", "entries", "records", "results", "items", "assets", "skipped",
+              "pages", "curations")
 _ASSETS_ACTIVE = frozenset({"pending", "running"})
 _JOBS_ACTIVE = frozenset({"PENDING", "RUNNING"})
+#: A job's status reaches you as the server sent it: the lower case (the API's ``JobStatus``) from current servers,
+#: the upper case from older ones. The SDK's own logic (the waits, the CLI's exit codes) reads either spelling.
 #: What an API key may contain: visible ASCII, the characters an HTTP header value can carry as a token.
 _KEY_CHARS = re.compile(r"[\x21-\x7e]+")
 
@@ -81,6 +86,13 @@ def _key(value: str | None) -> str:
 def _engine(engine: str | None, wait_for_ms: int | None) -> dict[str, Any]:
     """The engine options for a body, only when set (a static request's body is unchanged)."""
     return _clean({"engine": engine, "wait_for_ms": wait_for_ms})
+
+
+def _content(only_main_content: bool | None, include_tags: list[str] | None,
+             exclude_tags: list[str] | None) -> dict[str, Any]:
+    """The content-selection options for a body, only when set (the server validates the selectors)."""
+    return _clean({"only_main_content": only_main_content, "include_tags": include_tags,
+                   "exclude_tags": exclude_tags})
 
 
 def _check_engine(request: _Request, result: Any) -> Any:
@@ -123,7 +135,8 @@ class _Endpoints:
     def scrape(self, url: str, *, formats: list[str] | None = None, schema: dict | None = None,
                instruction: str | None = None, profile: str | None = None, wait_seconds: int = 30,
                engine: str | None = None, wait_for_ms: int | None = None,
-               idempotency_key: str | None = None) -> Any:
+               only_main_content: bool | None = None, include_tags: list[str] | None = None,
+               exclude_tags: list[str] | None = None, idempotency_key: str | None = None) -> Any:
         """Scrape one URL. ``status`` is ``completed``, ``pending`` (poll ``scrape_result``) or ``failed``.
 
         ``"json"`` in ``formats`` extracts with your own AI provider (``schema``, ``instruction``, ``profile``) and
@@ -136,12 +149,34 @@ class _Endpoints:
         A settled result's ``outcome`` distinguishes success, a target block/error, cancellation and a Scrawl
         pipeline failure. Refunds cover only Scrawl's own failures (a job that never started, or ``pipeline_failed``);
         a target block or error, a failure in your proxy and a cancellation after work starts are charged.
+
+        The markdown is the page's main content by default; ``only_main_content=False`` keeps the whole body.
+        ``include_tags`` keeps only what these CSS selectors match (in page order) instead of the main content, and
+        ``exclude_tags`` drops what its selectors match first (each at most 20 selectors of 200 characters). They
+        are sent only when set; the server validates the selectors and answers 422 ``invalid_request``.
         """
         body = _clean({"url": url, "formats": formats or ["markdown"], "schema": schema,
                        "instruction": instruction, "profile": profile, "wait_seconds": self._wait(wait_seconds),
-                       **_engine(engine, wait_for_ms)})
+                       **_engine(engine, wait_for_ms), **_content(only_main_content, include_tags, exclude_tags)})
         return self._call(_Request("POST", "/v1/scrape", json=body, idempotency_key=_key(idempotency_key),
                                    expect_engine=engine))
+
+    def scrape_local(self, url: str, body: bytes, *, http_status: int = 200, content_type: str = "",
+                     final_url: str | None = None, formats: list[str] | None = None, schema: dict | None = None,
+                     instruction: str | None = None, profile: str | None = None, wait_seconds: int = 30,
+                     only_main_content: bool | None = None, include_tags: list[str] | None = None,
+                     exclude_tags: list[str] | None = None, idempotency_key: str | None = None) -> Any:
+        """Have Scrawl render a page or document you already fetched (``POST /v1/scrape/local``); it fetches nothing.
+
+        The result is a scrape's, with ``origin`` ``client_fetched`` and ``url_verified`` false: URL, status and type
+        are your claims. ``local_fetch`` fetches the page for you first, honouring robots.txt.
+        """
+        payload = _clean({"url": url, "body_base64": base64.b64encode(body).decode("ascii"),
+                          "http_status": http_status, "content_type": content_type or None, "final_url": final_url,
+                          "formats": formats or ["markdown"], "schema": schema, "instruction": instruction,
+                          "profile": profile, "wait_seconds": self._wait(wait_seconds),
+                          **_content(only_main_content, include_tags, exclude_tags)})
+        return self._call(_Request("POST", "/v1/scrape/local", json=payload, idempotency_key=_key(idempotency_key)))
 
     def scrape_result(self, job_id: str, *, wait_seconds: int = 0, formats: list[str] | None = None,
                       engine: str | None = None) -> Any:
@@ -166,15 +201,19 @@ class _Endpoints:
 
     def batch_scrape(self, urls: list[str], *, formats: list[str] | None = None, schema: dict | None = None,
                      instruction: str | None = None, profile: str | None = None, engine: str | None = None,
-                     wait_for_ms: int | None = None, idempotency_key: str | None = None) -> Any:
+                     wait_for_ms: int | None = None, only_main_content: bool | None = None,
+                     include_tags: list[str] | None = None, exclude_tags: list[str] | None = None,
+                     idempotency_key: str | None = None) -> Any:
         """Start a batch of up to 20 URLs; poll ``batch_status`` (or use ``wait_for_batch``).
 
         ``"json"`` in ``formats`` needs the ``ai:use`` scope as well as ``scrape:write``, as for ``scrape``.
         ``engine="browser"`` renders every URL in a browser first, one at a time. A settled batch reports its
-        per-outcome counts in ``outcomes``.
+        per-outcome counts in ``outcomes``. ``only_main_content``, ``include_tags`` and ``exclude_tags`` apply to
+        every URL's markdown, as for ``scrape``.
         """
         body = _clean({"urls": list(urls), "formats": formats or ["markdown"], "schema": schema,
-                       "instruction": instruction, "profile": profile, **_engine(engine, wait_for_ms)})
+                       "instruction": instruction, "profile": profile, **_engine(engine, wait_for_ms),
+                       **_content(only_main_content, include_tags, exclude_tags)})
         return self._call(_Request("POST", "/v1/scrape/batch", json=body, idempotency_key=_key(idempotency_key)))
 
     def batch_status(self, batch_id: str, *, wait_seconds: int = 0) -> Any:
@@ -297,6 +336,26 @@ class _Endpoints:
                        "max_seconds": max_seconds})
         return self._call(_Request("POST", "/v1/crawls", json=body, idempotency_key=_key(idempotency_key)))
 
+    def crawl_site(self, url: str, *, max_pages: int | None = None, max_depth: int | None = None,
+                   engine: str | None = None, wait_for_ms: int | None = None, only_main_content: bool | None = None,
+                   include_tags: list[str] | None = None, exclude_tags: list[str] | None = None,
+                   resume_from: str | None = None, idempotency_key: str | None = None) -> Any:
+        """Crawl a site from URL into a new dataset version: its host only, breadth first, within the bounds.
+
+        robots.txt is read first (a page it disallows is never fetched). Each page is a scrape, charged as one, so
+        ``max_pages`` is the most it can cost. Follow it with ``site_crawl_status`` or ``wait_for_site_crawl``;
+        cancel it with ``cancel_job(crawl_id)``. ``resume_from`` continues an ended crawl of the same URL.
+        """
+        body = _clean({"url": url, "max_pages": max_pages, "max_depth": max_depth, **_engine(engine, wait_for_ms),
+                       **_content(only_main_content, include_tags, exclude_tags), "resume_from": resume_from})
+        return self._call(_Request("POST", "/v1/site-crawls", json=body, idempotency_key=_key(idempotency_key)))
+
+    def site_crawl_status(self, crawl_id: str, *, wait_seconds: int = 0, limit: int | None = None,
+                          cursor: str | None = None) -> Any:
+        """A site crawl's status, counts, charge, dataset version and one page of its pages (``next_cursor``)."""
+        params = _clean({"wait_seconds": self._wait(wait_seconds) or None, "limit": limit, "cursor": cursor})
+        return self._call(_Request("GET", f"/v1/site-crawls/{_seg(crawl_id)}", params=params))
+
     def get_job(self, job_id: str, *, wait_seconds: int = 0) -> Any:
         """A job's state; ``wait_seconds`` (≤60) returns as soon as it finishes."""
         params = _clean({"wait_seconds": self._wait(wait_seconds) or None})
@@ -350,6 +409,11 @@ class _Endpoints:
         """One stored asset's bytes: untrusted content, compare its ``sha256`` before you use it."""
         return self._call(_Request("GET", f"/v1/assets/{_seg(job_id)}/files/{_seg(asset_id)}", raw=True))
 
+    def download_asset_text(self, job_id: str, asset_id: str) -> Any:
+        """A stored document's text, as the UTF-8 bytes of its Markdown (``.decode("utf-8")``): the ``text_url`` of
+        an asset that has one. Untrusted external content, like the document itself; 404 when it has no text."""
+        return self._call(_Request("GET", f"/v1/assets/{_seg(job_id)}/files/{_seg(asset_id)}/text", raw=True))
+
     # -- datasets ---------------------------------------------------------------------------------
     def list_datasets(self, *, limit: int | None = None, cursor: str | None = None) -> Any:
         """Your datasets (``next_cursor`` pages)."""
@@ -395,6 +459,21 @@ class _Endpoints:
                        "max_records": max_records})
         return self._call(_Request("POST", f"/v1/datasets/{_seg(dataset_id)}/extract", json=body,
                                    idempotency_key=_key(idempotency_key)))
+
+    def curate_dataset(self, dataset_id: str, operation: str, *, version_id: str | None = None,
+                       record_ids: list[str] | None = None, field: str | None = None,
+                       only_main_content: bool | None = None, include_tags: list[str] | None = None,
+                       exclude_tags: list[str] | None = None) -> Any:
+        """A new version of a dataset without a crawl (no fetch, no charge): ``remove`` RECORD_IDS, ``dedupe`` by
+        FIELD (``content_hash`` by default), or ``reextract`` each page's markdown with new content options."""
+        body = _clean({"operation": operation, "version_id": version_id, "record_ids": record_ids, "field": field,
+                       **_content(only_main_content, include_tags, exclude_tags)})
+        return self._call(_Request("POST", f"/v1/datasets/{_seg(dataset_id)}/curate", json=body))
+
+    def list_curations(self, dataset_id: str, *, limit: int | None = None, cursor: str | None = None) -> Any:
+        """A dataset's curations, newest first (``next_cursor`` pages)."""
+        return self._call(_Request("GET", f"/v1/datasets/{_seg(dataset_id)}/curations",
+                                   params=_clean({"limit": limit, "cursor": cursor})))
 
     def quarantine_record(self, dataset_id: str, record_id: str, *, reason: str | None = None) -> Any:
         """Hide a record from retrieval (reversible with ``release_record``)."""
@@ -597,6 +676,27 @@ class Scrawl(_Endpoints):
         """Close the connection pool."""
         self._http.close()
 
+    def local_fetch(self, url: str, *, respect_robots: bool = True,
+                    max_redirects: int = _local.DEFAULT_MAX_REDIRECTS, max_bytes: int = _local.DEFAULT_MAX_BYTES,
+                    fetch_client: httpx.Client | None = None, allow_link_local: bool = False, **options: Any) -> Any:
+        """Fetch URL from your own machine, then have Scrawl render it (``scrape_local``); Scrawl fetches nothing.
+
+        robots.txt is honoured by default (``respect_robots=False`` is your responsibility); at most
+        ``max_redirects`` redirects and ``max_bytes`` bytes. The fetch uses its own client (``fetch_client``, or a new
+        one): never the one that carries your Scrawl API key. A redirect from https to http is never followed; with your
+        own ``fetch_client`` a redirect to another host is not either. OPTIONS are ``scrape_local``'s.
+        """
+        client = fetch_client or httpx.Client(timeout=self._t.timeout)
+        try:
+            page = _local.fetch(client, url, respect_robots=respect_robots, max_redirects=max_redirects,
+                                max_bytes=max_bytes, same_host_only=fetch_client is not None,
+                                allow_link_local=allow_link_local)
+        finally:
+            if fetch_client is None:
+                client.close()
+        return self.scrape_local(page.url, page.body, http_status=page.status, content_type=page.content_type,
+                                 final_url=page.final_url if page.final_url != page.url else None, **options)
+
     def _call(self, request: _Request) -> Any:
         attempt = 0
         replay_deadline = self._t.replay_deadline(request)
@@ -637,6 +737,14 @@ class Scrawl(_Endpoints):
         while True:
             status = self.batch_status(batch_id, wait_seconds=int(min(60, max(1, deadline - time.monotonic()))))
             if status.status == "completed" or time.monotonic() >= deadline:
+                return status
+
+    def wait_for_site_crawl(self, crawl_id: str, *, timeout: float = 3900.0) -> ScrawlObject:
+        """Block until a site crawl is done (its dataset version final), or TIMEOUT."""
+        deadline = time.monotonic() + timeout
+        while True:
+            status = self.site_crawl_status(crawl_id, wait_seconds=int(min(60, max(1, deadline - time.monotonic()))))
+            if status.get("done") or time.monotonic() >= deadline:
                 return status
 
     def wait_for_assets(self, job_id: str, *, timeout: float = 600.0) -> ScrawlObject:
@@ -686,6 +794,22 @@ class AsyncScrawl(_Endpoints):
         """Close the connection pool."""
         await self._http.aclose()
 
+    async def local_fetch(self, url: str, *, respect_robots: bool = True,
+                          max_redirects: int = _local.DEFAULT_MAX_REDIRECTS, max_bytes: int = _local.DEFAULT_MAX_BYTES,
+                          fetch_client: httpx.AsyncClient | None = None, allow_link_local: bool = False,
+                          **options: Any) -> Any:
+        """``Scrawl.local_fetch``, async: fetch URL from your own machine, then have Scrawl render it."""
+        client = fetch_client or httpx.AsyncClient(timeout=self._t.timeout)
+        try:
+            page = await _local.afetch(client, url, respect_robots=respect_robots, max_redirects=max_redirects,
+                                       max_bytes=max_bytes, same_host_only=fetch_client is not None,
+                                       allow_link_local=allow_link_local)
+        finally:
+            if fetch_client is None:
+                await client.aclose()
+        return await self.scrape_local(page.url, page.body, http_status=page.status, content_type=page.content_type,
+                                       final_url=page.final_url if page.final_url != page.url else None, **options)
+
     async def _call(self, request: _Request) -> Any:  # type: ignore[override]
         attempt = 0
         replay_deadline = self._t.replay_deadline(request)
@@ -728,6 +852,15 @@ class AsyncScrawl(_Endpoints):
         while True:
             status = await self.batch_status(batch_id, wait_seconds=int(min(60, max(1, deadline - time.monotonic()))))
             if status.status == "completed" or time.monotonic() >= deadline:
+                return status
+
+    async def wait_for_site_crawl(self, crawl_id: str, *, timeout: float = 3900.0) -> ScrawlObject:
+        """Wait until a site crawl is done (its dataset version final), or TIMEOUT."""
+        deadline = time.monotonic() + timeout
+        while True:
+            status = await self.site_crawl_status(crawl_id,
+                                                  wait_seconds=int(min(60, max(1, deadline - time.monotonic()))))
+            if status.get("done") or time.monotonic() >= deadline:
                 return status
 
     async def wait_for_assets(self, job_id: str, *, timeout: float = 600.0) -> ScrawlObject:

@@ -163,7 +163,11 @@
         "auth": true,
         "idempotency_key": false,
         "query": [],
-        "body": ["url", "label", "pool_id"],
+        "body": [
+          "url",
+          "label",
+          "pool_id"
+        ],
         "enums": {}
       }
     },
@@ -223,8 +227,16 @@
         "auth": true,
         "idempotency_key": false,
         "query": [],
-        "body": ["mode"],
-        "enums": {"mode": ["direct", "pool", "required_pool"]}
+        "body": [
+          "mode"
+        ],
+        "enums": {
+          "mode": [
+            "direct",
+            "pool",
+            "required_pool"
+          ]
+        }
       }
     },
     "POST /v1/proxy/health": {
@@ -711,7 +723,10 @@
           "profile",
           "wait_seconds",
           "engine",
-          "wait_for_ms"
+          "wait_for_ms",
+          "only_main_content",
+          "include_tags",
+          "exclude_tags"
         ],
         "enums": {
           "formats": [
@@ -742,7 +757,10 @@
           "instruction",
           "profile",
           "engine",
-          "wait_for_ms"
+          "wait_for_ms",
+          "only_main_content",
+          "include_tags",
+          "exclude_tags"
         ],
         "enums": {
           "formats": [
@@ -829,6 +847,135 @@
           "query",
           "limit"
         ],
+        "enums": {}
+      }
+    },
+    "POST /v1/scrape/local": {
+      "python": "scrape_local",
+      "typescript": "scrapeLocal",
+      "cli": "local-fetch",
+      "sends": {
+        "auth": true,
+        "idempotency_key": true,
+        "query": [],
+        "body": [
+          "url",
+          "body_base64",
+          "http_status",
+          "content_type",
+          "final_url",
+          "formats",
+          "schema",
+          "instruction",
+          "profile",
+          "wait_seconds",
+          "only_main_content",
+          "include_tags",
+          "exclude_tags"
+        ],
+        "enums": {
+          "formats": [
+            "markdown",
+            "links",
+            "html",
+            "json"
+          ]
+        }
+      }
+    },
+    "POST /v1/site-crawls": {
+      "python": "crawl_site",
+      "typescript": "crawlSite",
+      "cli": "site-crawl",
+      "sends": {
+        "auth": true,
+        "idempotency_key": true,
+        "query": [],
+        "body": [
+          "url",
+          "max_pages",
+          "max_depth",
+          "engine",
+          "wait_for_ms",
+          "only_main_content",
+          "include_tags",
+          "exclude_tags",
+          "resume_from"
+        ],
+        "enums": {
+          "engine": [
+            "static",
+            "browser"
+          ]
+        }
+      }
+    },
+    "GET /v1/site-crawls/{crawl_id}": {
+      "python": "site_crawl_status",
+      "typescript": "siteCrawlStatus",
+      "cli": "site-crawl-status",
+      "sends": {
+        "auth": true,
+        "idempotency_key": false,
+        "query": [
+          "wait_seconds",
+          "limit",
+          "cursor"
+        ],
+        "body": null,
+        "enums": {}
+      }
+    },
+    "POST /v1/datasets/{dataset_id}/curate": {
+      "python": "curate_dataset",
+      "typescript": "curateDataset",
+      "cli": "datasets curate",
+      "sends": {
+        "auth": true,
+        "idempotency_key": false,
+        "query": [],
+        "body": [
+          "operation",
+          "version_id",
+          "record_ids",
+          "field",
+          "only_main_content",
+          "include_tags",
+          "exclude_tags"
+        ],
+        "enums": {
+          "operation": [
+            "remove",
+            "dedupe",
+            "reextract"
+          ]
+        }
+      }
+    },
+    "GET /v1/datasets/{dataset_id}/curations": {
+      "python": "list_curations",
+      "typescript": "listCurations",
+      "cli": "datasets curations",
+      "sends": {
+        "auth": true,
+        "idempotency_key": false,
+        "query": [
+          "limit",
+          "cursor"
+        ],
+        "body": null,
+        "enums": {}
+      }
+    },
+    "GET /v1/assets/{job_id}/files/{asset_id}/text": {
+      "python": "download_asset_text",
+      "typescript": "downloadAssetText",
+      "cli": "assets-result --text",
+      "sends": {
+        "auth": true,
+        "idempotency_key": false,
+        "query": [],
+        "body": null,
         "enums": {}
       }
     }

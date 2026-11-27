@@ -210,6 +210,34 @@ def test_batch(client: Scrawl) -> None:
     assert done.outcomes.get("ok") == 1
 
 
+@covers("POST /v1/scrape/local")
+def test_local_fetch_renders_a_page_this_machine_fetched(client: Scrawl) -> None:
+    (target,) = need("SCRAWL_LIVE_TARGET_URL")
+    page = client.local_fetch(target, wait_seconds=60)
+    if page.status == "pending":
+        page = client.wait_for_scrape(page.job_id)
+    assert page.status == "completed" and page.markdown
+    assert page.origin == "client_fetched" and page.url_verified is False
+
+
+@covers("POST /v1/site-crawls", "GET /v1/site-crawls/{crawl_id}")
+def test_site_crawl_into_a_dataset_version(client: Scrawl) -> None:
+    (target,) = need("SCRAWL_LIVE_TARGET_URL")
+    started = client.crawl_site(target, max_pages=2, max_depth=1)
+    assert started.crawl_id and started.dataset_id
+    done = client.wait_for_site_crawl(started.crawl_id, timeout=900)
+    assert done.done is True and done.status in ("completed", "failed", "cancelled"), done
+    assert done.counts.launched <= 2 and isinstance(done.pages, list)
+
+
+@covers("POST /v1/datasets/{dataset_id}/curate", "GET /v1/datasets/{dataset_id}/curations")
+def test_curate_a_dataset_without_a_crawl(client: Scrawl, dataset: dict[str, Any]) -> None:
+    curation = client.curate_dataset(dataset["dataset_id"], "dedupe")
+    assert curation.operation == "dedupe" and curation.records_out <= curation.records_in
+    listed = client.list_curations(dataset["dataset_id"], limit=5).curations
+    assert curation.curation_id in [item.curation_id for item in listed]
+
+
 @covers("POST /v1/jobs/{job_id}/cancel")
 def test_cancel(client: Scrawl) -> None:
     (target,) = need("SCRAWL_LIVE_TARGET_URL")
@@ -307,7 +335,8 @@ def test_ai_over_datasets(client: Scrawl, dataset: dict[str, Any], ai_profile: s
     assert isinstance(answer.answer, str) and isinstance(answer.citations, list)
 
 
-@covers("POST /v1/assets/quote", "POST /v1/assets", "GET /v1/assets/{job_id}", "GET /v1/assets/{job_id}/files/{asset_id}")
+@covers("POST /v1/assets/quote", "POST /v1/assets", "GET /v1/assets/{job_id}", "GET /v1/assets/{job_id}/files/{asset_id}",
+        "GET /v1/assets/{job_id}/files/{asset_id}/text")
 def test_assets(client: Scrawl) -> None:
     target, _ = need("SCRAWL_LIVE_TARGET_URL", "SCRAWL_LIVE_ASSETS")
     quote = client.quote_assets(target, classes=["images", "documents"], max_items=5)
@@ -319,6 +348,10 @@ def test_assets(client: Scrawl) -> None:
         data = client.download_asset(job.job_id, asset.asset_id)
         assert hashlib.sha256(data).hexdigest() == asset.sha256
         break
+    for asset in client.paginate(client.get_assets, job.job_id):
+        if asset.get("text_url"):                       # a document with text: its Markdown, as UTF-8 bytes
+            assert isinstance(client.download_asset_text(job.job_id, asset.asset_id).decode("utf-8"), str)
+            break
 
 
 def test_browser_rendering(client: Scrawl) -> None:

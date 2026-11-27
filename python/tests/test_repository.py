@@ -82,12 +82,19 @@ def test_examples_and_tests_use_reserved_domains_only() -> None:
     files = [*(REPO / "python").glob("examples/*.py"), *(REPO / "python").glob("tests/**/*.py"),
              *(REPO / "typescript").glob("examples/*.mjs"), *(REPO / "typescript").glob("test/**/*.js"),
              *(REPO / "typescript").glob("test/**/*.mts"), REPO / "tools" / "fake_apexapi.py"]
+    # The destinations local fetch refuses, named only by the tests that prove it refuses them before connecting.
+    refused = {"169.254.169.254", "[fe80::1]", "[fd00:ec2::254]", "[::ffff:169.254.169.254]",
+               "metadata.google.internal", "metadata.google.internal.", "metadata"}
+    refused_in = {"python/tests/test_local_fetch.py", "python/tests/test_cli.py", "typescript/test/local-fetch.test.js"}
     for file in files:
+        name = str(file.relative_to(REPO))
         for netloc in re.findall(r"https?://([^/\s\"'`)]+)", file.read_text(encoding="utf-8")):
             host = netloc if netloc.startswith("[") and netloc.endswith("]") else re.sub(r":[^:\]]*$", "", netloc)
             if host in ("example.com",) or "$" in host or "{" in netloc:   # RFC 2606; template placeholders
                 continue
-            assert allowed.match(host.lower()), f"{file.relative_to(REPO)}: {netloc}"
+            if name in refused_in and host.lower() in refused:
+                continue
+            assert allowed.match(host.lower()), f"{name}: {netloc}"
 
 
 def test_no_build_output_or_virtualenv_is_tracked() -> None:

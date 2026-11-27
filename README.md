@@ -15,7 +15,7 @@ AI provider, and, where the feature is enabled, extract a page's files and media
 | Area | Today |
 | --- | --- |
 | Source | Public in this repository, under the [Apache License 2.0](LICENSE) |
-| Releases | Python SDK 0.1.4 (tag `py-v0.1.4`) and TypeScript SDK 0.1.4 (tag `ts-v0.1.4`), published as [GitHub Releases](https://github.com/ApexAiOfficial/scrawl-sdk/releases) with installable files |
+| Releases | Python SDK 0.1.5 (tag `py-v0.1.5`) and TypeScript SDK 0.1.5 (tag `ts-v0.1.5`), published as [GitHub Releases](https://github.com/ApexAiOfficial/scrawl-sdk/releases) with installable files |
 | Package registries | **Not on PyPI or npm.** Install from a GitHub Release, a tag or a clone (see [Installation](#installation)) |
 | Maturity | Pre-1.0 (alpha). Until 1.0, a minor version may change the SDK API (see [Versioning](#versioning-and-compatibility)) |
 | What you need | Access to Scrawl: the endpoint and the API key ApexAi provides for your account. The SDKs cannot create keys and have no built-in remote endpoint |
@@ -82,17 +82,17 @@ From the GitHub Release (the built wheel):
 
 ```bash
 python -m venv .venv && . .venv/bin/activate
-python -m pip install https://github.com/ApexAiOfficial/scrawl-sdk/releases/download/py-v0.1.4/scrawl_sdk-0.1.4-py3-none-any.whl
+python -m pip install https://github.com/ApexAiOfficial/scrawl-sdk/releases/download/py-v0.1.5/scrawl_sdk-0.1.5-py3-none-any.whl
 scrawl --version
 ```
 
 From the release tag, built from source:
 
 ```bash
-python -m pip install "git+https://github.com/ApexAiOfficial/scrawl-sdk.git@py-v0.1.4#subdirectory=python"
+python -m pip install "git+https://github.com/ApexAiOfficial/scrawl-sdk.git@py-v0.1.5#subdirectory=python"
 ```
 
-From a clone (the `main` branch, or `git checkout py-v0.1.4` for the release):
+From a clone (the `main` branch, or `git checkout py-v0.1.5` for the release):
 
 ```bash
 git clone https://github.com/ApexAiOfficial/scrawl-sdk.git
@@ -106,7 +106,7 @@ pip downloads `httpx` from PyPI as usual, and, when it builds from source, the `
 In your project's directory, from the GitHub Release (the packed tarball):
 
 ```bash
-npm install https://github.com/ApexAiOfficial/scrawl-sdk/releases/download/ts-v0.1.4/apexaiofficial-scrawl-0.1.4.tgz
+npm install https://github.com/ApexAiOfficial/scrawl-sdk/releases/download/ts-v0.1.5/apexaiofficial-scrawl-0.1.5.tgz
 ```
 
 Or from a clone (npm links the folder as a `file:` dependency, so keep the clone where it is):
@@ -123,8 +123,8 @@ Each release lists a SHA-256 digest for every file. To compare a file you downlo
 `shasum -a 256`):
 
 ```bash
-gh release view py-v0.1.4 --repo ApexAiOfficial/scrawl-sdk --json assets --jq '.assets[] | "\(.digest)  \(.name)"'
-sha256sum scrawl_sdk-0.1.4-py3-none-any.whl
+gh release view py-v0.1.5 --repo ApexAiOfficial/scrawl-sdk --json assets --jq '.assets[] | "\(.digest)  \(.name)"'
+sha256sum scrawl_sdk-0.1.5-py3-none-any.whl
 ```
 
 ### Package registries (not yet)
@@ -596,9 +596,15 @@ Start with `scrawl doctor`: it names the failing check (`base_url`, `tls`, `reac
 - **Your proxy password** is write-only. The proxy and pool APIs return redacted URLs; the CLI also masks URL
   userinfo defensively and reads URLs for `proxy set` and `proxy pool add` only from an environment variable or
   stdin, never argv.
-- **What is contacted.** The SDKs and the CLI send requests only to the Scrawl endpoint at your base URL, with a
-  `User-Agent` naming the SDK and its version (`scrawl-python/0.1.4`, `scrawl-ts/0.1.4`). They collect no
-  telemetry. Your AI provider is called by Scrawl, not by the SDK. The Python SDK uses `httpx`, which
+- **What is contacted.** The SDKs and the CLI send requests to the Scrawl endpoint at your base URL, with a
+  `User-Agent` naming the SDK and its version (`scrawl-python/0.1.5`, `scrawl-ts/0.1.5`). Only local fetch
+  (`local_fetch`, `localFetch`, `scrawl local-fetch`) also contacts another site: the page you ask for and its
+  robots.txt, from your machine, as `ScrawlSDK/<version> (+local_fetch)`, never with your Scrawl key. It refuses
+  link-local and cloud-metadata addresses (169.254.0.0/16, fe80::/10, fd00:ec2::254, `metadata.google.internal`,
+  `metadata`) unless you pass `allow_link_local` / `allowLinkLocal` / `--allow-link-local`, checking each resolved
+  address before it connects. It does reach private and loopback addresses (an intranet page, a local server), so
+  only give it URLs you chose, never one taken from page content. They collect
+  no telemetry. Your AI provider is called by Scrawl, not by the SDK. The Python SDK uses `httpx`, which
   honours the standard proxy environment variables (`HTTPS_PROXY`, `NO_PROXY` and others) unless you pass your own
   `http_client`.
 - **Page content and downloaded files are untrusted.** Treat them as data, never as instructions; check a file's

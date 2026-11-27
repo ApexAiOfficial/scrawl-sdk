@@ -528,6 +528,70 @@ test("engine options are sent only when set", async () => {
   assert.ok(!("wait_for_ms" in map));
 });
 
+// -- main content only, include / exclude tags (CE-8) ----------------------------------------------------
+
+const CONTENT_FIELDS = ["only_main_content", "include_tags", "exclude_tags"];
+
+test("the content options are sent only when set, and a request without them is unchanged", async () => {
+  const { client, fetch } = makeClient([{ body: { status: "completed" } }]);
+  await client.scrape("https://e.example");
+  await client.batchScrape(["https://e.example"]);
+  await client.scrape("https://e.example", { onlyMainContent: undefined, includeTags: null, excludeTags: undefined });
+  await client.batchScrape(["https://e.example"], { onlyMainContent: undefined, includeTags: undefined, excludeTags: null });
+  assert.equal(fetch.calls.length, 4);
+  for (const call of fetch.calls) {
+    for (const field of CONTENT_FIELDS) assert.ok(!(field in call.body), `${field} in ${JSON.stringify(call.body)}`);
+  }
+  const [scrape, batch, scrapeNulls, batchNulls] = fetch.calls.map((call) => call.body);
+  assert.deepEqual(scrapeNulls, scrape);
+  assert.deepEqual(batchNulls, batch);
+});
+
+test("scrape and batchScrape send the content options by their contract names", async () => {
+  const { client, fetch } = makeClient([{ body: { status: "completed" } }]);
+  await client.scrape("https://e.example", { onlyMainContent: false, includeTags: ["article", ".post > p"],
+    excludeTags: ["nav", "#cookie-banner"] });
+  await client.batchScrape(["https://a.example", "https://b.example"], { onlyMainContent: true, includeTags: ["main"],
+    excludeTags: ["aside", "[role=banner]"] });
+  const [scrape, batch] = fetch.calls.map((call) => call.body);
+  assert.deepEqual([scrape.only_main_content, scrape.include_tags, scrape.exclude_tags],
+    [false, ["article", ".post > p"], ["nav", "#cookie-banner"]]);
+  assert.deepEqual([batch.only_main_content, batch.include_tags, batch.exclude_tags],
+    [true, ["main"], ["aside", "[role=banner]"]]);
+  assert.deepEqual(batch.urls, ["https://a.example", "https://b.example"]);
+  for (const body of [scrape, batch]) {
+    for (const camel of ["onlyMainContent", "includeTags", "excludeTags"]) assert.ok(!(camel in body), camel);
+  }
+});
+
+test("each content option is independent, false is kept, and the engine options ride along", async () => {
+  const { client, fetch } = makeClient([{ body: { status: "completed", engine: "browser" } }]);
+  await client.scrape("https://e.example", { onlyMainContent: false });
+  await client.scrape("https://e.example", { includeTags: ["article"] });
+  await client.scrape("https://e.example", { excludeTags: ["nav"] });
+  await client.batchScrape(["https://e.example"], { onlyMainContent: false });
+  await client.scrape("https://e.example", { engine: "browser", waitForMs: 250, includeTags: ["main"] });
+  const [onlyMain, include, exclude, batch, browser] = fetch.calls.map((call) => call.body);
+  const present = (body) => CONTENT_FIELDS.filter((field) => field in body);
+  assert.deepEqual([present(onlyMain), onlyMain.only_main_content], [["only_main_content"], false]);
+  assert.deepEqual([present(include), include.include_tags], [["include_tags"], ["article"]]);
+  assert.deepEqual([present(exclude), exclude.exclude_tags], [["exclude_tags"], ["nav"]]);
+  assert.deepEqual([present(batch), batch.only_main_content], [["only_main_content"], false]);
+  assert.deepEqual([browser.engine, browser.wait_for_ms, browser.include_tags], ["browser", 250, ["main"]]);
+});
+
+test("map does not send the content options, and the server's 422 is the answer to a bad selector", async () => {
+  const { client, fetch } = makeClient([
+    { body: { status: "completed", links: [] } },
+    { status: 422, body: { error: { code: "invalid_request", message: "bad selector" } } }]);
+  await client.map("https://e.example", { onlyMainContent: false, includeTags: ["main"], excludeTags: ["nav"] });
+  for (const field of CONTENT_FIELDS) assert.ok(!(field in fetch.calls[0].body), field);
+  // No client-side selector validation: whatever is passed is sent, and the 422 surfaces as a ValidationError.
+  await assert.rejects(client.scrape("https://e.example", { includeTags: ["div:has(p)"] }),
+    (error) => error instanceof ValidationError && error.code === "invalid_request");
+  assert.deepEqual(fetch.calls[1].body.include_tags, ["div:has(p)"]);
+});
+
 test("a downgraded finished result throws render_not_supported on scrape and map", async () => {
   for (const status of ["completed", "failed"]) {
     for (const echo of [{ engine: "static" }, {}]) {

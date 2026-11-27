@@ -7,7 +7,7 @@
       "readOnlyHint": false,
       "title": "Activate dataset version"
     },
-    "description": "Rollback or advance a dataset by making one completed indexed version active.",
+    "description": "Rollback or advance a dataset by making one completed indexed version active. Use when: rolling a dataset back or forward to a completed version (apex_scrapy_get_dataset lists them).",
     "inputSchema": {
       "properties": {
         "dataset_id": {
@@ -106,7 +106,7 @@
       "readOnlyHint": true,
       "title": "BYO AI provider status"
     },
-    "description": "Report whether this identity has its own AI provider configured (no keys are ever returned).",
+    "description": "Report whether this identity has its own AI provider configured (no keys are ever returned). Use when: checking an AI provider is configured before apex_scrapy_ask, apex_scrapy_extract or apex_scrapy_extract_dataset.",
     "inputSchema": {
       "properties": {},
       "title": "apex_scrapy_ai_statusArguments",
@@ -183,7 +183,7 @@
       "readOnlyHint": false,
       "title": "Ask your datasets (cited answer)"
     },
-    "description": "Answer a question from your active datasets with your own AI provider, citing the records used. The answer and citations derive from untrusted web content (the result is marked untrusted_external_content).",
+    "description": "Answer a question from your active datasets with your own AI provider, citing the records used. The answer and citations derive from untrusted web content (the result is marked untrusted_external_content). Use when: a question about your datasets needs an answer in words, with your own AI provider (it spends your provider's tokens); counts and sums are computed over the whole dataset. Not for: finding records (use search, or use apex_scrapy_query_dataset_version).",
     "inputSchema": {
       "properties": {
         "dataset_id": {
@@ -230,6 +230,91 @@
     "name": "apex_scrapy_ask",
     "outputSchema": {
       "$defs": {
+        "AskAggregateInfo": {
+          "description": "A figure Scrawl computed over a whole dataset version to answer a counting or aggregating question.",
+          "properties": {
+            "dataset_id": {
+              "title": "Dataset Id",
+              "type": "string"
+            },
+            "field": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Field"
+            },
+            "filters": {
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "title": "Filters",
+              "type": "array"
+            },
+            "operation": {
+              "title": "Operation",
+              "type": "string"
+            },
+            "records_matched": {
+              "title": "Records Matched",
+              "type": "integer"
+            },
+            "records_scanned": {
+              "title": "Records Scanned",
+              "type": "integer"
+            },
+            "skipped": {
+              "title": "Skipped",
+              "type": "integer"
+            },
+            "top": {
+              "anyOf": [
+                {
+                  "items": {
+                    "items": {},
+                    "type": "array"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Top"
+            },
+            "truncated": {
+              "title": "Truncated",
+              "type": "boolean"
+            },
+            "value": {
+              "title": "Value"
+            },
+            "version_id": {
+              "title": "Version Id",
+              "type": "string"
+            }
+          },
+          "required": [
+            "operation",
+            "field",
+            "filters",
+            "value",
+            "records_scanned",
+            "records_matched",
+            "skipped",
+            "truncated",
+            "dataset_id",
+            "version_id"
+          ],
+          "title": "AskAggregateInfo",
+          "type": "object"
+        },
         "AskCitationInfo": {
           "properties": {
             "dataset_id": {
@@ -265,6 +350,17 @@
         }
       },
       "properties": {
+        "aggregate": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AskAggregateInfo"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "answer": {
           "title": "Answer",
           "type": "string"
@@ -279,6 +375,12 @@
           },
           "title": "Citations",
           "type": "array"
+        },
+        "coverage": {
+          "default": "sample",
+          "description": "whole_dataset: a figure computed over every record (aggregate says how); partial: a figure that leaves some records out (a version larger than Scrawl scans, or matched records without a usable value); sample: the answer rests on the retrieved records alone (at most 8)",
+          "title": "Coverage",
+          "type": "string"
         },
         "input_tokens": {
           "title": "Input Tokens",
@@ -343,7 +445,7 @@
       "readOnlyHint": true,
       "title": "Asset job result"
     },
-    "description": "Return an asset job's status, whole-job counts, billing and one page of stored assets (or skipped candidates with view=skipped), waiting up to wait_seconds. Page next with next_cursor.",
+    "description": "Return an asset job's status, whole-job counts, billing and one page of stored assets (or skipped candidates with view=skipped), waiting up to wait_seconds. Page next with next_cursor. Use when: following an asset job or paging its assets. Next: the result's next_call.",
     "inputSchema": {
       "properties": {
         "cursor": {
@@ -445,6 +547,19 @@
               "default": null,
               "title": "Final Url"
             },
+            "metadata": {
+              "anyOf": [
+                {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Metadata"
+            },
             "mime_type": {
               "anyOf": [
                 {
@@ -461,6 +576,18 @@
               "title": "Original Url",
               "type": "string"
             },
+            "reputation": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Reputation"
+            },
             "sha256": {
               "anyOf": [
                 {
@@ -476,6 +603,18 @@
             "size_bytes": {
               "title": "Size Bytes",
               "type": "integer"
+            },
+            "text_url": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Text Url"
             }
           },
           "required": [
@@ -485,6 +624,57 @@
             "original_url"
           ],
           "title": "AssetItemResult",
+          "type": "object"
+        },
+        "JobStatus": {
+          "description": "A job's status, spelled this way in every response: `pending` until it starts, then `running`, then one of\n`completed`, `failed`, `cancelled` or `orphaned` (its process was lost before it finished; no result follows).",
+          "enum": [
+            "pending",
+            "running",
+            "completed",
+            "failed",
+            "cancelled",
+            "orphaned"
+          ],
+          "title": "JobStatus",
+          "type": "string"
+        },
+        "NextAction": {
+          "description": "A call that usually comes after this result, and why.",
+          "properties": {
+            "name": {
+              "title": "Name",
+              "type": "string"
+            },
+            "why": {
+              "title": "Why",
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "why"
+          ],
+          "title": "NextAction",
+          "type": "object"
+        },
+        "NextCall": {
+          "description": "The tool to call next and its arguments: only a tool this caller may call.",
+          "properties": {
+            "arguments": {
+              "additionalProperties": true,
+              "title": "Arguments",
+              "type": "object"
+            },
+            "tool": {
+              "title": "Tool",
+              "type": "string"
+            }
+          },
+          "required": [
+            "tool"
+          ],
+          "title": "NextCall",
           "type": "object"
         },
         "SkippedAssetResult": {
@@ -597,6 +787,26 @@
           "title": "Job Id",
           "type": "string"
         },
+        "next_actions": {
+          "description": "At most 3 calls that usually come after this result.",
+          "items": {
+            "$ref": "#/$defs/NextAction"
+          },
+          "title": "Next Actions",
+          "type": "array"
+        },
+        "next_call": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NextCall"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The tool to call next, with its arguments."
+        },
         "next_cursor": {
           "anyOf": [
             {
@@ -625,6 +835,19 @@
           "default": null,
           "title": "Partial Reason"
         },
+        "poll_after_seconds": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Wait this long before polling next_call.",
+          "title": "Poll After Seconds"
+        },
         "skipped": {
           "anyOf": [
             {
@@ -641,8 +864,7 @@
           "title": "Skipped"
         },
         "status": {
-          "title": "Status",
-          "type": "string"
+          "$ref": "#/$defs/JobStatus"
         },
         "total_fetched_bytes": {
           "default": 0,
@@ -685,12 +907,114 @@
   {
     "annotations": {
       "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true,
+      "title": "Asset document text"
+    },
+    "description": "Return a window of the Markdown text Scrawl converted from a stored document (an asset that lists a text_url): up to max_chars characters from start_char, with total_chars to page by. The text comes from the web and is wrapped as untrusted content. Use when: reading the text of a document an asset job stored. Not for: a scraped page (use apex_scrapy_scrape_result).",
+    "inputSchema": {
+      "properties": {
+        "asset_id": {
+          "pattern": "^[0-9a-f]{24,64}$",
+          "title": "Asset Id",
+          "type": "string"
+        },
+        "job_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Job Id",
+          "type": "string"
+        },
+        "max_chars": {
+          "default": 12000,
+          "maximum": 50000,
+          "minimum": 1,
+          "title": "Max Chars",
+          "type": "integer"
+        },
+        "start_char": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Start Char",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "job_id",
+        "asset_id"
+      ],
+      "title": "apex_scrapy_asset_textArguments",
+      "type": "object"
+    },
+    "name": "apex_scrapy_asset_text",
+    "outputSchema": {
+      "description": "One stored document's text as Markdown, wrapped as untrusted web content.",
+      "properties": {
+        "asset_id": {
+          "title": "Asset Id",
+          "type": "string"
+        },
+        "chars": {
+          "title": "Chars",
+          "type": "integer"
+        },
+        "conversion_truncated": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Conversion Truncated",
+          "type": "array"
+        },
+        "job_id": {
+          "title": "Job Id",
+          "type": "string"
+        },
+        "start_char": {
+          "default": 0,
+          "title": "Start Char",
+          "type": "integer"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        },
+        "total_chars": {
+          "title": "Total Chars",
+          "type": "integer"
+        },
+        "truncated": {
+          "default": false,
+          "title": "Truncated",
+          "type": "boolean"
+        },
+        "untrusted_external_content": {
+          "default": true,
+          "title": "Untrusted External Content",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "job_id",
+        "asset_id",
+        "text",
+        "chars",
+        "total_chars"
+      ],
+      "title": "AssetTextResult",
+      "type": "object"
+    },
+    "title": "Asset document text"
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
       "idempotentHint": false,
       "openWorldHint": true,
       "readOnlyHint": false,
       "title": "Batch scrape"
     },
-    "description": "Scrape up to 20 URLs as gated jobs (4 at a time); poll apex_scrapy_batch_status with the batch_id. engine=browser renders every URL in a sandboxed browser first (on a dedicated deployment, when enabled), one at a time.",
+    "description": "Scrape up to 20 URLs as gated jobs (4 at a time); poll apex_scrapy_batch_status with the batch_id. engine=browser renders every URL in a sandboxed browser first (on a dedicated deployment, when enabled), one at a time. only_main_content (default true), include_tags and exclude_tags shape the markdown format. Selectors are a safe CSS subset: type, .class, #id, [attr], [attr=value] and *, joined by descendant (space) or child (>) combinators; at most 20 of 200 characters. Use when: you have up to 20 known URLs. Not for: one URL (use apex_scrapy_scrape_url) or discovering a site's pages (use apex_scrapy_crawl_site). Each URL is charged as one scrape. Next: the result's next_call.",
     "inputSchema": {
       "properties": {
         "engine": {
@@ -702,6 +1026,24 @@
           "title": "Engine",
           "type": "string"
         },
+        "exclude_tags": {
+          "anyOf": [
+            {
+              "items": {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              "maxItems": 20,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Exclude Tags"
+        },
         "formats": {
           "anyOf": [
             {
@@ -710,7 +1052,8 @@
                   "markdown",
                   "links",
                   "html",
-                  "json"
+                  "json",
+                  "metadata"
                 ],
                 "type": "string"
               },
@@ -722,6 +1065,24 @@
           ],
           "default": null,
           "title": "Formats"
+        },
+        "include_tags": {
+          "anyOf": [
+            {
+              "items": {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              "maxItems": 20,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Include Tags"
         },
         "instruction": {
           "anyOf": [
@@ -735,6 +1096,11 @@
           ],
           "default": null,
           "title": "Instruction"
+        },
+        "only_main_content": {
+          "default": true,
+          "title": "Only Main Content",
+          "type": "boolean"
         },
         "profile": {
           "anyOf": [
@@ -844,6 +1210,44 @@
           "title": "BatchItemResult",
           "type": "object"
         },
+        "NextAction": {
+          "description": "A call that usually comes after this result, and why.",
+          "properties": {
+            "name": {
+              "title": "Name",
+              "type": "string"
+            },
+            "why": {
+              "title": "Why",
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "why"
+          ],
+          "title": "NextAction",
+          "type": "object"
+        },
+        "NextCall": {
+          "description": "The tool to call next and its arguments: only a tool this caller may call.",
+          "properties": {
+            "arguments": {
+              "additionalProperties": true,
+              "title": "Arguments",
+              "type": "object"
+            },
+            "tool": {
+              "title": "Tool",
+              "type": "string"
+            }
+          },
+          "required": [
+            "tool"
+          ],
+          "title": "NextCall",
+          "type": "object"
+        },
         "ScrapeUrlResult": {
           "description": "One URL scraped through the gate: formats when completed, the job when pending.",
           "properties": {
@@ -1030,6 +1434,52 @@
               "default": null,
               "title": "Markdown"
             },
+            "metadata": {
+              "anyOf": [
+                {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Metadata"
+            },
+            "next_actions": {
+              "description": "At most 3 calls that usually come after this result.",
+              "items": {
+                "$ref": "#/$defs/NextAction"
+              },
+              "title": "Next Actions",
+              "type": "array"
+            },
+            "next_call": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/NextCall"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "The tool to call next, with its arguments."
+            },
+            "origin": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "client_fetched: the caller's own client fetched the page",
+              "title": "Origin"
+            },
             "outcome": {
               "anyOf": [
                 {
@@ -1041,6 +1491,19 @@
               ],
               "default": null,
               "title": "Outcome"
+            },
+            "poll_after_seconds": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Wait this long before polling next_call.",
+              "title": "Poll After Seconds"
             },
             "retry_after_s": {
               "anyOf": [
@@ -1083,6 +1546,19 @@
             "url": {
               "title": "Url",
               "type": "string"
+            },
+            "url_verified": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "false for a client-fetched page (its URL is a claim)",
+              "title": "Url Verified"
             }
           },
           "required": [
@@ -1114,12 +1590,45 @@
           "title": "Items",
           "type": "array"
         },
+        "next_actions": {
+          "description": "At most 3 calls that usually come after this result.",
+          "items": {
+            "$ref": "#/$defs/NextAction"
+          },
+          "title": "Next Actions",
+          "type": "array"
+        },
+        "next_call": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NextCall"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The tool to call next, with its arguments."
+        },
         "outcomes": {
           "additionalProperties": {
             "type": "integer"
           },
           "title": "Outcomes",
           "type": "object"
+        },
+        "poll_after_seconds": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Wait this long before polling next_call.",
+          "title": "Poll After Seconds"
         },
         "status": {
           "title": "Status",
@@ -1153,7 +1662,7 @@
       "readOnlyHint": true,
       "title": "Batch status"
     },
-    "description": "Return a batch's per-URL jobs and results, waiting up to wait_seconds. Never calls an AI provider.",
+    "description": "Return a batch's per-URL jobs and results, waiting up to wait_seconds. Never calls an AI provider. Use when: following a batch from apex_scrapy_batch_scrape. Next: the result's next_call while it runs.",
     "inputSchema": {
       "properties": {
         "batch_id": {
@@ -1233,6 +1742,44 @@
           "title": "BatchItemResult",
           "type": "object"
         },
+        "NextAction": {
+          "description": "A call that usually comes after this result, and why.",
+          "properties": {
+            "name": {
+              "title": "Name",
+              "type": "string"
+            },
+            "why": {
+              "title": "Why",
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "why"
+          ],
+          "title": "NextAction",
+          "type": "object"
+        },
+        "NextCall": {
+          "description": "The tool to call next and its arguments: only a tool this caller may call.",
+          "properties": {
+            "arguments": {
+              "additionalProperties": true,
+              "title": "Arguments",
+              "type": "object"
+            },
+            "tool": {
+              "title": "Tool",
+              "type": "string"
+            }
+          },
+          "required": [
+            "tool"
+          ],
+          "title": "NextCall",
+          "type": "object"
+        },
         "ScrapeUrlResult": {
           "description": "One URL scraped through the gate: formats when completed, the job when pending.",
           "properties": {
@@ -1419,6 +1966,52 @@
               "default": null,
               "title": "Markdown"
             },
+            "metadata": {
+              "anyOf": [
+                {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Metadata"
+            },
+            "next_actions": {
+              "description": "At most 3 calls that usually come after this result.",
+              "items": {
+                "$ref": "#/$defs/NextAction"
+              },
+              "title": "Next Actions",
+              "type": "array"
+            },
+            "next_call": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/NextCall"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "The tool to call next, with its arguments."
+            },
+            "origin": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "client_fetched: the caller's own client fetched the page",
+              "title": "Origin"
+            },
             "outcome": {
               "anyOf": [
                 {
@@ -1430,6 +2023,19 @@
               ],
               "default": null,
               "title": "Outcome"
+            },
+            "poll_after_seconds": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Wait this long before polling next_call.",
+              "title": "Poll After Seconds"
             },
             "retry_after_s": {
               "anyOf": [
@@ -1472,6 +2078,19 @@
             "url": {
               "title": "Url",
               "type": "string"
+            },
+            "url_verified": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "false for a client-fetched page (its URL is a claim)",
+              "title": "Url Verified"
             }
           },
           "required": [
@@ -1503,12 +2122,45 @@
           "title": "Items",
           "type": "array"
         },
+        "next_actions": {
+          "description": "At most 3 calls that usually come after this result.",
+          "items": {
+            "$ref": "#/$defs/NextAction"
+          },
+          "title": "Next Actions",
+          "type": "array"
+        },
+        "next_call": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NextCall"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The tool to call next, with its arguments."
+        },
         "outcomes": {
           "additionalProperties": {
             "type": "integer"
           },
           "title": "Outcomes",
           "type": "object"
+        },
+        "poll_after_seconds": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Wait this long before polling next_call.",
+          "title": "Poll After Seconds"
         },
         "status": {
           "title": "Status",
@@ -1542,7 +2194,7 @@
       "readOnlyHint": false,
       "title": "Cancel a job"
     },
-    "description": "Cancel a pending or running job you own, wherever it runs. A queued job is cancelled outright; a job another process runs gets a cancellation request (cancelled false, status running) that stops it within seconds: poll apex_scrapy_get_job. AI extraction jobs need ai:use, other jobs scrape:write.",
+    "description": "Cancel a pending or running job you own, wherever it runs. A queued job is cancelled outright; a job another process runs gets a cancellation request (cancelled false, status running) that stops it within seconds: poll apex_scrapy_get_job. AI extraction jobs need ai:use, other jobs scrape:write. Use when: stopping a job, batch page or site crawl you started.",
     "inputSchema": {
       "properties": {
         "job_id": {
@@ -1558,6 +2210,21 @@
     },
     "name": "apex_scrapy_cancel_job",
     "outputSchema": {
+      "$defs": {
+        "JobStatus": {
+          "description": "A job's status, spelled this way in every response: `pending` until it starts, then `running`, then one of\n`completed`, `failed`, `cancelled` or `orphaned` (its process was lost before it finished; no result follows).",
+          "enum": [
+            "pending",
+            "running",
+            "completed",
+            "failed",
+            "cancelled",
+            "orphaned"
+          ],
+          "title": "JobStatus",
+          "type": "string"
+        }
+      },
       "properties": {
         "cancelled": {
           "title": "Cancelled",
@@ -1580,8 +2247,7 @@
           "title": "Message"
         },
         "status": {
-          "title": "Status",
-          "type": "string"
+          "$ref": "#/$defs/JobStatus"
         }
       },
       "required": [
@@ -1602,7 +2268,7 @@
       "readOnlyHint": false,
       "title": "Check Scrapy project"
     },
-    "description": "Run bounded Scrapy contract checks of the operator's Scrapy project. Dedicated deployments only.",
+    "description": "Run bounded Scrapy contract checks of the operator's Scrapy project. Dedicated deployments only. Use when: an operator checks a dedicated deployment's Scrapy project contracts. Not for: scraping a site (use apex_scrapy_scrape_url).",
     "inputSchema": {
       "properties": {
         "crawl_target": {
@@ -1623,6 +2289,21 @@
     },
     "name": "apex_scrapy_check_project",
     "outputSchema": {
+      "$defs": {
+        "JobStatus": {
+          "description": "A job's status, spelled this way in every response: `pending` until it starts, then `running`, then one of\n`completed`, `failed`, `cancelled` or `orphaned` (its process was lost before it finished; no result follows).",
+          "enum": [
+            "pending",
+            "running",
+            "completed",
+            "failed",
+            "cancelled",
+            "orphaned"
+          ],
+          "title": "JobStatus",
+          "type": "string"
+        }
+      },
       "properties": {
         "job_id": {
           "anyOf": [
@@ -1663,14 +2344,13 @@
         "status": {
           "anyOf": [
             {
-              "type": "string"
+              "$ref": "#/$defs/JobStatus"
             },
             {
               "type": "null"
             }
           ],
-          "default": null,
-          "title": "Status"
+          "default": null
         }
       },
       "title": "TextCommandResult",
@@ -1681,12 +2361,400 @@
   {
     "annotations": {
       "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false,
+      "title": "Crawl a site"
+    },
+    "description": "Crawl a site from one URL into a new dataset version: the URL's host only, breadth first, at most max_pages pages (1-500) to max_depth links from the start (0-5). robots.txt is read first; a page it disallows is never fetched. Each page is a scrape, charged as one, so max_pages is the most it can cost. Follow it with apex_scrapy_site_crawl_status; cancel it with apex_scrapy_cancel_job(crawl_id) (pages in flight finish; only finished pages are charged). resume_from continues an ended crawl of the same URL without fetching its finished pages again. Read the pages with the dataset tools once done is true. Use when: you need many pages of one site as a dataset. Not for: one page (use apex_scrapy_scrape_url), a list of known URLs (use apex_scrapy_batch_scrape) or a configured spider (use apex_scrapy_start_crawl). Next: the result's next_call while it runs, then its next_actions.",
+    "inputSchema": {
+      "properties": {
+        "engine": {
+          "default": "static",
+          "enum": [
+            "static",
+            "browser"
+          ],
+          "title": "Engine",
+          "type": "string"
+        },
+        "exclude_tags": {
+          "anyOf": [
+            {
+              "items": {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              "maxItems": 20,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Exclude Tags"
+        },
+        "include_tags": {
+          "anyOf": [
+            {
+              "items": {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              "maxItems": 20,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Include Tags"
+        },
+        "max_depth": {
+          "default": 2,
+          "maximum": 5,
+          "minimum": 0,
+          "title": "Max Depth",
+          "type": "integer"
+        },
+        "max_pages": {
+          "default": 25,
+          "maximum": 500,
+          "minimum": 1,
+          "title": "Max Pages",
+          "type": "integer"
+        },
+        "only_main_content": {
+          "default": true,
+          "title": "Only Main Content",
+          "type": "boolean"
+        },
+        "resume_from": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Resume From"
+        },
+        "url": {
+          "maxLength": 2048,
+          "minLength": 8,
+          "title": "Url",
+          "type": "string"
+        },
+        "wait_for_ms": {
+          "default": 0,
+          "maximum": 10000,
+          "minimum": 0,
+          "title": "Wait For Ms",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "url"
+      ],
+      "title": "apex_scrapy_crawl_siteArguments",
+      "type": "object"
+    },
+    "name": "apex_scrapy_crawl_site",
+    "outputSchema": {
+      "$defs": {
+        "JobStatus": {
+          "description": "A job's status, spelled this way in every response: `pending` until it starts, then `running`, then one of\n`completed`, `failed`, `cancelled` or `orphaned` (its process was lost before it finished; no result follows).",
+          "enum": [
+            "pending",
+            "running",
+            "completed",
+            "failed",
+            "cancelled",
+            "orphaned"
+          ],
+          "title": "JobStatus",
+          "type": "string"
+        },
+        "NextAction": {
+          "description": "A call that usually comes after this result, and why.",
+          "properties": {
+            "name": {
+              "title": "Name",
+              "type": "string"
+            },
+            "why": {
+              "title": "Why",
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "why"
+          ],
+          "title": "NextAction",
+          "type": "object"
+        },
+        "NextCall": {
+          "description": "The tool to call next and its arguments: only a tool this caller may call.",
+          "properties": {
+            "arguments": {
+              "additionalProperties": true,
+              "title": "Arguments",
+              "type": "object"
+            },
+            "tool": {
+              "title": "Tool",
+              "type": "string"
+            }
+          },
+          "required": [
+            "tool"
+          ],
+          "title": "NextCall",
+          "type": "object"
+        },
+        "SiteCrawlPageInfo": {
+          "description": "One URL a site crawl reached (from a page's links: untrusted text, defused).",
+          "properties": {
+            "depth": {
+              "title": "Depth",
+              "type": "integer"
+            },
+            "error": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Error"
+            },
+            "job_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Job Id"
+            },
+            "outcome": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "ok",
+                    "target_blocked",
+                    "target_error",
+                    "cancelled",
+                    "pipeline_failed"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Outcome"
+            },
+            "skip_reason": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Skip Reason"
+            },
+            "url": {
+              "title": "Url",
+              "type": "string"
+            }
+          },
+          "required": [
+            "url",
+            "depth"
+          ],
+          "title": "SiteCrawlPageInfo",
+          "type": "object"
+        }
+      },
+      "description": "A bounded site crawl: its status, counts, charge, dataset version and one page of the URLs it reached.\n\nRead the pages' text with the dataset tools (apex_scrapy_query_dataset_version, search, fetch) once done is true.",
+      "properties": {
+        "counts": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Counts",
+          "type": "object"
+        },
+        "crawl_id": {
+          "title": "Crawl Id",
+          "type": "string"
+        },
+        "credits_charged": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Credits Charged"
+        },
+        "dataset_id": {
+          "title": "Dataset Id",
+          "type": "string"
+        },
+        "dataset_version_id": {
+          "title": "Dataset Version Id",
+          "type": "string"
+        },
+        "done": {
+          "title": "Done",
+          "type": "boolean"
+        },
+        "max_depth": {
+          "title": "Max Depth",
+          "type": "integer"
+        },
+        "max_pages": {
+          "title": "Max Pages",
+          "type": "integer"
+        },
+        "next_actions": {
+          "description": "At most 3 calls that usually come after this result.",
+          "items": {
+            "$ref": "#/$defs/NextAction"
+          },
+          "title": "Next Actions",
+          "type": "array"
+        },
+        "next_call": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NextCall"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The tool to call next, with its arguments."
+        },
+        "next_cursor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Next Cursor"
+        },
+        "pages": {
+          "items": {
+            "$ref": "#/$defs/SiteCrawlPageInfo"
+          },
+          "title": "Pages",
+          "type": "array"
+        },
+        "poll_after_seconds": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Wait this long before polling next_call.",
+          "title": "Poll After Seconds"
+        },
+        "resumed_from": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Resumed From"
+        },
+        "status": {
+          "$ref": "#/$defs/JobStatus"
+        },
+        "stop_reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Stop Reason"
+        },
+        "untrusted_external_content": {
+          "default": true,
+          "title": "Untrusted External Content",
+          "type": "boolean"
+        },
+        "url": {
+          "title": "Url",
+          "type": "string"
+        }
+      },
+      "required": [
+        "crawl_id",
+        "status",
+        "url",
+        "max_pages",
+        "max_depth",
+        "dataset_id",
+        "dataset_version_id",
+        "counts",
+        "done"
+      ],
+      "title": "SiteCrawlResult",
+      "type": "object"
+    },
+    "title": "Crawl a site"
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
       "idempotentHint": true,
       "openWorldHint": false,
       "readOnlyHint": true,
       "title": "Credit balance"
     },
-    "description": "Return the identity's credits: hosted account balance, or unmetered on a dedicated deployment.",
+    "description": "Return the identity's credits: hosted account balance, or unmetered on a dedicated deployment. Use when: checking credits before a charged call.",
     "inputSchema": {
       "properties": {},
       "title": "apex_scrapy_credit_balanceArguments",
@@ -1765,12 +2833,194 @@
   {
     "annotations": {
       "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false,
+      "readOnlyHint": false,
+      "title": "Curate a dataset"
+    },
+    "description": "Make a new version of an owned dataset without a crawl; nothing is fetched or charged. remove drops record_ids; dedupe keeps the first record of each value of field (content_hash by default); reextract renders each page's markdown again from its saved page with only_main_content, include_tags and exclude_tags. The source is the active version unless version_id names another completed one. The new version is published; the earlier one stays and can be activated again. Use when: cleaning a dataset you own (drop records, dedupe, re-extract) without fetching. Not for: hiding one record from reads (use apex_scrapy_set_record_quarantine).",
+    "inputSchema": {
+      "properties": {
+        "dataset_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Dataset Id",
+          "type": "string"
+        },
+        "exclude_tags": {
+          "anyOf": [
+            {
+              "items": {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              "maxItems": 20,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Exclude Tags"
+        },
+        "field": {
+          "default": "content_hash",
+          "maxLength": 64,
+          "minLength": 1,
+          "title": "Field",
+          "type": "string"
+        },
+        "include_tags": {
+          "anyOf": [
+            {
+              "items": {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              "maxItems": 20,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Include Tags"
+        },
+        "only_main_content": {
+          "default": true,
+          "title": "Only Main Content",
+          "type": "boolean"
+        },
+        "operation": {
+          "enum": [
+            "remove",
+            "dedupe",
+            "reextract"
+          ],
+          "title": "Operation",
+          "type": "string"
+        },
+        "record_ids": {
+          "anyOf": [
+            {
+              "items": {
+                "maxLength": 128,
+                "minLength": 1,
+                "type": "string"
+              },
+              "maxItems": 1000,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Record Ids"
+        },
+        "version_id": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Version Id"
+        }
+      },
+      "required": [
+        "dataset_id",
+        "operation"
+      ],
+      "title": "apex_scrapy_curate_datasetArguments",
+      "type": "object"
+    },
+    "name": "apex_scrapy_curate_dataset",
+    "outputSchema": {
+      "description": "One curation: the new version it made from which version, how, and what it counted.",
+      "properties": {
+        "created_at": {
+          "title": "Created At",
+          "type": "string"
+        },
+        "curation_id": {
+          "title": "Curation Id",
+          "type": "string"
+        },
+        "dataset_id": {
+          "title": "Dataset Id",
+          "type": "string"
+        },
+        "operation": {
+          "enum": [
+            "remove",
+            "dedupe",
+            "reextract"
+          ],
+          "title": "Operation",
+          "type": "string"
+        },
+        "parameters": {
+          "additionalProperties": true,
+          "title": "Parameters",
+          "type": "object"
+        },
+        "records_in": {
+          "title": "Records In",
+          "type": "integer"
+        },
+        "records_out": {
+          "title": "Records Out",
+          "type": "integer"
+        },
+        "source_version_id": {
+          "title": "Source Version Id",
+          "type": "string"
+        },
+        "stale": {
+          "title": "Stale",
+          "type": "integer"
+        },
+        "version_id": {
+          "title": "Version Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "curation_id",
+        "dataset_id",
+        "source_version_id",
+        "version_id",
+        "operation",
+        "parameters",
+        "records_in",
+        "records_out",
+        "stale",
+        "created_at"
+      ],
+      "title": "DatasetCurationInfo",
+      "type": "object"
+    },
+    "title": "Curate a dataset"
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
       "idempotentHint": true,
       "openWorldHint": false,
       "readOnlyHint": true,
       "title": "Diff dataset versions"
     },
-    "description": "List added, removed, and changed record IDs between two completed stored dataset versions.",
+    "description": "List added, removed, and changed record IDs between two completed stored dataset versions. Use when: comparing two versions of a dataset. Next: the result's next_call for the next page.",
     "inputSchema": {
       "properties": {
         "cursor": {
@@ -1893,6 +3143,44 @@
           ],
           "title": "DatasetVersionDiffTotals",
           "type": "object"
+        },
+        "NextAction": {
+          "description": "A call that usually comes after this result, and why.",
+          "properties": {
+            "name": {
+              "title": "Name",
+              "type": "string"
+            },
+            "why": {
+              "title": "Why",
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "why"
+          ],
+          "title": "NextAction",
+          "type": "object"
+        },
+        "NextCall": {
+          "description": "The tool to call next and its arguments: only a tool this caller may call.",
+          "properties": {
+            "arguments": {
+              "additionalProperties": true,
+              "title": "Arguments",
+              "type": "object"
+            },
+            "tool": {
+              "title": "Tool",
+              "type": "string"
+            }
+          },
+          "required": [
+            "tool"
+          ],
+          "title": "NextCall",
+          "type": "object"
         }
       },
       "description": "A page of a dataset version diff with whole-diff totals and the next cursor.",
@@ -1903,6 +3191,26 @@
           },
           "title": "Entries",
           "type": "array"
+        },
+        "next_actions": {
+          "description": "At most 3 calls that usually come after this result.",
+          "items": {
+            "$ref": "#/$defs/NextAction"
+          },
+          "title": "Next Actions",
+          "type": "array"
+        },
+        "next_call": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NextCall"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The tool to call next, with its arguments."
         },
         "next_cursor": {
           "anyOf": [
@@ -1915,6 +3223,19 @@
           ],
           "default": null,
           "title": "Next Cursor"
+        },
+        "poll_after_seconds": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Wait this long before polling next_call.",
+          "title": "Poll After Seconds"
         },
         "totals": {
           "$ref": "#/$defs/DatasetVersionDiffTotals"
@@ -1937,7 +3258,7 @@
       "readOnlyHint": false,
       "title": "Extract structured data with your AI provider"
     },
-    "description": "Extract one JSON object from a job's HTML or text artifact using your own AI provider. The values derive from untrusted web content (the result is marked untrusted_external_content).",
+    "description": "Extract one JSON object from a job's HTML or text artifact using your own AI provider. The values derive from untrusted web content (the result is marked untrusted_external_content). Use when: you need one structured object from one job's page with your own AI provider (it spends your provider's tokens). Not for: every record of a dataset (use apex_scrapy_extract_dataset).",
     "inputSchema": {
       "properties": {
         "artifact_name": {
@@ -2084,7 +3405,7 @@
       "readOnlyHint": false,
       "title": "Extract assets"
     },
-    "description": "Extract the images, video, audio, documents, data files or web assets one page links to, through the egress gate. Hosted: holds the estimate (see apex_scrapy_quote_assets) and charges actual usage up to it, nothing if nothing is stored; max_credits refuses a larger estimate. Poll apex_scrapy_asset_result with the job_id.",
+    "description": "Extract the images, video, audio, documents, data files or web assets one page links to, through the egress gate (archives only when classes names them: stored with a member listing, never extracted, not malware-scanned without a provider). Hosted: holds the estimate (see apex_scrapy_quote_assets) and charges actual usage up to it, nothing if nothing is stored; max_credits refuses a larger estimate. include_headers records each stored file's allowlisted response headers. Poll apex_scrapy_asset_result with the job_id. Use when: you need the files a page links to (images, documents, data). Not for: the page's own text (use apex_scrapy_scrape_url). Charged in credits on hosted. Next: the result's next_call.",
     "inputSchema": {
       "properties": {
         "classes": {
@@ -2097,7 +3418,8 @@
                   "audio",
                   "documents",
                   "data",
-                  "web_assets"
+                  "web_assets",
+                  "archives"
                 ],
                 "type": "string"
               },
@@ -2109,6 +3431,11 @@
           ],
           "default": null,
           "title": "Classes"
+        },
+        "include_headers": {
+          "default": false,
+          "title": "Include Headers",
+          "type": "boolean"
         },
         "max_bytes": {
           "default": 52428800,
@@ -2153,6 +3480,59 @@
     },
     "name": "apex_scrapy_extract_assets",
     "outputSchema": {
+      "$defs": {
+        "JobStatus": {
+          "description": "A job's status, spelled this way in every response: `pending` until it starts, then `running`, then one of\n`completed`, `failed`, `cancelled` or `orphaned` (its process was lost before it finished; no result follows).",
+          "enum": [
+            "pending",
+            "running",
+            "completed",
+            "failed",
+            "cancelled",
+            "orphaned"
+          ],
+          "title": "JobStatus",
+          "type": "string"
+        },
+        "NextAction": {
+          "description": "A call that usually comes after this result, and why.",
+          "properties": {
+            "name": {
+              "title": "Name",
+              "type": "string"
+            },
+            "why": {
+              "title": "Why",
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "why"
+          ],
+          "title": "NextAction",
+          "type": "object"
+        },
+        "NextCall": {
+          "description": "The tool to call next and its arguments: only a tool this caller may call.",
+          "properties": {
+            "arguments": {
+              "additionalProperties": true,
+              "title": "Arguments",
+              "type": "object"
+            },
+            "tool": {
+              "title": "Tool",
+              "type": "string"
+            }
+          },
+          "required": [
+            "tool"
+          ],
+          "title": "NextCall",
+          "type": "object"
+        }
+      },
       "description": "A submitted asset job: poll apex_scrapy_asset_result with its job_id.",
       "properties": {
         "classes": {
@@ -2186,6 +3566,39 @@
           "title": "Metered",
           "type": "boolean"
         },
+        "next_actions": {
+          "description": "At most 3 calls that usually come after this result.",
+          "items": {
+            "$ref": "#/$defs/NextAction"
+          },
+          "title": "Next Actions",
+          "type": "array"
+        },
+        "next_call": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NextCall"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The tool to call next, with its arguments."
+        },
+        "poll_after_seconds": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Wait this long before polling next_call.",
+          "title": "Poll After Seconds"
+        },
         "reserved_credits": {
           "anyOf": [
             {
@@ -2199,8 +3612,7 @@
           "title": "Reserved Credits"
         },
         "status": {
-          "title": "Status",
-          "type": "string"
+          "$ref": "#/$defs/JobStatus"
         },
         "url": {
           "title": "Url",
@@ -2228,7 +3640,7 @@
       "readOnlyHint": false,
       "title": "Extract a dataset with your AI provider"
     },
-    "description": "Create a derived dataset by extracting validated JSON from non-quarantined source records.",
+    "description": "Create a derived dataset by extracting validated JSON from non-quarantined source records. Use when: you need structured fields from every record of a dataset, with your own AI provider (it spends your provider's tokens). Not for: one page (use apex_scrapy_extract). Next: the result's next_call.",
     "inputSchema": {
       "properties": {
         "dataset_id": {
@@ -2307,6 +3719,59 @@
     },
     "name": "apex_scrapy_extract_dataset",
     "outputSchema": {
+      "$defs": {
+        "JobStatus": {
+          "description": "A job's status, spelled this way in every response: `pending` until it starts, then `running`, then one of\n`completed`, `failed`, `cancelled` or `orphaned` (its process was lost before it finished; no result follows).",
+          "enum": [
+            "pending",
+            "running",
+            "completed",
+            "failed",
+            "cancelled",
+            "orphaned"
+          ],
+          "title": "JobStatus",
+          "type": "string"
+        },
+        "NextAction": {
+          "description": "A call that usually comes after this result, and why.",
+          "properties": {
+            "name": {
+              "title": "Name",
+              "type": "string"
+            },
+            "why": {
+              "title": "Why",
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "why"
+          ],
+          "title": "NextAction",
+          "type": "object"
+        },
+        "NextCall": {
+          "description": "The tool to call next and its arguments: only a tool this caller may call.",
+          "properties": {
+            "arguments": {
+              "additionalProperties": true,
+              "title": "Arguments",
+              "type": "object"
+            },
+            "tool": {
+              "title": "Tool",
+              "type": "string"
+            }
+          },
+          "required": [
+            "tool"
+          ],
+          "title": "NextCall",
+          "type": "object"
+        }
+      },
       "properties": {
         "job_id": {
           "title": "Job Id",
@@ -2319,6 +3784,39 @@
           "title": "Links",
           "type": "object"
         },
+        "next_actions": {
+          "description": "At most 3 calls that usually come after this result.",
+          "items": {
+            "$ref": "#/$defs/NextAction"
+          },
+          "title": "Next Actions",
+          "type": "array"
+        },
+        "next_call": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NextCall"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The tool to call next, with its arguments."
+        },
+        "poll_after_seconds": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Wait this long before polling next_call.",
+          "title": "Poll After Seconds"
+        },
         "source_dataset_id": {
           "title": "Source Dataset Id",
           "type": "string"
@@ -2328,8 +3826,7 @@
           "type": "string"
         },
         "status": {
-          "title": "Status",
-          "type": "string"
+          "$ref": "#/$defs/JobStatus"
         },
         "target_dataset_id": {
           "title": "Target Dataset Id",
@@ -2362,7 +3859,7 @@
       "readOnlyHint": true,
       "title": "Get dataset manifest"
     },
-    "description": "Return one owned dataset plus its version history and active published version.",
+    "description": "Return one owned dataset plus its version history and active published version. Use when: you need one dataset's version history. Not for: its records (use apex_scrapy_query_dataset_version).",
     "inputSchema": {
       "properties": {
         "dataset_id": {
@@ -2497,8 +3994,7 @@
               "type": "integer"
             },
             "status": {
-              "title": "Status",
-              "type": "string"
+              "$ref": "#/$defs/JobStatus"
             },
             "validation_state": {
               "title": "Validation State",
@@ -2527,6 +4023,19 @@
           ],
           "title": "DatasetVersionInfo",
           "type": "object"
+        },
+        "JobStatus": {
+          "description": "A job's status, spelled this way in every response: `pending` until it starts, then `running`, then one of\n`completed`, `failed`, `cancelled` or `orphaned` (its process was lost before it finished; no result follows).",
+          "enum": [
+            "pending",
+            "running",
+            "completed",
+            "failed",
+            "cancelled",
+            "orphaned"
+          ],
+          "title": "JobStatus",
+          "type": "string"
         }
       },
       "properties": {
@@ -2558,7 +4067,7 @@
       "readOnlyHint": true,
       "title": "Get job"
     },
-    "description": "Return one owned job and its artifact metadata; wait_seconds (≤60) waits for a terminal state first.",
+    "description": "Return one owned job and its artifact metadata; wait_seconds (≤60) waits for a terminal state first. Use when: following any job by its job_id. Not for: a scrape's content (use apex_scrapy_scrape_result). Next: the result's next_call while it runs.",
     "inputSchema": {
       "properties": {
         "job_id": {
@@ -2608,6 +4117,57 @@
             "dataset_queryable"
           ],
           "title": "ArtifactInfo",
+          "type": "object"
+        },
+        "JobStatus": {
+          "description": "A job's status, spelled this way in every response: `pending` until it starts, then `running`, then one of\n`completed`, `failed`, `cancelled` or `orphaned` (its process was lost before it finished; no result follows).",
+          "enum": [
+            "pending",
+            "running",
+            "completed",
+            "failed",
+            "cancelled",
+            "orphaned"
+          ],
+          "title": "JobStatus",
+          "type": "string"
+        },
+        "NextAction": {
+          "description": "A call that usually comes after this result, and why.",
+          "properties": {
+            "name": {
+              "title": "Name",
+              "type": "string"
+            },
+            "why": {
+              "title": "Why",
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "why"
+          ],
+          "title": "NextAction",
+          "type": "object"
+        },
+        "NextCall": {
+          "description": "The tool to call next and its arguments: only a tool this caller may call.",
+          "properties": {
+            "arguments": {
+              "additionalProperties": true,
+              "title": "Arguments",
+              "type": "object"
+            },
+            "tool": {
+              "title": "Tool",
+              "type": "string"
+            }
+          },
+          "required": [
+            "tool"
+          ],
+          "title": "NextCall",
           "type": "object"
         }
       },
@@ -2677,6 +4237,39 @@
           "title": "Job Id",
           "type": "string"
         },
+        "next_actions": {
+          "description": "At most 3 calls that usually come after this result.",
+          "items": {
+            "$ref": "#/$defs/NextAction"
+          },
+          "title": "Next Actions",
+          "type": "array"
+        },
+        "next_call": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NextCall"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The tool to call next, with its arguments."
+        },
+        "poll_after_seconds": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Wait this long before polling next_call.",
+          "title": "Poll After Seconds"
+        },
         "project_workspace": {
           "anyOf": [
             {
@@ -2718,8 +4311,7 @@
           "title": "Started At"
         },
         "status": {
-          "title": "Status",
-          "type": "string"
+          "$ref": "#/$defs/JobStatus"
         },
         "warnings": {
           "items": {
@@ -2750,7 +4342,7 @@
       "readOnlyHint": true,
       "title": "List job artifacts"
     },
-    "description": "List files belonging to one owned job without exposing filesystem paths.",
+    "description": "List files belonging to one owned job without exposing filesystem paths. Use when: finding the files a job wrote. Next: apex_scrapy_read_artifact with a filename.",
     "inputSchema": {
       "properties": {
         "job_id": {
@@ -2821,7 +4413,7 @@
       "readOnlyHint": true,
       "title": "List Scrapy capabilities"
     },
-    "description": "List capability identifiers exposed by the configured Scrapy engine. Dedicated deployments only.",
+    "description": "List capability identifiers exposed by the configured Scrapy engine. Dedicated deployments only. Use when: deciding which Scrapy features a dedicated deployment's engine supports.",
     "inputSchema": {
       "properties": {},
       "title": "apex_scrapy_list_capabilitiesArguments",
@@ -2857,9 +4449,219 @@
       "idempotentHint": true,
       "openWorldHint": false,
       "readOnlyHint": true,
+      "title": "List dataset curations"
+    },
+    "description": "An owned dataset's curations, newest first: each one's new version, source version, operation and counts. Use when: reviewing what was curated in a dataset. Next: the result's next_call for the next page.",
+    "inputSchema": {
+      "properties": {
+        "cursor": {
+          "anyOf": [
+            {
+              "maxLength": 512,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cursor"
+        },
+        "dataset_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Dataset Id",
+          "type": "string"
+        },
+        "limit": {
+          "default": 50,
+          "maximum": 100,
+          "minimum": 1,
+          "title": "Limit",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "dataset_id"
+      ],
+      "title": "apex_scrapy_list_dataset_curationsArguments",
+      "type": "object"
+    },
+    "name": "apex_scrapy_list_dataset_curations",
+    "outputSchema": {
+      "$defs": {
+        "DatasetCurationInfo": {
+          "description": "One curation: the new version it made from which version, how, and what it counted.",
+          "properties": {
+            "created_at": {
+              "title": "Created At",
+              "type": "string"
+            },
+            "curation_id": {
+              "title": "Curation Id",
+              "type": "string"
+            },
+            "dataset_id": {
+              "title": "Dataset Id",
+              "type": "string"
+            },
+            "operation": {
+              "enum": [
+                "remove",
+                "dedupe",
+                "reextract"
+              ],
+              "title": "Operation",
+              "type": "string"
+            },
+            "parameters": {
+              "additionalProperties": true,
+              "title": "Parameters",
+              "type": "object"
+            },
+            "records_in": {
+              "title": "Records In",
+              "type": "integer"
+            },
+            "records_out": {
+              "title": "Records Out",
+              "type": "integer"
+            },
+            "source_version_id": {
+              "title": "Source Version Id",
+              "type": "string"
+            },
+            "stale": {
+              "title": "Stale",
+              "type": "integer"
+            },
+            "version_id": {
+              "title": "Version Id",
+              "type": "string"
+            }
+          },
+          "required": [
+            "curation_id",
+            "dataset_id",
+            "source_version_id",
+            "version_id",
+            "operation",
+            "parameters",
+            "records_in",
+            "records_out",
+            "stale",
+            "created_at"
+          ],
+          "title": "DatasetCurationInfo",
+          "type": "object"
+        },
+        "NextAction": {
+          "description": "A call that usually comes after this result, and why.",
+          "properties": {
+            "name": {
+              "title": "Name",
+              "type": "string"
+            },
+            "why": {
+              "title": "Why",
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "why"
+          ],
+          "title": "NextAction",
+          "type": "object"
+        },
+        "NextCall": {
+          "description": "The tool to call next and its arguments: only a tool this caller may call.",
+          "properties": {
+            "arguments": {
+              "additionalProperties": true,
+              "title": "Arguments",
+              "type": "object"
+            },
+            "tool": {
+              "title": "Tool",
+              "type": "string"
+            }
+          },
+          "required": [
+            "tool"
+          ],
+          "title": "NextCall",
+          "type": "object"
+        }
+      },
+      "properties": {
+        "curations": {
+          "items": {
+            "$ref": "#/$defs/DatasetCurationInfo"
+          },
+          "title": "Curations",
+          "type": "array"
+        },
+        "next_actions": {
+          "description": "At most 3 calls that usually come after this result.",
+          "items": {
+            "$ref": "#/$defs/NextAction"
+          },
+          "title": "Next Actions",
+          "type": "array"
+        },
+        "next_call": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NextCall"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The tool to call next, with its arguments."
+        },
+        "next_cursor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Next Cursor"
+        },
+        "poll_after_seconds": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Wait this long before polling next_call.",
+          "title": "Poll After Seconds"
+        }
+      },
+      "title": "DatasetCurationListResult",
+      "type": "object"
+    },
+    "title": "List dataset curations"
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true,
       "title": "List dataset fields"
     },
-    "description": "Discover field paths, observed JSON types, counts, and examples in a stored dataset version.",
+    "description": "Discover field paths, observed JSON types, counts, and examples in a stored dataset version. Use when: learning a dataset's field paths before filtering it. Next: apex_scrapy_query_dataset_version.",
     "inputSchema": {
       "properties": {
         "dataset_id": {
@@ -2965,7 +4767,7 @@
       "readOnlyHint": true,
       "title": "List published datasets"
     },
-    "description": "List versioned datasets owned by this identity, including their active versions.",
+    "description": "List versioned datasets owned by this identity, including their active versions. Use when: finding your datasets and their active versions. Next: apex_scrapy_get_dataset with a dataset_id.",
     "inputSchema": {
       "properties": {
         "limit": {
@@ -3063,7 +4865,7 @@
       "readOnlyHint": true,
       "title": "List owned jobs"
     },
-    "description": "List only jobs owned by the authenticated MCP identity/account.",
+    "description": "List only jobs owned by the authenticated MCP identity/account. Use when: finding a job you started earlier. Not for: one known job (use apex_scrapy_get_job). Next: apex_scrapy_get_job with a job_id.",
     "inputSchema": {
       "properties": {
         "limit": {
@@ -3083,6 +4885,7 @@
             }
           ],
           "default": null,
+          "description": "Only jobs of this status, e.g. running (either case is accepted)",
           "title": "Status"
         }
       },
@@ -3188,8 +4991,7 @@
               "title": "Started At"
             },
             "status": {
-              "title": "Status",
-              "type": "string"
+              "$ref": "#/$defs/JobStatus"
             }
           },
           "required": [
@@ -3202,6 +5004,19 @@
           ],
           "title": "JobInfo",
           "type": "object"
+        },
+        "JobStatus": {
+          "description": "A job's status, spelled this way in every response: `pending` until it starts, then `running`, then one of\n`completed`, `failed`, `cancelled` or `orphaned` (its process was lost before it finished; no result follows).",
+          "enum": [
+            "pending",
+            "running",
+            "completed",
+            "failed",
+            "cancelled",
+            "orphaned"
+          ],
+          "title": "JobStatus",
+          "type": "string"
         }
       },
       "properties": {
@@ -3239,7 +5054,7 @@
       "readOnlyHint": true,
       "title": "List crawl targets"
     },
-    "description": "List a dedicated deployment's spiders or hosted catalog crawl targets visible to this identity.",
+    "description": "List a dedicated deployment's spiders or hosted catalog crawl targets visible to this identity. Use when: choosing a crawl_target for apex_scrapy_start_crawl. Not for: a site URL (use apex_scrapy_crawl_site).",
     "inputSchema": {
       "properties": {},
       "title": "apex_scrapy_list_spidersArguments",
@@ -3332,7 +5147,7 @@
       "readOnlyHint": true,
       "title": "Map result"
     },
-    "description": "Finish a pending map: pass the job_ids apex_scrapy_map_url returned (start page first), waiting up to wait_seconds for the start page. Reads those jobs' results; fetches nothing and starts no job.",
+    "description": "Finish a pending map: pass the job_ids apex_scrapy_map_url returned (start page first), waiting up to wait_seconds for the start page. Reads those jobs' results; fetches nothing and starts no job. Use when: apex_scrapy_map_url returned pending. Not for: starting a map (use apex_scrapy_map_url).",
     "inputSchema": {
       "properties": {
         "job_ids": {
@@ -3369,6 +5184,46 @@
     },
     "name": "apex_scrapy_map_result",
     "outputSchema": {
+      "$defs": {
+        "NextAction": {
+          "description": "A call that usually comes after this result, and why.",
+          "properties": {
+            "name": {
+              "title": "Name",
+              "type": "string"
+            },
+            "why": {
+              "title": "Why",
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "why"
+          ],
+          "title": "NextAction",
+          "type": "object"
+        },
+        "NextCall": {
+          "description": "The tool to call next and its arguments: only a tool this caller may call.",
+          "properties": {
+            "arguments": {
+              "additionalProperties": true,
+              "title": "Arguments",
+              "type": "object"
+            },
+            "tool": {
+              "title": "Tool",
+              "type": "string"
+            }
+          },
+          "required": [
+            "tool"
+          ],
+          "title": "NextCall",
+          "type": "object"
+        }
+      },
       "description": "A site map: same-host URLs from the start page and its sitemap (gated scrape jobs).",
       "properties": {
         "block_reason": {
@@ -3450,6 +5305,26 @@
           "default": null,
           "title": "Next"
         },
+        "next_actions": {
+          "description": "At most 3 calls that usually come after this result.",
+          "items": {
+            "$ref": "#/$defs/NextAction"
+          },
+          "title": "Next Actions",
+          "type": "array"
+        },
+        "next_call": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NextCall"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The tool to call next, with its arguments."
+        },
         "outcome": {
           "anyOf": [
             {
@@ -3461,6 +5336,19 @@
           ],
           "default": null,
           "title": "Outcome"
+        },
+        "poll_after_seconds": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Wait this long before polling next_call.",
+          "title": "Poll After Seconds"
         },
         "sources": {
           "additionalProperties": {
@@ -3512,7 +5400,7 @@
       "readOnlyHint": false,
       "title": "Map a site"
     },
-    "description": "List a site's URLs: same-host links of the start page plus its sitemap.xml, through the egress gate. Pending after wait_seconds: call apex_scrapy_map_result with the job_ids. engine=browser renders the start page in a sandboxed browser first (on a dedicated deployment, when enabled); the sitemap is always fetched statically.",
+    "description": "List a site's URLs: same-host links of the start page plus its sitemap.xml, through the egress gate. Pending after wait_seconds: call apex_scrapy_map_result with the job_ids. engine=browser renders the start page in a sandboxed browser first (on a dedicated deployment, when enabled); the sitemap is always fetched statically. Use when: you need a site's URLs before choosing pages. Not for: page content (use apex_scrapy_scrape_url, or use apex_scrapy_crawl_site for many pages). Each fetch is charged as a scrape. Next: while pending, the result's next_call.",
     "inputSchema": {
       "properties": {
         "engine": {
@@ -3560,6 +5448,46 @@
     },
     "name": "apex_scrapy_map_url",
     "outputSchema": {
+      "$defs": {
+        "NextAction": {
+          "description": "A call that usually comes after this result, and why.",
+          "properties": {
+            "name": {
+              "title": "Name",
+              "type": "string"
+            },
+            "why": {
+              "title": "Why",
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "why"
+          ],
+          "title": "NextAction",
+          "type": "object"
+        },
+        "NextCall": {
+          "description": "The tool to call next and its arguments: only a tool this caller may call.",
+          "properties": {
+            "arguments": {
+              "additionalProperties": true,
+              "title": "Arguments",
+              "type": "object"
+            },
+            "tool": {
+              "title": "Tool",
+              "type": "string"
+            }
+          },
+          "required": [
+            "tool"
+          ],
+          "title": "NextCall",
+          "type": "object"
+        }
+      },
       "description": "A site map: same-host URLs from the start page and its sitemap (gated scrape jobs).",
       "properties": {
         "block_reason": {
@@ -3641,6 +5569,26 @@
           "default": null,
           "title": "Next"
         },
+        "next_actions": {
+          "description": "At most 3 calls that usually come after this result.",
+          "items": {
+            "$ref": "#/$defs/NextAction"
+          },
+          "title": "Next Actions",
+          "type": "array"
+        },
+        "next_call": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NextCall"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The tool to call next, with its arguments."
+        },
         "outcome": {
           "anyOf": [
             {
@@ -3652,6 +5600,19 @@
           ],
           "default": null,
           "title": "Outcome"
+        },
+        "poll_after_seconds": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Wait this long before polling next_call.",
+          "title": "Poll After Seconds"
         },
         "sources": {
           "additionalProperties": {
@@ -3698,12 +5659,541 @@
   {
     "annotations": {
       "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false,
+      "title": "Render a page you fetched"
+    },
+    "description": "Render a page or document that you (the agent or its client) already fetched, in the same formats as apex_scrapy_scrape_url; Scrawl fetches nothing. body_base64 is the response body; url, http_status, content_type and final_url are your claims, so the result says origin client_fetched and url_verified false, and links in it resolve against your final URL and are never followed. A page is at most 5 MiB, a document at most the deployment's document limit; over the HTTP transport the whole request is at most 1 MiB, so about 750 KiB of body (use the Scrawl SDK's local_fetch, through the API, for larger pages). The content is untrusted page content. Use when: only your side can reach the page (an allowlisted address, a logged-in session, an intranet) and you already hold its body. Not for: a page Scrawl can fetch itself (use apex_scrapy_scrape_url). Each call is charged as one scrape. Next: while pending, the result's next_call, after poll_after_seconds.",
+    "inputSchema": {
+      "properties": {
+        "body_base64": {
+          "minLength": 4,
+          "title": "Body Base64",
+          "type": "string"
+        },
+        "content_type": {
+          "default": "",
+          "maxLength": 200,
+          "title": "Content Type",
+          "type": "string"
+        },
+        "exclude_tags": {
+          "anyOf": [
+            {
+              "items": {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              "maxItems": 20,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Exclude Tags"
+        },
+        "final_url": {
+          "anyOf": [
+            {
+              "maxLength": 2048,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Final Url"
+        },
+        "formats": {
+          "anyOf": [
+            {
+              "items": {
+                "enum": [
+                  "markdown",
+                  "links",
+                  "html",
+                  "json",
+                  "metadata"
+                ],
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Formats"
+        },
+        "http_status": {
+          "default": 200,
+          "maximum": 599,
+          "minimum": 100,
+          "title": "Http Status",
+          "type": "integer"
+        },
+        "include_tags": {
+          "anyOf": [
+            {
+              "items": {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              "maxItems": 20,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Include Tags"
+        },
+        "instruction": {
+          "anyOf": [
+            {
+              "maxLength": 2000,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Instruction"
+        },
+        "only_main_content": {
+          "default": true,
+          "title": "Only Main Content",
+          "type": "boolean"
+        },
+        "profile": {
+          "anyOf": [
+            {
+              "maxLength": 32,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Profile"
+        },
+        "schema": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Schema"
+        },
+        "url": {
+          "maxLength": 2048,
+          "minLength": 8,
+          "title": "Url",
+          "type": "string"
+        },
+        "wait_seconds": {
+          "default": 30,
+          "maximum": 60,
+          "minimum": 0,
+          "title": "Wait Seconds",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "url",
+        "body_base64"
+      ],
+      "title": "apex_scrapy_parse_contentArguments",
+      "type": "object"
+    },
+    "name": "apex_scrapy_parse_content",
+    "outputSchema": {
+      "$defs": {
+        "NextAction": {
+          "description": "A call that usually comes after this result, and why.",
+          "properties": {
+            "name": {
+              "title": "Name",
+              "type": "string"
+            },
+            "why": {
+              "title": "Why",
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "why"
+          ],
+          "title": "NextAction",
+          "type": "object"
+        },
+        "NextCall": {
+          "description": "The tool to call next and its arguments: only a tool this caller may call.",
+          "properties": {
+            "arguments": {
+              "additionalProperties": true,
+              "title": "Arguments",
+              "type": "object"
+            },
+            "tool": {
+              "title": "Tool",
+              "type": "string"
+            }
+          },
+          "required": [
+            "tool"
+          ],
+          "title": "NextCall",
+          "type": "object"
+        }
+      },
+      "description": "One URL scraped through the gate: formats when completed, the job when pending.",
+      "properties": {
+        "ai": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ai"
+        },
+        "block_reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Block Reason"
+        },
+        "browser": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Browser"
+        },
+        "content_type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Content Type"
+        },
+        "data": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Data"
+        },
+        "elapsed_ms": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Elapsed Ms"
+        },
+        "engine": {
+          "default": "static",
+          "title": "Engine",
+          "type": "string"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error"
+        },
+        "error_code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error Code"
+        },
+        "final_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Final Url"
+        },
+        "hint": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Hint"
+        },
+        "html": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Html"
+        },
+        "http_status": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Http Status"
+        },
+        "job_id": {
+          "title": "Job Id",
+          "type": "string"
+        },
+        "links": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Links"
+        },
+        "markdown": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Markdown"
+        },
+        "metadata": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Metadata"
+        },
+        "next_actions": {
+          "description": "At most 3 calls that usually come after this result.",
+          "items": {
+            "$ref": "#/$defs/NextAction"
+          },
+          "title": "Next Actions",
+          "type": "array"
+        },
+        "next_call": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NextCall"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The tool to call next, with its arguments."
+        },
+        "origin": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "client_fetched: the caller's own client fetched the page",
+          "title": "Origin"
+        },
+        "outcome": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Outcome"
+        },
+        "poll_after_seconds": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Wait this long before polling next_call.",
+          "title": "Poll After Seconds"
+        },
+        "retry_after_s": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Retry After S"
+        },
+        "status": {
+          "title": "Status",
+          "type": "string"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Title"
+        },
+        "truncated": {
+          "default": false,
+          "title": "Truncated",
+          "type": "boolean"
+        },
+        "untrusted_external_content": {
+          "default": true,
+          "title": "Untrusted External Content",
+          "type": "boolean"
+        },
+        "url": {
+          "title": "Url",
+          "type": "string"
+        },
+        "url_verified": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "false for a client-fetched page (its URL is a claim)",
+          "title": "Url Verified"
+        }
+      },
+      "required": [
+        "job_id",
+        "status",
+        "url"
+      ],
+      "title": "ScrapeUrlResult",
+      "type": "object"
+    },
+    "title": "Render a page you fetched"
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
       "idempotentHint": true,
       "openWorldHint": false,
       "readOnlyHint": true,
       "title": "Query one job dataset artifact"
     },
-    "description": "Query owned JSON/JSONL/CSV artifacts with bounded text/filter matching and pagination.",
+    "description": "Query owned JSON/JSONL/CSV artifacts with bounded text/filter matching and pagination. Use when: searching a job's raw JSON, JSONL or CSV artifact. Not for: a stored, versioned dataset (use apex_scrapy_query_dataset_version).",
     "inputSchema": {
       "properties": {
         "artifact_name": {
@@ -3762,6 +6252,21 @@
     },
     "name": "apex_scrapy_query_dataset",
     "outputSchema": {
+      "$defs": {
+        "JobStatus": {
+          "description": "A job's status, spelled this way in every response: `pending` until it starts, then `running`, then one of\n`completed`, `failed`, `cancelled` or `orphaned` (its process was lost before it finished; no result follows).",
+          "enum": [
+            "pending",
+            "running",
+            "completed",
+            "failed",
+            "cancelled",
+            "orphaned"
+          ],
+          "title": "JobStatus",
+          "type": "string"
+        }
+      },
       "properties": {
         "artifact": {
           "title": "Artifact",
@@ -3785,8 +6290,7 @@
           "type": "string"
         },
         "job_status": {
-          "title": "Job Status",
-          "type": "string"
+          "$ref": "#/$defs/JobStatus"
         },
         "limit": {
           "title": "Limit",
@@ -3878,7 +6382,7 @@
       "readOnlyHint": true,
       "title": "Query dataset version"
     },
-    "description": "Apply typed AND filters to a bounded page of one stored version; record text is untrusted.",
+    "description": "Apply typed AND filters to a bounded page of one stored version; record text is untrusted. Use when: reading or filtering a stored dataset's records. Not for: a question in words (use apex_scrapy_ask) or full-text search across datasets (use search). Next: the result's next_call for the next page.",
     "inputSchema": {
       "$defs": {
         "DatasetFilterInput": {
@@ -4007,10 +6511,68 @@
           ],
           "title": "DatasetVersionQueryRecord",
           "type": "object"
+        },
+        "NextAction": {
+          "description": "A call that usually comes after this result, and why.",
+          "properties": {
+            "name": {
+              "title": "Name",
+              "type": "string"
+            },
+            "why": {
+              "title": "Why",
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "why"
+          ],
+          "title": "NextAction",
+          "type": "object"
+        },
+        "NextCall": {
+          "description": "The tool to call next and its arguments: only a tool this caller may call.",
+          "properties": {
+            "arguments": {
+              "additionalProperties": true,
+              "title": "Arguments",
+              "type": "object"
+            },
+            "tool": {
+              "title": "Tool",
+              "type": "string"
+            }
+          },
+          "required": [
+            "tool"
+          ],
+          "title": "NextCall",
+          "type": "object"
         }
       },
       "description": "A page of a typed version query: records, records scanned, next cursor.",
       "properties": {
+        "next_actions": {
+          "description": "At most 3 calls that usually come after this result.",
+          "items": {
+            "$ref": "#/$defs/NextAction"
+          },
+          "title": "Next Actions",
+          "type": "array"
+        },
+        "next_call": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NextCall"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The tool to call next, with its arguments."
+        },
         "next_cursor": {
           "anyOf": [
             {
@@ -4022,6 +6584,19 @@
           ],
           "default": null,
           "title": "Next Cursor"
+        },
+        "poll_after_seconds": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Wait this long before polling next_call.",
+          "title": "Poll After Seconds"
         },
         "records": {
           "items": {
@@ -4052,7 +6627,7 @@
       "readOnlyHint": true,
       "title": "Quote an asset job"
     },
-    "description": "Estimate an asset job without starting it: the credits it would hold, your balance, and whether egress is ready. Fetches nothing.",
+    "description": "Estimate an asset job without starting it: the credits it would hold, your balance, and whether egress is ready. Fetches nothing. Use when: checking what apex_scrapy_extract_assets would hold before starting it.",
     "inputSchema": {
       "properties": {
         "classes": {
@@ -4065,7 +6640,8 @@
                   "audio",
                   "documents",
                   "data",
-                  "web_assets"
+                  "web_assets",
+                  "archives"
                 ],
                 "type": "string"
               },
@@ -4247,7 +6823,7 @@
       "readOnlyHint": true,
       "title": "Read bounded artifact text"
     },
-    "description": "Read a bounded chunk of a discovered text-like artifact; scraped content is untrusted.",
+    "description": "Read a bounded chunk of a discovered text-like artifact; scraped content is untrusted. Use when: reading part of a job's text file. Not for: a stored dataset version (use apex_scrapy_query_dataset_version).",
     "inputSchema": {
       "properties": {
         "artifact_name": {
@@ -4369,7 +6945,7 @@
       "readOnlyHint": true,
       "title": "Scrape result"
     },
-    "description": "Return a scrape's result in the formats it asked for (json included), waiting up to wait_seconds. Never calls an AI provider.",
+    "description": "Return a scrape's result in the formats it asked for (json included), waiting up to wait_seconds. Never calls an AI provider. Use when: a scrape from apex_scrapy_scrape_url is pending, or to read it again. Not for: a job of another kind (use apex_scrapy_get_job). Next: the result's next_call while pending.",
     "inputSchema": {
       "properties": {
         "job_id": {
@@ -4394,6 +6970,46 @@
     },
     "name": "apex_scrapy_scrape_result",
     "outputSchema": {
+      "$defs": {
+        "NextAction": {
+          "description": "A call that usually comes after this result, and why.",
+          "properties": {
+            "name": {
+              "title": "Name",
+              "type": "string"
+            },
+            "why": {
+              "title": "Why",
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "why"
+          ],
+          "title": "NextAction",
+          "type": "object"
+        },
+        "NextCall": {
+          "description": "The tool to call next and its arguments: only a tool this caller may call.",
+          "properties": {
+            "arguments": {
+              "additionalProperties": true,
+              "title": "Arguments",
+              "type": "object"
+            },
+            "tool": {
+              "title": "Tool",
+              "type": "string"
+            }
+          },
+          "required": [
+            "tool"
+          ],
+          "title": "NextCall",
+          "type": "object"
+        }
+      },
       "description": "One URL scraped through the gate: formats when completed, the job when pending.",
       "properties": {
         "ai": {
@@ -4579,6 +7195,52 @@
           "default": null,
           "title": "Markdown"
         },
+        "metadata": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Metadata"
+        },
+        "next_actions": {
+          "description": "At most 3 calls that usually come after this result.",
+          "items": {
+            "$ref": "#/$defs/NextAction"
+          },
+          "title": "Next Actions",
+          "type": "array"
+        },
+        "next_call": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NextCall"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The tool to call next, with its arguments."
+        },
+        "origin": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "client_fetched: the caller's own client fetched the page",
+          "title": "Origin"
+        },
         "outcome": {
           "anyOf": [
             {
@@ -4590,6 +7252,19 @@
           ],
           "default": null,
           "title": "Outcome"
+        },
+        "poll_after_seconds": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Wait this long before polling next_call.",
+          "title": "Poll After Seconds"
         },
         "retry_after_s": {
           "anyOf": [
@@ -4632,6 +7307,19 @@
         "url": {
           "title": "Url",
           "type": "string"
+        },
+        "url_verified": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "false for a client-fetched page (its URL is a claim)",
+          "title": "Url Verified"
         }
       },
       "required": [
@@ -4652,7 +7340,7 @@
       "readOnlyHint": false,
       "title": "Scrape a URL"
     },
-    "description": "Scrape one public URL through the egress gate: markdown (default), links, html, or json (schema/instruction, your AI profile). Pending after wait_seconds: call apex_scrapy_scrape_result with the job_id. engine=browser renders the page in a sandboxed browser first (on a dedicated deployment, when enabled), with an optional passive wait_for_ms; the result's engine says which engine ran.",
+    "description": "Scrape one public URL through the egress gate: markdown (default), links, html, json (schema/instruction, your AI profile), or metadata (embedded JSON-LD, Microdata, RDFa, OpenGraph, meta tags; a JSON, XML or CSV body read into its structure; no model). Pending after wait_seconds: call apex_scrapy_scrape_result with the job_id. engine=browser renders the page in a sandboxed browser first (on a dedicated deployment, when enabled), with an optional passive wait_for_ms; the result's engine says which engine ran. only_main_content (default true), include_tags and exclude_tags shape the markdown format. Selectors are a safe CSS subset: type, .class, #id, [attr], [attr=value] and *, joined by descendant (space) or child (>) combinators; at most 20 of 200 characters. Use when: you need one page's content now. Not for: several URLs (use apex_scrapy_batch_scrape), a whole site (use apex_scrapy_crawl_site) or only its URL list (use apex_scrapy_map_url). Each call is charged as one scrape. Next: while pending, the result's next_call, after poll_after_seconds.",
     "inputSchema": {
       "properties": {
         "engine": {
@@ -4664,6 +7352,24 @@
           "title": "Engine",
           "type": "string"
         },
+        "exclude_tags": {
+          "anyOf": [
+            {
+              "items": {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              "maxItems": 20,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Exclude Tags"
+        },
         "formats": {
           "anyOf": [
             {
@@ -4672,7 +7378,8 @@
                   "markdown",
                   "links",
                   "html",
-                  "json"
+                  "json",
+                  "metadata"
                 ],
                 "type": "string"
               },
@@ -4684,6 +7391,24 @@
           ],
           "default": null,
           "title": "Formats"
+        },
+        "include_tags": {
+          "anyOf": [
+            {
+              "items": {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              "maxItems": 20,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Include Tags"
         },
         "instruction": {
           "anyOf": [
@@ -4697,6 +7422,11 @@
           ],
           "default": null,
           "title": "Instruction"
+        },
+        "only_main_content": {
+          "default": true,
+          "title": "Only Main Content",
+          "type": "boolean"
         },
         "profile": {
           "anyOf": [
@@ -4753,6 +7483,46 @@
     },
     "name": "apex_scrapy_scrape_url",
     "outputSchema": {
+      "$defs": {
+        "NextAction": {
+          "description": "A call that usually comes after this result, and why.",
+          "properties": {
+            "name": {
+              "title": "Name",
+              "type": "string"
+            },
+            "why": {
+              "title": "Why",
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "why"
+          ],
+          "title": "NextAction",
+          "type": "object"
+        },
+        "NextCall": {
+          "description": "The tool to call next and its arguments: only a tool this caller may call.",
+          "properties": {
+            "arguments": {
+              "additionalProperties": true,
+              "title": "Arguments",
+              "type": "object"
+            },
+            "tool": {
+              "title": "Tool",
+              "type": "string"
+            }
+          },
+          "required": [
+            "tool"
+          ],
+          "title": "NextCall",
+          "type": "object"
+        }
+      },
       "description": "One URL scraped through the gate: formats when completed, the job when pending.",
       "properties": {
         "ai": {
@@ -4938,6 +7708,52 @@
           "default": null,
           "title": "Markdown"
         },
+        "metadata": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Metadata"
+        },
+        "next_actions": {
+          "description": "At most 3 calls that usually come after this result.",
+          "items": {
+            "$ref": "#/$defs/NextAction"
+          },
+          "title": "Next Actions",
+          "type": "array"
+        },
+        "next_call": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NextCall"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The tool to call next, with its arguments."
+        },
+        "origin": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "client_fetched: the caller's own client fetched the page",
+          "title": "Origin"
+        },
         "outcome": {
           "anyOf": [
             {
@@ -4949,6 +7765,19 @@
           ],
           "default": null,
           "title": "Outcome"
+        },
+        "poll_after_seconds": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Wait this long before polling next_call.",
+          "title": "Poll After Seconds"
         },
         "retry_after_s": {
           "anyOf": [
@@ -4991,6 +7820,19 @@
         "url": {
           "title": "Url",
           "type": "string"
+        },
+        "url_verified": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "false for a client-fetched page (its URL is a claim)",
+          "title": "Url Verified"
         }
       },
       "required": [
@@ -5011,7 +7853,7 @@
       "readOnlyHint": false,
       "title": "Quarantine dataset record"
     },
-    "description": "Suppress or restore a stable record ID across versions without deleting provenance.",
+    "description": "Suppress or restore a stable record ID across versions without deleting provenance. Use when: hiding one record from reads in every version, or restoring it. Not for: a new cleaned version (use apex_scrapy_curate_dataset).",
     "inputSchema": {
       "properties": {
         "dataset_id": {
@@ -5094,12 +7936,342 @@
   {
     "annotations": {
       "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true,
+      "title": "Site crawl status"
+    },
+    "description": "A site crawl you started: status, counts, what its pages were charged, its dataset version and one page of the URLs it reached (next_cursor for more). wait_seconds (at most 60) waits for it to end. Use when: following a crawl you started with apex_scrapy_crawl_site. Next: the result's next_call (poll, then page) and next_actions.",
+    "inputSchema": {
+      "properties": {
+        "crawl_id": {
+          "maxLength": 64,
+          "minLength": 1,
+          "title": "Crawl Id",
+          "type": "string"
+        },
+        "cursor": {
+          "anyOf": [
+            {
+              "maxLength": 512,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cursor"
+        },
+        "limit": {
+          "default": 50,
+          "maximum": 200,
+          "minimum": 1,
+          "title": "Limit",
+          "type": "integer"
+        },
+        "wait_seconds": {
+          "default": 0,
+          "maximum": 60,
+          "minimum": 0,
+          "title": "Wait Seconds",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "crawl_id"
+      ],
+      "title": "apex_scrapy_site_crawl_statusArguments",
+      "type": "object"
+    },
+    "name": "apex_scrapy_site_crawl_status",
+    "outputSchema": {
+      "$defs": {
+        "JobStatus": {
+          "description": "A job's status, spelled this way in every response: `pending` until it starts, then `running`, then one of\n`completed`, `failed`, `cancelled` or `orphaned` (its process was lost before it finished; no result follows).",
+          "enum": [
+            "pending",
+            "running",
+            "completed",
+            "failed",
+            "cancelled",
+            "orphaned"
+          ],
+          "title": "JobStatus",
+          "type": "string"
+        },
+        "NextAction": {
+          "description": "A call that usually comes after this result, and why.",
+          "properties": {
+            "name": {
+              "title": "Name",
+              "type": "string"
+            },
+            "why": {
+              "title": "Why",
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "why"
+          ],
+          "title": "NextAction",
+          "type": "object"
+        },
+        "NextCall": {
+          "description": "The tool to call next and its arguments: only a tool this caller may call.",
+          "properties": {
+            "arguments": {
+              "additionalProperties": true,
+              "title": "Arguments",
+              "type": "object"
+            },
+            "tool": {
+              "title": "Tool",
+              "type": "string"
+            }
+          },
+          "required": [
+            "tool"
+          ],
+          "title": "NextCall",
+          "type": "object"
+        },
+        "SiteCrawlPageInfo": {
+          "description": "One URL a site crawl reached (from a page's links: untrusted text, defused).",
+          "properties": {
+            "depth": {
+              "title": "Depth",
+              "type": "integer"
+            },
+            "error": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Error"
+            },
+            "job_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Job Id"
+            },
+            "outcome": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "ok",
+                    "target_blocked",
+                    "target_error",
+                    "cancelled",
+                    "pipeline_failed"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Outcome"
+            },
+            "skip_reason": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Skip Reason"
+            },
+            "url": {
+              "title": "Url",
+              "type": "string"
+            }
+          },
+          "required": [
+            "url",
+            "depth"
+          ],
+          "title": "SiteCrawlPageInfo",
+          "type": "object"
+        }
+      },
+      "description": "A bounded site crawl: its status, counts, charge, dataset version and one page of the URLs it reached.\n\nRead the pages' text with the dataset tools (apex_scrapy_query_dataset_version, search, fetch) once done is true.",
+      "properties": {
+        "counts": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Counts",
+          "type": "object"
+        },
+        "crawl_id": {
+          "title": "Crawl Id",
+          "type": "string"
+        },
+        "credits_charged": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Credits Charged"
+        },
+        "dataset_id": {
+          "title": "Dataset Id",
+          "type": "string"
+        },
+        "dataset_version_id": {
+          "title": "Dataset Version Id",
+          "type": "string"
+        },
+        "done": {
+          "title": "Done",
+          "type": "boolean"
+        },
+        "max_depth": {
+          "title": "Max Depth",
+          "type": "integer"
+        },
+        "max_pages": {
+          "title": "Max Pages",
+          "type": "integer"
+        },
+        "next_actions": {
+          "description": "At most 3 calls that usually come after this result.",
+          "items": {
+            "$ref": "#/$defs/NextAction"
+          },
+          "title": "Next Actions",
+          "type": "array"
+        },
+        "next_call": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NextCall"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The tool to call next, with its arguments."
+        },
+        "next_cursor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Next Cursor"
+        },
+        "pages": {
+          "items": {
+            "$ref": "#/$defs/SiteCrawlPageInfo"
+          },
+          "title": "Pages",
+          "type": "array"
+        },
+        "poll_after_seconds": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Wait this long before polling next_call.",
+          "title": "Poll After Seconds"
+        },
+        "resumed_from": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Resumed From"
+        },
+        "status": {
+          "$ref": "#/$defs/JobStatus"
+        },
+        "stop_reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Stop Reason"
+        },
+        "untrusted_external_content": {
+          "default": true,
+          "title": "Untrusted External Content",
+          "type": "boolean"
+        },
+        "url": {
+          "title": "Url",
+          "type": "string"
+        }
+      },
+      "required": [
+        "crawl_id",
+        "status",
+        "url",
+        "max_pages",
+        "max_depth",
+        "dataset_id",
+        "dataset_version_id",
+        "counts",
+        "done"
+      ],
+      "title": "SiteCrawlResult",
+      "type": "object"
+    },
+    "title": "Site crawl status"
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
       "idempotentHint": false,
       "openWorldHint": true,
       "readOnlyHint": false,
       "title": "Start bounded Scrapy crawl"
     },
-    "description": "Start an existing spider/catalog crawl and register a versioned, queryable dataset.",
+    "description": "Start an existing spider/catalog crawl and register a versioned, queryable dataset. Use when: running a spider or catalog crawl target by name (apex_scrapy_list_spiders). Not for: a site from a URL (use apex_scrapy_crawl_site). Next: the result's next_call.",
     "inputSchema": {
       "properties": {
         "crawl_target": {
@@ -5139,6 +8311,59 @@
     },
     "name": "apex_scrapy_start_crawl",
     "outputSchema": {
+      "$defs": {
+        "JobStatus": {
+          "description": "A job's status, spelled this way in every response: `pending` until it starts, then `running`, then one of\n`completed`, `failed`, `cancelled` or `orphaned` (its process was lost before it finished; no result follows).",
+          "enum": [
+            "pending",
+            "running",
+            "completed",
+            "failed",
+            "cancelled",
+            "orphaned"
+          ],
+          "title": "JobStatus",
+          "type": "string"
+        },
+        "NextAction": {
+          "description": "A call that usually comes after this result, and why.",
+          "properties": {
+            "name": {
+              "title": "Name",
+              "type": "string"
+            },
+            "why": {
+              "title": "Why",
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "why"
+          ],
+          "title": "NextAction",
+          "type": "object"
+        },
+        "NextCall": {
+          "description": "The tool to call next and its arguments: only a tool this caller may call.",
+          "properties": {
+            "arguments": {
+              "additionalProperties": true,
+              "title": "Arguments",
+              "type": "object"
+            },
+            "tool": {
+              "title": "Tool",
+              "type": "string"
+            }
+          },
+          "required": [
+            "tool"
+          ],
+          "title": "NextCall",
+          "type": "object"
+        }
+      },
       "properties": {
         "crawl_target": {
           "title": "Crawl Target",
@@ -5176,9 +8401,41 @@
           "title": "Next",
           "type": "string"
         },
+        "next_actions": {
+          "description": "At most 3 calls that usually come after this result.",
+          "items": {
+            "$ref": "#/$defs/NextAction"
+          },
+          "title": "Next Actions",
+          "type": "array"
+        },
+        "next_call": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NextCall"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The tool to call next, with its arguments."
+        },
+        "poll_after_seconds": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Wait this long before polling next_call.",
+          "title": "Poll After Seconds"
+        },
         "status": {
-          "title": "Status",
-          "type": "string"
+          "$ref": "#/$defs/JobStatus"
         }
       },
       "required": [
@@ -5206,7 +8463,7 @@
       "readOnlyHint": true,
       "title": "Scrawl status"
     },
-    "description": "Return authenticated MCP identity, deployment, engine, and dataset-registry status.",
+    "description": "Return authenticated MCP identity, deployment, engine, and dataset-registry status. Use when: checking who you are connected as and what this deployment offers, before other calls.",
     "inputSchema": {
       "properties": {},
       "title": "apex_scrapy_statusArguments",
@@ -5294,7 +8551,7 @@
       "readOnlyHint": false,
       "title": "Scrapy runtime version"
     },
-    "description": "Return the configured Scrapy runtime version through the normal dispatcher path. Dedicated deployments only.",
+    "description": "Return the configured Scrapy runtime version through the normal dispatcher path. Dedicated deployments only. Use when: an operator needs the Scrapy runtime version of a dedicated deployment.",
     "inputSchema": {
       "properties": {},
       "title": "apex_scrapy_versionArguments",
@@ -5302,6 +8559,21 @@
     },
     "name": "apex_scrapy_version",
     "outputSchema": {
+      "$defs": {
+        "JobStatus": {
+          "description": "A job's status, spelled this way in every response: `pending` until it starts, then `running`, then one of\n`completed`, `failed`, `cancelled` or `orphaned` (its process was lost before it finished; no result follows).",
+          "enum": [
+            "pending",
+            "running",
+            "completed",
+            "failed",
+            "cancelled",
+            "orphaned"
+          ],
+          "title": "JobStatus",
+          "type": "string"
+        }
+      },
       "properties": {
         "job_id": {
           "anyOf": [
@@ -5342,14 +8614,13 @@
         "status": {
           "anyOf": [
             {
-              "type": "string"
+              "$ref": "#/$defs/JobStatus"
             },
             {
               "type": "null"
             }
           ],
-          "default": null,
-          "title": "Status"
+          "default": null
         }
       },
       "title": "TextCommandResult",
@@ -5365,7 +8636,7 @@
       "readOnlyHint": true,
       "title": "Fetch Scrawl dataset record"
     },
-    "description": "Fetch one search result by ID with full normalized record text and provenance metadata.",
+    "description": "Fetch one search result by ID with full normalized record text and provenance metadata. Use when: reading one record found with search in full.",
     "inputSchema": {
       "properties": {
         "id": {
@@ -5424,7 +8695,7 @@
       "readOnlyHint": true,
       "title": "Search Scrawl datasets"
     },
-    "description": "Search active published Scrawl datasets. Returns {results:[{id,title,text,url}...]}.",
+    "description": "Search active published Scrawl datasets. Returns {results:[{id,title,text,url}...]}. Use when: finding records by text across your published datasets. Not for: typed filters (use apex_scrapy_query_dataset_version). Next: fetch with a result id.",
     "inputSchema": {
       "properties": {
         "query": {
