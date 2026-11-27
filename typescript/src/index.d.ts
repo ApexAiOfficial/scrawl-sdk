@@ -698,6 +698,7 @@ export declare class Scrawl {
 
   scrape(url: string, options?: ScrapeOptions): Promise<ScrapeResult>;
   scrapeResult(jobId: string, options?: { waitSeconds?: number; formats?: RenderFormat[]; engine?: ScrapeEngine }):
+    Promise<ScrapeResult>;
   /** Render a page or document you already fetched (`POST /v1/scrape/local`); Scrawl fetches nothing. */
   scrapeLocal(url: string, body: Uint8Array | string, options?: ScrapeLocalOptions): Promise<ScrapeResult>;
   /**
@@ -705,7 +706,6 @@ export declare class Scrawl {
    * render it with `scrapeLocal`. The fetch never carries your Scrawl API key.
    */
   localFetch(url: string, options?: LocalFetchOptions): Promise<ScrapeResult>;
-    Promise<ScrapeResult>;
   map(url: string, options?: { limit?: number; waitSeconds?: number; engine?: ScrapeEngine; waitForMs?: number;
     idempotencyKey?: string }): Promise<MapResult>;
   batchScrape(urls: string[], options?: Omit<ScrapeOptions, "waitSeconds">): Promise<BatchStatus>;

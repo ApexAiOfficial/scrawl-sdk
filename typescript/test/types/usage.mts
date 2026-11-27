@@ -40,13 +40,6 @@ export async function usage(): Promise<void> {
   const mapOutcome: ScrapeOutcome | null | undefined = map.outcome;
   console.log(mapEngine, mapOutcome, map.block_reason, map.hint);
   const batch = await client.batchScrape(map.links ?? []);
-  const jobStatus: JobStatus = job.status;
-  const crawlStatus: JobStatus = (await client.crawl("target")).status;
-  const cancelStatus: JobStatus = (await client.cancelJob("j")).status;
-  const versionStatus: JobStatus | undefined = (await client.getDataset("d")).versions[0]?.status;
-  const extractStatus: JobStatus = (await client.extractDataset("d", { instruction: "titles" })).status;
-  await client.listJobs({ status: "COMPLETED" });                     // either case filters
-  console.log(jobStatus, crawlStatus, cancelStatus, versionStatus, extractStatus);
   const done = await client.waitForBatch(batch.batch_id);
   console.log(done.outcomes?.target_blocked);
   for (const item of done.items ?? []) console.log(item.url, item.result?.markdown);
@@ -55,10 +48,17 @@ export async function usage(): Promise<void> {
   console.log(rows.records[0]?.record_id, rows.records[0]?.provenance);
   const job = await client.getJob("j");
   const firstArg: string | undefined = job.args[0];
+  const jobStatus: JobStatus = job.status;
+  const crawlStatus: JobStatus = (await client.crawl("target")).status;
+  const cancelStatus: JobStatus = (await client.cancelJob("j")).status;
+  const versionStatus: JobStatus | undefined = (await client.getDataset("d")).versions[0]?.status;
+  const extractStatus: JobStatus = (await client.extractDataset("d", { instruction: "titles" })).status;
+  await client.listJobs({ status: "COMPLETED" });                     // either case filters
+  console.log(jobStatus, crawlStatus, cancelStatus, versionStatus, extractStatus);
   const jobWarnings: string[] = job.warnings;
   const launch = await client.crawl("target", { exportFormat: "csv" });
   const finished = await client.waitForJob(launch.job_id, { timeoutMs: 1000 });
-  console.log(finished.status === "COMPLETED", launch.dataset_version_id);
+  console.log(finished.status === "completed", launch.dataset_version_id);
   for await (const version of client.paginate(client.listVersions, "d", { limit: 2 })) console.log(version);
   const versions = await client.listVersions("d");
   console.log(versions.versions.map((v) => v.version_id));
