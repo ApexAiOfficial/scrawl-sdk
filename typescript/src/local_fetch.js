@@ -13,6 +13,9 @@
 // http is never followed. With your own `fetchPage` (it may carry credentials for the site you asked for) a redirect
 // to another host is not followed either. Where the environment hides redirects (a browser's fetch answers an opaque
 // redirect), the call is refused rather than sending an empty page: fetch the address it redirects to directly.
+// The robots.txt request gets the same redirect checks as the page, and at most 500 KiB of it is read (RFC 9309
+// section 2.5). Each request is bounded by the client's timeout. A failure to reach the site is a ScrawlError
+// (fetch_failed, or fetch_timeout); an empty page is refused (empty_body) before anything is sent to Scrawl.
 
 import { ScrawlError } from "./errors.js";
 import { VERSION } from "./version.js";
@@ -22,6 +25,10 @@ const ROBOTS_AGENT = "scrawlsdk"; // our product token, lower-cased
 export const DEFAULT_MAX_REDIRECTS = 5;
 export const DEFAULT_MAX_BYTES = 5 * 1024 * 1024;
 const REDIRECTS = new Set([301, 302, 303, 307, 308]);
+// How much of a robots.txt is read; the rest is ignored (RFC 9309 section 2.5: at least 500 kibibytes).
+export const ROBOTS_MAX_BYTES = 500 * 1024;
+// The longest Content-Type Scrawl accepts; a longer one is sent as its media type alone.
+const MAX_CONTENT_TYPE = 200;
 
 function refuse(code, message) {
   return new ScrawlError(message, { code });
@@ -97,11 +104,37 @@ function normaliseRobotsPath(text) {
   return out;
 }
 
+// Whether all of TEXT matches PATTERN, where `*` matches any run of characters. Greedy, going back only to the last
+// `*`: at most PATTERN.length x TEXT.length steps, whatever the rule (no regular expression to backtrack).
+function glob(pattern, text) {
+  let p = 0;
+  let t = 0;
+  let star = -1;
+  let mark = 0;
+  while (t < text.length) {
+    if (p < pattern.length && pattern[p] === "*") {
+      star = p;
+      mark = t;
+      p += 1;
+    } else if (p < pattern.length && pattern[p] === text[t]) {
+      p += 1;
+      t += 1;
+    } else if (star >= 0) {
+      p = star + 1;
+      mark += 1;
+      t = mark;
+    } else {
+      return false;
+    }
+  }
+  while (p < pattern.length && pattern[p] === "*") p += 1;
+  return p === pattern.length;
+}
+
+// A rule matches a path from its start; a final `$` makes it match the whole path.
 function matches(pattern, path) {
   const anchored = pattern.endsWith("$");
-  const body = anchored ? pattern.slice(0, -1) : pattern;
-  const regex = body.split("*").map((part) => part.replace(/[.+?^${}()|[\]\\]/g, "\\$&")).join(".*");
-  return new RegExp(`^${regex}${anchored ? "$" : ""}`).test(path);
+  return glob(anchored ? pattern.slice(0, -1) : `${pattern}*`, path);
 }
 
 /** Whether RULES allow URL: the longest matching rule wins, Allow on a tie; no rule allows. */
@@ -119,17 +152,58 @@ export function robotsAllow(rules, url) {
   return best === null || best.allow;
 }
 
-async function readRobots(fetchImpl, origin) {
-  const res = await fetchImpl(`${origin}/robots.txt`, { headers: { "User-Agent": USER_AGENT }, redirect: "follow" });
-  if (res.status >= 500 || res.status === 429) {
-    throw refuse("robots_unavailable", `robots.txt answered ${res.status}: not fetched (pass respectRobots: false `
-      + "to fetch anyway, at your own responsibility)");
+function init(timeoutMs) {
+  const options = { headers: { "User-Agent": USER_AGENT }, redirect: "manual" };
+  if (timeoutMs > 0 && typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function") {
+    options.signal = AbortSignal.timeout(timeoutMs);
   }
-  if (res.status >= 400) return [];
-  return parseRobots(await res.text());
+  return options;
 }
 
-async function readCapped(res, maxBytes) {
+// One request of the fetch: a failure to reach the site is a ScrawlError, never a bare TypeError.
+async function request(fetchImpl, url, timeoutMs) {
+  try {
+    return await fetchImpl(url, init(timeoutMs));
+  } catch (error) {
+    if (error instanceof ScrawlError) throw error;
+    if (error?.name === "TimeoutError" || error?.name === "AbortError") {
+      throw refuse("fetch_timeout", `${url} did not answer in time: not fetched`);
+    }
+    throw refuse("fetch_failed", `Could not fetch ${url} (${error?.name ?? "error"}): not fetched`);
+  }
+}
+
+// ORIGIN's robots.txt rules, its redirects checked as a page's are (at most five), at most 500 KiB read.
+async function readRobots(fetchImpl, origin, sameHostOnly, timeoutMs) {
+  let current = `${origin}/robots.txt`;
+  for (let hop = 0; hop <= DEFAULT_MAX_REDIRECTS; hop += 1) {
+    const res = await request(fetchImpl, current, timeoutMs);
+    if (res.type === "opaqueredirect" || res.status === 0) {
+      throw refuse("redirect_hidden", `${current} redirects, and this environment hides where to: robots.txt `
+        + "cannot be read (pass respectRobots: false to fetch anyway, at your own responsibility)");
+    }
+    const location = res.headers.get("location");
+    if (REDIRECTS.has(res.status) && location) {
+      current = nextHop(current, location, sameHostOnly);
+      continue;
+    }
+    if (res.status >= 500 || res.status === 429) {
+      throw refuse("robots_unavailable", `robots.txt answered ${res.status}: not fetched (pass respectRobots: false `
+        + "to fetch anyway, at your own responsibility)");
+    }
+    if (res.status >= 400) return [];
+    const bytes = await readCapped(res, ROBOTS_MAX_BYTES, { truncate: true });
+    return parseRobots(new TextDecoder("utf-8").decode(bytes));
+  }
+  throw refuse("robots_unavailable", `robots.txt at ${origin} redirects more than ${DEFAULT_MAX_REDIRECTS} times: `
+    + "not fetched (pass respectRobots: false to fetch anyway)");
+}
+
+function contentTypeOf(value) {
+  return value.length <= MAX_CONTENT_TYPE ? value : value.split(";", 1)[0].trim().slice(0, MAX_CONTENT_TYPE);
+}
+
+async function readCapped(res, maxBytes, { truncate = false } = {}) {
   const chunks = [];
   let total = 0;
   if (res.body && typeof res.body.getReader === "function") {
@@ -137,6 +211,12 @@ async function readCapped(res, maxBytes) {
     for (;;) {
       const { done, value } = await reader.read();
       if (done) break;
+      if (truncate && total + value.byteLength >= maxBytes) {
+        chunks.push(value.subarray(0, maxBytes - total));
+        total = maxBytes;
+        await reader.cancel();
+        break;
+      }
       total += value.byteLength;
       if (total > maxBytes) {
         await reader.cancel();
@@ -150,6 +230,7 @@ async function readCapped(res, maxBytes) {
     return out;
   }
   const whole = new Uint8Array(await res.arrayBuffer());
+  if (truncate) return whole.subarray(0, maxBytes);
   if (whole.byteLength > maxBytes) throw refuse("payload_too_large", `The page is larger than ${maxBytes} bytes: not sent`);
   return whole;
 }
@@ -182,20 +263,20 @@ function nextHop(current, location, sameHostOnly) {
 /** Fetch URL from this machine: { url, finalUrl, status, contentType, body } (robots, redirects, the size limit);
  * with SAME_HOST_ONLY (your own fetch) no redirect to another host. */
 export async function fetchPage(fetchImpl, url, { respectRobots = true, maxRedirects = DEFAULT_MAX_REDIRECTS,
-  maxBytes = DEFAULT_MAX_BYTES, sameHostOnly = false } = {}) {
+  maxBytes = DEFAULT_MAX_BYTES, sameHostOnly = false, timeoutMs = 0 } = {}) {
   checkUrl(url);
   const rules = new Map();
   let current = url;
   for (let hop = 0; hop <= maxRedirects; hop += 1) {
     const origin = new URL(current).origin;
     if (respectRobots) {
-      if (!rules.has(origin)) rules.set(origin, await readRobots(fetchImpl, origin));
+      if (!rules.has(origin)) rules.set(origin, await readRobots(fetchImpl, origin, sameHostOnly, timeoutMs));
       if (!robotsAllow(rules.get(origin), current)) {
         throw refuse("robots_disallowed", `robots.txt disallows ${current}: not fetched (pass respectRobots: false `
           + "to fetch anyway, at your own responsibility)");
       }
     }
-    const res = await fetchImpl(current, { headers: { "User-Agent": USER_AGENT }, redirect: "manual" });
+    const res = await request(fetchImpl, current, timeoutMs);
     if (res.type === "opaqueredirect" || res.status === 0) {
       throw refuse("redirect_hidden", `${current} redirects, and this environment hides where to (a browser's fetch): `
         + "fetch the address it redirects to directly");
@@ -206,7 +287,11 @@ export async function fetchPage(fetchImpl, url, { respectRobots = true, maxRedir
       continue;
     }
     const body = await readCapped(res, maxBytes);
-    return { url, finalUrl: current, status: res.status, contentType: res.headers.get("content-type") || "", body };
+    if (body.byteLength === 0) {
+      throw refuse("empty_body", `${current} answered ${res.status} with no body: nothing to render, nothing sent`);
+    }
+    return { url, finalUrl: current, status: res.status, contentType: contentTypeOf(res.headers.get("content-type") || ""),
+      body };
   }
   throw refuse("too_many_redirects", `More than ${maxRedirects} redirects from ${url}: not fetched`);
 }

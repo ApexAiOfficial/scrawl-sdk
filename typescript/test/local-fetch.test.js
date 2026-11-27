@@ -153,3 +153,92 @@ test("the module says how robots paths are compared (fixes-6 item 4)", async () 
   assert.ok(!header.includes("not normalised"), header);
   assert.ok(header.includes("percent-encoding normalised") && header.includes("dot segments removed"), header);
 });
+
+// -- the review of kits 0.1.5: robots redirects, bounds, errors, timeouts, uploads ------------------------------------
+
+function robotsRedirectSite(location) {
+  const seen = [];
+  const fetchPage = async (url) => {
+    const parsed = new URL(url);
+    seen.push(parsed.toString());
+    if (parsed.pathname === "/robots.txt" && parsed.hostname === "members.example") {
+      return new Response(null, { status: 301, headers: { location } });
+    }
+    if (parsed.pathname.endsWith("robots.txt")) return new Response("User-agent: *\nDisallow: /private/\n");
+    return new Response(PAGE, { headers: { "content-type": "text/html" } });
+  };
+  return { seen, fetchPage };
+}
+
+test("robots.txt redirects get the same checks as every page hop", async () => {
+  for (const [location, code] of [["http://members.example/robots.txt", "insecure_redirect"],
+    ["https://other.example/robots.txt", "cross_origin_redirect"]]) {
+    const { seen, fetchPage } = robotsRedirectSite(location);
+    const { client, fetch } = makeClient([]);
+    await assert.rejects(client.localFetch("https://members.example/lamp", { fetchPage }),
+      (error) => error.code === code);
+    assert.deepEqual(seen, ["https://members.example/robots.txt"]);
+    assert.equal(fetch.calls.length, 0);
+  }
+});
+
+test("a same-host robots.txt redirect is followed and its rules apply", async () => {
+  const { seen, fetchPage } = robotsRedirectSite("/moved-robots.txt");
+  const { client, fetch } = makeClient([]);
+  await assert.rejects(client.localFetch("https://members.example/private/x", { fetchPage }),
+    (error) => error.code === "robots_disallowed");
+  assert.deepEqual(seen, ["https://members.example/robots.txt", "https://members.example/moved-robots.txt"]);
+  assert.equal(fetch.calls.length, 0);
+});
+
+test("robots.txt is read up to 500 KiB only", async () => {
+  const robots = "User-agent: *\n" + `# ${"x".repeat(1022)}\n`.repeat(600) + "Disallow: /lamp\n";
+  const { fetchPage } = site(robots);
+  const { client, fetch } = makeClient([{ body: { job_id: "j1", status: "completed" } }]);
+  await client.localFetch("https://members.example/lamp", { fetchPage });
+  assert.equal(fetch.calls.length, 1);
+});
+
+test("a network failure or a timeout of the fetch is a ScrawlError", async () => {
+  for (const [failure, code] of [[new TypeError("fetch failed"), "fetch_failed"],
+    [Object.assign(new Error("timed out"), { name: "TimeoutError" }), "fetch_timeout"]]) {
+    const { client, fetch } = makeClient([]);
+    await assert.rejects(client.localFetch("https://members.example/lamp", { fetchPage: async () => { throw failure; } }),
+      (error) => error.code === code);
+    assert.equal(fetch.calls.length, 0);
+  }
+});
+
+test("the fetch is bounded by the client's timeout", async () => {
+  const signals = [];
+  const fetchPage = async (url, init = {}) => {
+    signals.push(init.signal);
+    return new URL(url).pathname === "/robots.txt" ? new Response("", { status: 404 })
+      : new Response(PAGE, { headers: { "content-type": "text/html" } });
+  };
+  const { client } = makeClient([{ body: { job_id: "j1", status: "completed" } }]);
+  await client.localFetch("https://members.example/lamp", { fetchPage });
+  assert.equal(signals.length, 2);
+  assert.ok(signals.every((signal) => signal instanceof AbortSignal));
+});
+
+test("robots wildcards match in bounded time", () => {
+  const rules = [{ allow: false, pattern: "/" + "*a".repeat(40) + "b" }];
+  const started = Date.now();
+  assert.equal(robotsAllow(rules, "https://members.example/" + "a".repeat(5000)), true);
+  assert.equal(robotsAllow(rules, "https://members.example/" + "a".repeat(50) + "b"), false);
+  assert.ok(Date.now() - started < 2000);
+});
+
+test("an empty page is refused before anything is sent, and an overlong type is sent as its media type", async () => {
+  const empty = site(undefined, { "/lamp": () => new Response(null, { status: 204 }) });
+  const first = makeClient([]);
+  await assert.rejects(first.client.localFetch("https://members.example/lamp", { fetchPage: empty.fetchPage }),
+    (error) => error.code === "empty_body");
+  assert.equal(first.fetch.calls.length, 0);
+  const longType = "text/html; " + Array.from({ length: 60 }, (_, index) => `p${index}=v`).join("; ");
+  const long = site(undefined, { "/lamp": () => new Response(PAGE, { headers: { "content-type": longType } }) });
+  const second = makeClient([{ body: { job_id: "j1", status: "completed" } }]);
+  await second.client.localFetch("https://members.example/lamp", { fetchPage: long.fetchPage });
+  assert.equal(second.fetch.calls[0].body.content_type, "text/html");
+});

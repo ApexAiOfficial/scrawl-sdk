@@ -46,12 +46,13 @@ scrawl local-fetch https://example.com/page --file page.html --content-type text
 ```
 
 `--full-page`, `--include-tag SELECTOR` and `--exclude-tag SELECTOR` (each repeatable, at most 20) choose what the
-markdown keeps, on `scrape`, `batch`, `site-crawl` and `datasets curate ... reextract`. They are sent only when
+markdown keeps, on `scrape`, `batch`, `local-fetch`, `site-crawl` and `datasets curate ... reextract`. They are sent only when
 given, and the server validates them.
 
 `local-fetch` fetches the page from your machine (robots.txt honoured unless `--ignore-robots`, at most
 `--max-redirects` redirects and `--max-bytes` bytes), then has Scrawl render it; Scrawl fetches nothing. With
-`--file` nothing is fetched at all, and `--content-type` and `--status` describe the file. The result's `origin`
+`--file` nothing is fetched at all: the file must be a page you saved (a regular file, not empty, at most
+`--max-bytes`), since whatever it holds is sent to Scrawl. `--content-type` and `--status` describe the file. The result's `origin`
 is `client_fetched` and `url_verified` is false: the URL, status and type are your claims. Exit codes are
 `scrape`'s.
 
@@ -90,8 +91,9 @@ A site crawl stays on the URL's host and reads robots.txt first. Each page is ch
 ended crawl. `site-crawl --wait` and `site-crawl-status` exit 0 once the dataset version is final and the crawl
 completed, 1 if it failed or was cancelled, and 4 while it still runs.
 
-A job's `status` is one lower-case word (`pending`, `running`, `completed`, `failed`, `cancelled`, `orphaned`).
-The CLI also reads the upper case older servers sent, and `--status` accepts either.
+A job's `status` is printed as the server sent it: the lower case (`pending`, `running`, `completed`, `failed`,
+`cancelled`, `orphaned`) from current servers, the upper case from older ones. Exit codes and `--status` accept
+either spelling.
 
 Detailed job output (`job`, a waited `crawl`, or a waited dataset extraction) includes `warnings`; it is an empty
 list when there are none or when an older server omitted the field.

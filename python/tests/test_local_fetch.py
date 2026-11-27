@@ -215,3 +215,89 @@ def test_the_module_says_how_robots_paths_are_compared() -> None:
     doc = " ".join((_local_fetch.__doc__ or "").split())
     assert "not normalised" not in doc, doc
     assert "percent-encoding normalised" in doc and "dot segments removed" in doc, doc
+
+
+# -- the review of kits 0.1.5 (DeepSeek ds-xg73yq and passes): robots redirects, bounds, errors, uploads ------------
+
+def _robots_redirect_site(location: str):  # type: ignore[no-untyped-def]
+    """A site whose robots.txt redirects to LOCATION; the page itself is fine."""
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        if request.url.path == "/robots.txt" and request.url.host == "members.example":
+            return httpx.Response(301, headers={"location": location})
+        if request.url.path in ("/robots.txt", "/moved-robots.txt"):
+            return httpx.Response(200, text="User-agent: *\nDisallow: /private/\n")
+        return httpx.Response(200, content=PAGE, headers={"content-type": "text/html"})
+
+    return seen, httpx.MockTransport(handler)
+
+
+@pytest.mark.parametrize(("location", "code"), [("http://members.example/robots.txt", "insecure_redirect"),
+                                                ("https://other.example/robots.txt", "cross_origin_redirect")])
+def test_robots_txt_redirects_get_the_same_checks_as_every_page_hop(location: str, code: str) -> None:
+    seen, site = _robots_redirect_site(location)
+    calls, client = _api()
+    with pytest.raises(ScrawlError) as refused:
+        client.local_fetch("https://members.example/lamp", fetch_client=httpx.Client(transport=site))
+    assert refused.value.code == code and calls == []
+    assert [str(request.url) for request in seen] == ["https://members.example/robots.txt"]   # the hop never made
+
+
+def test_a_robots_txt_redirect_on_the_same_host_is_followed_and_its_rules_apply() -> None:
+    seen, site = _robots_redirect_site("/moved-robots.txt")
+    calls, client = _api()
+    with pytest.raises(ScrawlError) as refused:
+        client.local_fetch("https://members.example/private/x", fetch_client=httpx.Client(transport=site))
+    assert refused.value.code == "robots_disallowed" and calls == []
+    assert [request.url.path for request in seen] == ["/robots.txt", "/moved-robots.txt"]
+
+
+def test_robots_txt_is_read_up_to_500_kib_only() -> None:
+    padding = "# " + "x" * 1022 + "\n"
+    robots = "User-agent: *\n" + padding * 600 + "Disallow: /lamp\n"         # the rule sits past 500 KiB
+    _seen, site = _site(robots=robots)
+    calls, client = _api()
+    client.local_fetch("https://members.example/lamp", fetch_client=httpx.Client(transport=site))
+    assert len(calls) == 1                                                  # past the limit: ignored (RFC 9309 2.5)
+
+
+@pytest.mark.parametrize(("failure", "code"), [(httpx.ConnectError("refused"), "fetch_failed"),
+                                               (httpx.ReadTimeout("slow"), "fetch_timeout")])
+def test_a_network_failure_of_the_fetch_is_a_scrawl_error(failure: Exception, code: str) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise failure
+
+    calls, client = _api()
+    with pytest.raises(ScrawlError) as failed:
+        client.local_fetch("https://members.example/lamp", fetch_client=httpx.Client(transport=httpx.MockTransport(handler)))
+    assert failed.value.code == code and calls == []
+
+
+def test_robots_wildcards_match_in_bounded_time() -> None:
+    import time
+
+    from scrawl._local_fetch import RobotsRule, robots_allow
+
+    rules = [RobotsRule(False, "/" + "*a" * 40 + "b")]
+    started = time.monotonic()
+    assert robots_allow(rules, "https://members.example/" + "a" * 5000) is True
+    assert robots_allow(rules, "https://members.example/" + "a" * 50 + "b") is False
+    assert time.monotonic() - started < 2.0
+
+
+def test_an_empty_page_is_refused_before_anything_is_sent() -> None:
+    _seen, site = _site(pages={"/lamp": httpx.Response(204)})
+    calls, client = _api()
+    with pytest.raises(ScrawlError) as refused:
+        client.local_fetch("https://members.example/lamp", fetch_client=httpx.Client(transport=site))
+    assert refused.value.code == "empty_body" and calls == []
+
+
+def test_an_overlong_content_type_is_sent_as_its_media_type() -> None:
+    long_type = "text/html; " + "; ".join(f"p{index}=v" for index in range(60))
+    _seen, site = _site(pages={"/lamp": httpx.Response(200, content=PAGE, headers={"content-type": long_type})})
+    calls, client = _api()
+    client.local_fetch("https://members.example/lamp", fetch_client=httpx.Client(transport=site))
+    assert json.loads(calls[0].content)["content_type"] == "text/html"

@@ -20,10 +20,8 @@ const LIST_KEYS = ["datasets", "versions", "jobs", "entries", "records", "result
   "pages", "curations"];
 const ASSETS_ACTIVE = new Set(["pending", "running"]);
 const JOBS_ACTIVE = new Set(["PENDING", "RUNNING"]);
-// A job's status has one spelling, the lower case (the API's JobStatus). Servers before it sent the upper case from
-// the job and dataset routes; the SDK reads either until the next minor release.
-const JOB_STATUSES = ["pending", "running", "completed", "failed", "cancelled", "orphaned"];
-const OLD_JOB_STATUS = new Map(JOB_STATUSES.map((status) => [status.toUpperCase(), status]));
+// A job's status reaches you as the server sent it: the lower case (the API's JobStatus) from current servers, the
+// upper case from older ones. The SDK's own logic (the waits) reads either spelling.
 const API_KEYS = new WeakMap(); // the key never lives on the instance, so logging a client cannot print it
 // What an API key may contain: visible ASCII, the characters an HTTP header value can carry as a token.
 const KEY_CHARS = /^[\x21-\x7e]+$/;
@@ -189,7 +187,7 @@ export class Scrawl {
     fetchPage: pageFetch, ...options } = {}) {
     const fetchImpl = pageFetch ?? ((...args) => globalThis.fetch(...args));
     const page = await fetchPage(fetchImpl, url, { respectRobots, maxRedirects, maxBytes,
-      sameHostOnly: pageFetch !== undefined });
+      sameHostOnly: pageFetch !== undefined, timeoutMs: this.timeoutMs });
     return this.scrapeLocal(page.url, page.body, { ...options, httpStatus: page.status, contentType: page.contentType,
       finalUrl: page.finalUrl !== page.url ? page.finalUrl : undefined });
   }
@@ -352,8 +350,7 @@ export class Scrawl {
   async crawl(crawlTarget, { exportFormat, maxItems, maxSeconds, idempotencyKey } = {}) {
     const json = clean({ crawl_target: crawlTarget, export_format: exportFormat, max_items: maxItems,
       max_seconds: maxSeconds });
-    return jobStatus(await this._call({ method: "POST", path: "/v1/crawls", json,
-      idempotencyKey: newKey(idempotencyKey) }));
+    return this._call({ method: "POST", path: "/v1/crawls", json, idempotencyKey: newKey(idempotencyKey) });
   }
 
   /**
@@ -367,32 +364,32 @@ export class Scrawl {
     const json = clean({ url, max_pages: maxPages, max_depth: maxDepth, engine, wait_for_ms: waitForMs,
       only_main_content: onlyMainContent, include_tags: includeTags, exclude_tags: excludeTags,
       resume_from: resumeFrom });
-    return jobStatus(await this._call({ method: "POST", path: "/v1/site-crawls", json,
-      idempotencyKey: newKey(idempotencyKey) }));
+    return this._call({ method: "POST", path: "/v1/site-crawls", json,
+      idempotencyKey: newKey(idempotencyKey) });
   }
 
   /** A site crawl's status, counts, charge, dataset version and one page of its pages (`next_cursor`). */
   async siteCrawlStatus(crawlId, { waitSeconds = 0, limit, cursor } = {}) {
-    return jobStatus(await this._call({ method: "GET", path: `/v1/site-crawls/${seg(crawlId)}`,
-      params: { wait_seconds: this._serverWait(waitSeconds) || undefined, limit, cursor } }));
+    return this._call({ method: "GET", path: `/v1/site-crawls/${seg(crawlId)}`,
+      params: { wait_seconds: this._serverWait(waitSeconds) || undefined, limit, cursor } });
   }
 
   /** A job's state; `waitSeconds` (<= 60) returns as soon as it finishes. */
   async getJob(jobId, { waitSeconds = 0 } = {}) {
-    return jobWithDefaults(jobStatus(await this._call({ method: "GET", path: `/v1/jobs/${seg(jobId)}`,
-      params: { wait_seconds: this._serverWait(waitSeconds) || undefined } })));
+    return jobWithDefaults(await this._call({ method: "GET", path: `/v1/jobs/${seg(jobId)}`,
+      params: { wait_seconds: this._serverWait(waitSeconds) || undefined } }));
   }
 
   /** Your jobs, newest first (`next_cursor` pages). */
   async listJobs({ limit, status, cursor } = {}) {
-    const page = jobStatus(await this._call({ method: "GET", path: "/v1/jobs", params: { limit, status, cursor } }));
+    const page = await this._call({ method: "GET", path: "/v1/jobs", params: { limit, status, cursor } });
     if (Array.isArray(page?.jobs)) for (const job of page.jobs) jobWithDefaults(job);
     return page;
   }
 
   /** Cancel a pending or running job (another process's job: `cancelled` false, requested). */
   async cancelJob(jobId) {
-    return jobStatus(await this._call({ method: "POST", path: `/v1/jobs/${seg(jobId)}/cancel` }));
+    return this._call({ method: "POST", path: `/v1/jobs/${seg(jobId)}/cancel` });
   }
 
   /** A job's artifacts. */
@@ -446,13 +443,13 @@ export class Scrawl {
 
   /** A dataset's manifest and active version. */
   async getDataset(datasetId) {
-    return jobStatus(await this._call({ method: "GET", path: `/v1/datasets/${seg(datasetId)}` }));
+    return this._call({ method: "GET", path: `/v1/datasets/${seg(datasetId)}` });
   }
 
   /** A dataset's versions, newest first. */
   async listVersions(datasetId, { limit, cursor, status } = {}) {
-    return jobStatus(await this._call({ method: "GET", path: `/v1/datasets/${seg(datasetId)}/versions`,
-      params: { limit, cursor, status } }));
+    return this._call({ method: "GET", path: `/v1/datasets/${seg(datasetId)}/versions`,
+      params: { limit, cursor, status } });
   }
 
   /** Make a completed version the active one. */
@@ -481,8 +478,8 @@ export class Scrawl {
   /** Extract a structured dataset version from a dataset with your own AI provider (a job). */
   async extractDataset(datasetId, { schema, instruction, profile, versionId, maxRecords, idempotencyKey } = {}) {
     const json = clean({ schema, instruction, profile, version_id: versionId, max_records: maxRecords });
-    return jobStatus(await this._call({ method: "POST", path: `/v1/datasets/${seg(datasetId)}/extract`, json,
-      idempotencyKey: newKey(idempotencyKey) }));
+    return this._call({ method: "POST", path: `/v1/datasets/${seg(datasetId)}/extract`, json,
+      idempotencyKey: newKey(idempotencyKey) });
   }
 
   /**
@@ -691,18 +688,6 @@ export class Scrawl {
 }
 
 /** RESULT with an upper-case job status (an older server's) in the lower case: top level, `jobs` and `versions`. */
-function jobStatus(result) {
-  if (!isPlainObject(result)) return result;
-  const items = [result];
-  for (const key of ["jobs", "versions"]) if (Array.isArray(result[key])) items.push(...result[key]);
-  for (const item of items) {
-    if (isPlainObject(item) && typeof item.status === "string") {
-      item.status = OLD_JOB_STATUS.get(item.status) ?? item.status;
-    }
-  }
-  return result;
-}
-
 /** The downgrade guard: `browser` was asked for, but a finished result says another engine rendered it. */
 function checkEngine(requested, result) {
   if (requested === "browser" && result && (result.status === "completed" || result.status === "failed")

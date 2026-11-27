@@ -382,13 +382,13 @@ def test_wait_for_job_follows_a_job_until_it_leaves_pending_or_running() -> None
 
     rec = Recorder(job("PENDING"), job("RUNNING"), job("COMPLETED"))
     done = make_client(rec).wait_for_job("c1")
-    assert done.status == "completed" and len(rec.requests) == 3          # CC-1: the one spelling, the lower case
+    assert done.status == "COMPLETED" and len(rec.requests) == 3
     assert all(r.url.path == "/v1/jobs/c1" and r.url.params["wait_seconds"] == "60" for r in rec.requests)
     for status in ("FAILED", "CANCELLED", "ORPHANED"):
         rec = Recorder(job(status))
-        assert make_client(rec).wait_for_job("c1").status == status.lower() and len(rec.requests) == 1
+        assert make_client(rec).wait_for_job("c1").status == status and len(rec.requests) == 1
     rec = Recorder(job("RUNNING"))
-    assert make_client(rec).wait_for_job("c1", timeout=0).status == "running" and len(rec.requests) == 1
+    assert make_client(rec).wait_for_job("c1", timeout=0).status == "RUNNING" and len(rec.requests) == 1
 
 
 def test_job_warnings_are_exposed_and_default_to_an_empty_list() -> None:
@@ -409,7 +409,7 @@ async def test_async_wait_for_job_mirrors_the_sync_one() -> None:
                    httpx.Response(200, json={"job_id": "c1", "status": "COMPLETED"}))
     async with make_async_client(rec) as c:
         finished = await c.wait_for_job("c1")
-        assert finished.status == "completed" and finished.warnings == []    # CC-1: the lower case
+        assert finished.status == "COMPLETED" and finished.warnings == []
     assert len(rec.requests) == 2
 
 

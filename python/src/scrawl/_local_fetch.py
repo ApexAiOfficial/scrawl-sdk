@@ -11,12 +11,14 @@ as ``%2F``, stays encoded) and dot segments removed.
 
 The fetch never carries your Scrawl API key: it uses its own client, never the one that talks to Scrawl. A redirect
 from https to http is never followed. When you pass your own client (it may carry credentials for the site you
-asked for), a redirect to another host is not followed either: fetch that address yourself if you mean to.
+asked for), a redirect to another host is not followed either: fetch that address yourself if you mean to. The
+robots.txt request gets the same redirect checks as the page, and at most 500 KiB of it is read (RFC 9309 section
+2.5). A failure to reach the site is a ``ScrawlError`` (``fetch_failed``, or ``fetch_timeout``); an empty page is
+refused (``empty_body``) before anything is sent to Scrawl.
 """
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass
 from urllib.parse import urljoin, urlsplit
 
@@ -33,6 +35,10 @@ DEFAULT_MAX_REDIRECTS = 5
 #: Scrawl accepts a page of at most 5 MiB (a document may be larger on some deployments: pass max_bytes).
 DEFAULT_MAX_BYTES = 5 * 1024 * 1024
 _REDIRECTS = {301, 302, 303, 307, 308}
+#: How much of a robots.txt is read; the rest is ignored (RFC 9309 section 2.5: at least 500 kibibytes).
+ROBOTS_MAX_BYTES = 500 * 1024
+#: The longest Content-Type Scrawl accepts; a longer one is sent as its media type alone.
+MAX_CONTENT_TYPE = 200
 
 
 @dataclass(frozen=True)
@@ -146,11 +152,32 @@ def _without_dot_segments(path: str) -> str:
     return joined if joined.startswith("/") or not path.startswith("/") else "/" + joined
 
 
+def _glob(pattern: str, text: str) -> bool:
+    """Whether all of TEXT matches PATTERN, where ``*`` matches any run of characters. Greedy, going back only to
+    the last ``*``: at most len(PATTERN) x len(TEXT) steps, whatever the rule (no regular expression to backtrack)."""
+    p = t = 0
+    star, mark = -1, 0
+    while t < len(text):
+        if p < len(pattern) and pattern[p] == "*":
+            star, mark = p, t
+            p += 1
+        elif p < len(pattern) and pattern[p] == text[t]:
+            p += 1
+            t += 1
+        elif star >= 0:
+            p, mark = star + 1, mark + 1
+            t = mark
+        else:
+            return False
+    while p < len(pattern) and pattern[p] == "*":
+        p += 1
+    return p == len(pattern)
+
+
 def _matches(pattern: str, path: str) -> bool:
+    """A rule matches a path from its start; a final ``$`` makes it match the whole path."""
     anchored = pattern.endswith("$")
-    body = pattern[:-1] if anchored else pattern
-    regex = ".*".join(re.escape(part) for part in body.split("*"))
-    return re.match(regex + ("$" if anchored else ""), path) is not None
+    return _glob(pattern[:-1] if anchored else pattern + "*", path)
 
 
 def robots_allow(rules: list[RobotsRule], url: str) -> bool:
@@ -203,6 +230,27 @@ def _next_hop(current: str, location: str, same_host_only: bool) -> str:
     return target
 
 
+def _unreachable(url: str, exc: httpx.HTTPError) -> ScrawlError:
+    if isinstance(exc, httpx.TimeoutException):
+        return _refuse("fetch_timeout", f"{url} did not answer in time: not fetched")
+    return _refuse("fetch_failed", f"Could not fetch {url} ({type(exc).__name__}): not fetched")
+
+
+def _content_type(value: str) -> str:
+    """VALUE, or only its media type when it is longer than Scrawl accepts."""
+    return value if len(value) <= MAX_CONTENT_TYPE else value.split(";", 1)[0].strip()[:MAX_CONTENT_TYPE]
+
+
+def _page(url: str, current: str, status: int, content_type: str, body: bytes) -> Fetched:
+    if not body:
+        raise _refuse("empty_body", f"{current} answered {status} with no body: nothing to render, nothing sent")
+    return Fetched(url, current, status, _content_type(content_type), body)
+
+
+def _robots_text(chunks: bytes) -> str:
+    return chunks[:ROBOTS_MAX_BYTES].decode("utf-8", errors="replace")
+
+
 def _disallowed(url: str) -> ScrawlError:
     return _refuse("robots_disallowed", f"robots.txt disallows {url}: not fetched (pass respect_robots=False to fetch "
                                         "anyway, at your own responsibility)")
@@ -220,25 +268,45 @@ def fetch(client: httpx.Client, url: str, *, respect_robots: bool = True,
     _check_url(url)
     rules: dict[str, list[RobotsRule] | None] = {}
     current = url
-    for _hop in range(max_redirects + 1):
-        if respect_robots:
-            origin = _robots_url(current)
-            if origin not in rules:
-                answer = client.get(origin, headers={"User-Agent": USER_AGENT}, follow_redirects=True)
-                rules[origin] = _parser(answer.status_code, answer.text)
-            if not _allowed(rules[origin], current):
-                raise _disallowed(current)
-        with client.stream("GET", current, headers={"User-Agent": USER_AGENT}, follow_redirects=False) as response:
-            if response.status_code in _REDIRECTS and response.headers.get("location"):
-                current = _next_hop(current, response.headers["location"], same_host_only)
+    try:
+        for _hop in range(max_redirects + 1):
+            if respect_robots:
+                origin = _robots_url(current)
+                if origin not in rules:
+                    rules[origin] = _read_robots(client, origin, same_host_only)
+                if not _allowed(rules[origin], current):
+                    raise _disallowed(current)
+            with client.stream("GET", current, headers={"User-Agent": USER_AGENT}, follow_redirects=False) as response:
+                if response.status_code in _REDIRECTS and response.headers.get("location"):
+                    current = _next_hop(current, response.headers["location"], same_host_only)
+                    continue
+                body = bytearray()
+                for chunk in response.iter_bytes():
+                    body += chunk
+                    if len(body) > max_bytes:
+                        raise _too_large(max_bytes)
+                return _page(url, current, response.status_code, response.headers.get("content-type", ""), bytes(body))
+    except httpx.HTTPError as exc:
+        raise _unreachable(current, exc) from None
+    raise _refuse("too_many_redirects", f"More than {max_redirects} redirects from {url}: not fetched")
+
+
+def _read_robots(client: httpx.Client, origin: str, same_host_only: bool) -> list[RobotsRule] | None:
+    """ORIGIN's robots.txt rules, its redirects checked as a page's are (at most five), at most 500 KiB read."""
+    current = origin
+    for _hop in range(DEFAULT_MAX_REDIRECTS + 1):
+        with client.stream("GET", current, headers={"User-Agent": USER_AGENT}, follow_redirects=False) as answer:
+            if answer.status_code in _REDIRECTS and answer.headers.get("location"):
+                current = _next_hop(current, answer.headers["location"], same_host_only)
                 continue
             body = bytearray()
-            for chunk in response.iter_bytes():
+            for chunk in answer.iter_bytes():
                 body += chunk
-                if len(body) > max_bytes:
-                    raise _too_large(max_bytes)
-            return Fetched(url, current, response.status_code, response.headers.get("content-type", ""), bytes(body))
-    raise _refuse("too_many_redirects", f"More than {max_redirects} redirects from {url}: not fetched")
+                if len(body) >= ROBOTS_MAX_BYTES:
+                    break
+            return _parser(answer.status_code, _robots_text(bytes(body)))
+    raise _refuse("robots_unavailable", f"robots.txt at {origin} redirects more than {DEFAULT_MAX_REDIRECTS} times: "
+                                        "not fetched (pass respect_robots=False to fetch anyway)")
 
 
 async def afetch(client: httpx.AsyncClient, url: str, *, respect_robots: bool = True,
@@ -248,23 +316,43 @@ async def afetch(client: httpx.AsyncClient, url: str, *, respect_robots: bool = 
     _check_url(url)
     rules: dict[str, list[RobotsRule] | None] = {}
     current = url
-    for _hop in range(max_redirects + 1):
-        if respect_robots:
-            origin = _robots_url(current)
-            if origin not in rules:
-                answer = await client.get(origin, headers={"User-Agent": USER_AGENT}, follow_redirects=True)
-                rules[origin] = _parser(answer.status_code, answer.text)
-            if not _allowed(rules[origin], current):
-                raise _disallowed(current)
-        async with client.stream("GET", current, headers={"User-Agent": USER_AGENT},
-                                 follow_redirects=False) as response:
-            if response.status_code in _REDIRECTS and response.headers.get("location"):
-                current = _next_hop(current, response.headers["location"], same_host_only)
+    try:
+        for _hop in range(max_redirects + 1):
+            if respect_robots:
+                origin = _robots_url(current)
+                if origin not in rules:
+                    rules[origin] = await _aread_robots(client, origin, same_host_only)
+                if not _allowed(rules[origin], current):
+                    raise _disallowed(current)
+            async with client.stream("GET", current, headers={"User-Agent": USER_AGENT},
+                                     follow_redirects=False) as response:
+                if response.status_code in _REDIRECTS and response.headers.get("location"):
+                    current = _next_hop(current, response.headers["location"], same_host_only)
+                    continue
+                body = bytearray()
+                async for chunk in response.aiter_bytes():
+                    body += chunk
+                    if len(body) > max_bytes:
+                        raise _too_large(max_bytes)
+                return _page(url, current, response.status_code, response.headers.get("content-type", ""), bytes(body))
+    except httpx.HTTPError as exc:
+        raise _unreachable(current, exc) from None
+    raise _refuse("too_many_redirects", f"More than {max_redirects} redirects from {url}: not fetched")
+
+
+async def _aread_robots(client: httpx.AsyncClient, origin: str, same_host_only: bool) -> list[RobotsRule] | None:
+    """``_read_robots``, with an async CLIENT."""
+    current = origin
+    for _hop in range(DEFAULT_MAX_REDIRECTS + 1):
+        async with client.stream("GET", current, headers={"User-Agent": USER_AGENT}, follow_redirects=False) as answer:
+            if answer.status_code in _REDIRECTS and answer.headers.get("location"):
+                current = _next_hop(current, answer.headers["location"], same_host_only)
                 continue
             body = bytearray()
-            async for chunk in response.aiter_bytes():
+            async for chunk in answer.aiter_bytes():
                 body += chunk
-                if len(body) > max_bytes:
-                    raise _too_large(max_bytes)
-            return Fetched(url, current, response.status_code, response.headers.get("content-type", ""), bytes(body))
-    raise _refuse("too_many_redirects", f"More than {max_redirects} redirects from {url}: not fetched")
+                if len(body) >= ROBOTS_MAX_BYTES:
+                    break
+            return _parser(answer.status_code, _robots_text(bytes(body)))
+    raise _refuse("robots_unavailable", f"robots.txt at {origin} redirects more than {DEFAULT_MAX_REDIRECTS} times: "
+                                        "not fetched (pass respect_robots=False to fetch anyway)")

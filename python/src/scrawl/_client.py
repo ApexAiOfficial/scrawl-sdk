@@ -48,10 +48,8 @@ _LIST_KEYS = ("datasets", "versions", "jobs", "entries", "records", "results", "
               "pages", "curations")
 _ASSETS_ACTIVE = frozenset({"pending", "running"})
 _JOBS_ACTIVE = frozenset({"PENDING", "RUNNING"})
-#: A job's status has one spelling, the lower case (the API's ``JobStatus``). Servers before it sent the upper
-#: case from the job and dataset routes; the SDK reads either until the next minor release.
-_JOB_STATUSES = ("pending", "running", "completed", "failed", "cancelled", "orphaned")
-_OLD_JOB_STATUS = {status.upper(): status for status in _JOB_STATUSES}
+#: A job's status reaches you as the server sent it: the lower case (the API's ``JobStatus``) from current servers,
+#: the upper case from older ones. The SDK's own logic (the waits, the CLI's exit codes) reads either spelling.
 #: What an API key may contain: visible ASCII, the characters an HTTP header value can carry as a token.
 _KEY_CHARS = re.compile(r"[\x21-\x7e]+")
 
@@ -67,8 +65,6 @@ class _Request:
     auth: bool = True
     #: The engine the caller asked for; a finished result that echoes another one is a downgrade.
     expect_engine: str | None = None
-    #: The response carries a job's status (top level, or in its ``jobs`` or ``versions``): spell it the one way.
-    job_status: bool = False
 
 
 def _clean(values: dict[str, Any]) -> dict[str, Any]:
@@ -97,17 +93,6 @@ def _content(only_main_content: bool | None, include_tags: list[str] | None,
     """The content-selection options for a body, only when set (the server validates the selectors)."""
     return _clean({"only_main_content": only_main_content, "include_tags": include_tags,
                    "exclude_tags": exclude_tags})
-
-
-def _job_status(request: _Request, result: Any) -> Any:
-    """RESULT with an upper-case job status (an older server's) in the lower case, on routes that carry one."""
-    if not request.job_status or not isinstance(result, dict):
-        return result
-    for item in [result, *(entry for key in ("jobs", "versions") if isinstance(result.get(key), list)
-                           for entry in result[key])]:
-        if isinstance(item, dict) and isinstance(item.get("status"), str):
-            item["status"] = _OLD_JOB_STATUS.get(item["status"], item["status"])
-    return result
 
 
 def _check_engine(request: _Request, result: Any) -> Any:
@@ -349,8 +334,7 @@ class _Endpoints:
         """Start a bounded crawl that publishes a new dataset version."""
         body = _clean({"crawl_target": crawl_target, "export_format": export_format, "max_items": max_items,
                        "max_seconds": max_seconds})
-        return self._call(_Request("POST", "/v1/crawls", json=body, idempotency_key=_key(idempotency_key),
-                                   job_status=True))
+        return self._call(_Request("POST", "/v1/crawls", json=body, idempotency_key=_key(idempotency_key)))
 
     def crawl_site(self, url: str, *, max_pages: int | None = None, max_depth: int | None = None,
                    engine: str | None = None, wait_for_ms: int | None = None, only_main_content: bool | None = None,
@@ -364,31 +348,30 @@ class _Endpoints:
         """
         body = _clean({"url": url, "max_pages": max_pages, "max_depth": max_depth, **_engine(engine, wait_for_ms),
                        **_content(only_main_content, include_tags, exclude_tags), "resume_from": resume_from})
-        return self._call(_Request("POST", "/v1/site-crawls", json=body, idempotency_key=_key(idempotency_key),
-                                   job_status=True))
+        return self._call(_Request("POST", "/v1/site-crawls", json=body, idempotency_key=_key(idempotency_key)))
 
     def site_crawl_status(self, crawl_id: str, *, wait_seconds: int = 0, limit: int | None = None,
                           cursor: str | None = None) -> Any:
         """A site crawl's status, counts, charge, dataset version and one page of its pages (``next_cursor``)."""
         params = _clean({"wait_seconds": self._wait(wait_seconds) or None, "limit": limit, "cursor": cursor})
-        return self._call(_Request("GET", f"/v1/site-crawls/{_seg(crawl_id)}", params=params, job_status=True))
+        return self._call(_Request("GET", f"/v1/site-crawls/{_seg(crawl_id)}", params=params))
 
     def get_job(self, job_id: str, *, wait_seconds: int = 0) -> Any:
         """A job's state; ``wait_seconds`` (≤60) returns as soon as it finishes."""
         params = _clean({"wait_seconds": self._wait(wait_seconds) or None})
-        return self._call(_Request("GET", f"/v1/jobs/{_seg(job_id)}", params=params, job_status=True))
+        return self._call(_Request("GET", f"/v1/jobs/{_seg(job_id)}", params=params))
 
     def list_jobs(self, *, limit: int | None = None, status: str | None = None, cursor: str | None = None) -> Any:
         """Your jobs, newest first (``next_cursor`` pages)."""
         return self._call(_Request("GET", "/v1/jobs", params=_clean({"limit": limit, "status": status,
-                                                                      "cursor": cursor}), job_status=True))
+                                                                      "cursor": cursor})))
 
     def cancel_job(self, job_id: str) -> Any:
         """Cancel a pending or running job (another process's job: ``cancelled`` false, requested).
 
         Needs the scope that starts that kind of job: ``ai:use`` for a dataset extraction, else ``scrape:write``.
         """
-        return self._call(_Request("POST", f"/v1/jobs/{_seg(job_id)}/cancel", job_status=True))
+        return self._call(_Request("POST", f"/v1/jobs/{_seg(job_id)}/cancel"))
 
     def list_artifacts(self, job_id: str) -> Any:
         """A job's artifacts."""
@@ -438,14 +421,13 @@ class _Endpoints:
 
     def get_dataset(self, dataset_id: str) -> Any:
         """A dataset's manifest and active version."""
-        return self._call(_Request("GET", f"/v1/datasets/{_seg(dataset_id)}", job_status=True))
+        return self._call(_Request("GET", f"/v1/datasets/{_seg(dataset_id)}"))
 
     def list_versions(self, dataset_id: str, *, limit: int | None = None, cursor: str | None = None,
                       status: str | None = None) -> Any:
         """A dataset's versions, newest first."""
         return self._call(_Request("GET", f"/v1/datasets/{_seg(dataset_id)}/versions",
-                                   params=_clean({"limit": limit, "cursor": cursor, "status": status}),
-                                   job_status=True))
+                                   params=_clean({"limit": limit, "cursor": cursor, "status": status})))
 
     def activate_version(self, dataset_id: str, version_id: str) -> Any:
         """Make a completed version the active one."""
@@ -476,7 +458,7 @@ class _Endpoints:
         body = _clean({"schema": schema, "instruction": instruction, "profile": profile, "version_id": version_id,
                        "max_records": max_records})
         return self._call(_Request("POST", f"/v1/datasets/{_seg(dataset_id)}/extract", json=body,
-                                   idempotency_key=_key(idempotency_key), job_status=True))
+                                   idempotency_key=_key(idempotency_key)))
 
     def curate_dataset(self, dataset_id: str, operation: str, *, version_id: str | None = None,
                        record_ids: list[str] | None = None, field: str | None = None,
@@ -647,7 +629,7 @@ class _Transport:
         except ValueError:
             raise ScrawlError("The API returned a response that is not JSON", status=response.status_code,
                               request_id=response.headers.get("X-Request-ID")) from None
-        return _with_job_defaults(request, _check_engine(request, _job_status(request, wrap(data))))
+        return _with_job_defaults(request, _check_engine(request, wrap(data)))
 
 
 def _retry_after(response: httpx.Response) -> float | None:

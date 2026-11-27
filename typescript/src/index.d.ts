@@ -261,16 +261,18 @@ export interface BatchStatus extends ApiObject, NextStepInfo {
 }
 
 /**
- * A job's status, the one spelling every response uses. The SDK also reads the upper case older servers sent
- * (`COMPLETED`) and gives it to you in this spelling.
+ * A job's status, as the server sent it. Current servers send the lower case (`completed`), the API's one spelling;
+ * servers before it sent the upper case (`COMPLETED`). The upper-case members are deprecated: compare with the lower
+ * case (or `status.toLowerCase()`). A later minor release may drop them.
  */
-export type JobStatus = "pending" | "running" | "completed" | "failed" | "cancelled" | "orphaned";
+export type JobStatus = "pending" | "running" | "completed" | "failed" | "cancelled" | "orphaned"
+  | "PENDING" | "RUNNING" | "COMPLETED" | "FAILED" | "CANCELLED" | "ORPHANED";
 
 export interface Job extends ApiObject, NextStepInfo {
   job_id: string;
   command: string;
   args: string[];
-  status: JobStatus;
+  status: JobStatus | (string & {});
   engine_id: string;
   artifacts_url: string;
   result_url: string;
@@ -286,7 +288,7 @@ export interface CancelResult extends ApiObject {
   job_id: string;
   /** False when the job had already ended, or when another process runs it (then `status` is `running`). */
   cancelled: boolean;
-  status: JobStatus;
+  status: JobStatus | (string & {});
   message?: string | null;
 }
 
@@ -295,10 +297,10 @@ export interface DatasetVersion extends ApiObject {
   version_id: string;
   dataset_id: string;
   job_id: string;
-  status: JobStatus;
+  status: JobStatus | (string & {});
   record_count: number;
-  skipped_count: number;
-  validation_state: string;
+  skipped_count?: number;
+  validation_state?: string;
   is_published: boolean;
   created_at: string;
   finalized_at?: string | null;
@@ -322,7 +324,7 @@ export interface SiteCrawlPage extends ApiObject {
 /** A site crawl's progress; `crawl_id` is its job id (cancel it with `cancelJob`). */
 export interface SiteCrawl extends ApiObject, NextStepInfo {
   crawl_id: string;
-  status: JobStatus;
+  status: JobStatus | (string & {});
   url: string;
   max_pages: number;
   max_depth: number;
@@ -480,7 +482,7 @@ export interface DatasetDiff extends ApiObject {
 
 export interface DatasetExtraction extends ApiObject, NextStepInfo {
   job_id: string;
-  status: JobStatus;
+  status: JobStatus | (string & {});
   source_dataset_id: string;
   source_version_id: string;
   target_dataset_id: string;
@@ -578,7 +580,8 @@ export interface ScrapeOptions {
   idempotencyKey?: string;
 }
 
-export type AssetClass = "images" | "video" | "audio" | "documents" | "data" | "web_assets";
+/** `archives` is opt-in: it is extracted only when asked for. */
+export type AssetClass = "images" | "video" | "audio" | "documents" | "data" | "web_assets" | "archives";
 
 export interface AssetOptions {
   /** Default: all six classes. */
@@ -664,7 +667,7 @@ export interface AssetBilling extends ApiObject {
 
 export interface AssetResult extends ApiObject, NextStepInfo {
   job_id: string;
-  status: JobStatus;
+  status: "pending" | "running" | "completed" | "failed" | "cancelled" | "orphaned";
   url: string;
   classes: AssetClass[];
   /** A completed job that stopped early (e.g. its deadline); what it stored is still delivered. */
@@ -744,7 +747,7 @@ export declare class Scrawl {
   crawl(crawlTarget: string, options?: { exportFormat?: ExportFormat; maxItems?: number; maxSeconds?: number; idempotencyKey?: string }): Promise<CrawlLaunch>;
   getJob(jobId: string, options?: { waitSeconds?: number }): Promise<Job>;
   /** `status` filters by a job status; either case is accepted. */
-  listJobs(options?: { limit?: number; status?: JobStatus | Uppercase<JobStatus>; cursor?: string }): Promise<{ jobs: Job[]; next_cursor?: string | null } & ApiObject>;
+  listJobs(options?: { limit?: number; status?: JobStatus | (string & {}); cursor?: string }): Promise<{ jobs: Job[]; next_cursor?: string | null } & ApiObject>;
   curateDataset(datasetId: string, operation: "remove" | "dedupe" | "reextract", options?: { versionId?: string; recordIds?: string[]; field?: string; onlyMainContent?: boolean; includeTags?: string[]; excludeTags?: string[] }): Promise<DatasetCuration>;
   listCurations(datasetId: string, options?: { limit?: number; cursor?: string }): Promise<Page<DatasetCuration> & { curations: DatasetCuration[] }>;
   crawlSite(url: string, options?: { maxPages?: number; maxDepth?: number; engine?: ScrapeEngine; waitForMs?: number; onlyMainContent?: boolean; includeTags?: string[]; excludeTags?: string[]; resumeFrom?: string; idempotencyKey?: string }): Promise<SiteCrawl>;
@@ -758,7 +761,7 @@ export declare class Scrawl {
 
   listDatasets(options?: { limit?: number; cursor?: string }): Promise<{ count: number; datasets: DatasetInfo[]; next_cursor?: string | null } & ApiObject>;
   getDataset(datasetId: string): Promise<DatasetManifest>;
-  listVersions(datasetId: string, options?: { limit?: number; cursor?: string; status?: JobStatus | Uppercase<JobStatus> }): Promise<{ count: number; versions: DatasetVersion[]; next_cursor?: string | null } & ApiObject>;
+  listVersions(datasetId: string, options?: { limit?: number; cursor?: string; status?: JobStatus | (string & {}) }): Promise<{ count: number; versions: DatasetVersion[]; next_cursor?: string | null } & ApiObject>;
   activateVersion(datasetId: string, versionId: string): Promise<{ dataset: DatasetInfo } & ApiObject>;
   diffVersions(datasetId: string, fromVersion: string, toVersion: string, options?: { limit?: number; cursor?: string }): Promise<DatasetDiff>;
   datasetFields(datasetId: string, options?: { version?: string }): Promise<DatasetFields>;
@@ -787,7 +790,7 @@ export declare class Scrawl {
   waitForBatch(batchId: string, options?: { timeoutMs?: number }): Promise<BatchStatus>;
   /** Wait until an asset job is completed, failed, cancelled or orphaned. Default timeout 600 000 ms. */
   waitForAssets(jobId: string, options?: { timeoutMs?: number }): Promise<AssetResult>;
-  /** Wait until a job (a crawl, a dataset extraction...) leaves PENDING/RUNNING. Default timeout 1 800 000 ms. */
+  /** Wait until a job (a crawl, a dataset extraction...) leaves pending/running (either spelling). Default timeout 1 800 000 ms. */
   waitForJob(jobId: string, options?: { timeoutMs?: number }): Promise<Job>;
   /** Iterate every item of a cursor-paged list method, following `next_cursor`. */
   paginate<T = ApiObject>(method: PagedMethod, ...args: unknown[]): AsyncGenerator<T, void, undefined>;

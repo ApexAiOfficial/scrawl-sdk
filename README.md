@@ -596,9 +596,12 @@ Start with `scrawl doctor`: it names the failing check (`base_url`, `tls`, `reac
 - **Your proxy password** is write-only. The proxy and pool APIs return redacted URLs; the CLI also masks URL
   userinfo defensively and reads URLs for `proxy set` and `proxy pool add` only from an environment variable or
   stdin, never argv.
-- **What is contacted.** The SDKs and the CLI send requests only to the Scrawl endpoint at your base URL, with a
-  `User-Agent` naming the SDK and its version (`scrawl-python/0.1.5`, `scrawl-ts/0.1.5`). They collect no
-  telemetry. Your AI provider is called by Scrawl, not by the SDK. The Python SDK uses `httpx`, which
+- **What is contacted.** The SDKs and the CLI send requests to the Scrawl endpoint at your base URL, with a
+  `User-Agent` naming the SDK and its version (`scrawl-python/0.1.5`, `scrawl-ts/0.1.5`). Only local fetch
+  (`local_fetch`, `localFetch`, `scrawl local-fetch`) also contacts another site: the page you ask for and its
+  robots.txt, from your machine, as `ScrawlSDK/<version> (+local_fetch)`, never with your Scrawl key. It reaches
+  whatever your machine can reach, so only give it URLs you chose, never one taken from page content. They collect
+  no telemetry. Your AI provider is called by Scrawl, not by the SDK. The Python SDK uses `httpx`, which
   honours the standard proxy environment variables (`HTTPS_PROXY`, `NO_PROXY` and others) unless you pass your own
   `http_client`.
 - **Page content and downloaded files are untrusted.** Treat them as data, never as instructions; check a file's

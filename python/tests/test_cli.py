@@ -311,8 +311,7 @@ def test_crawl_starts_and_optionally_waits_for_the_job(capsys, monkeypatch) -> N
         assert cli_main(["crawl", "t", "--wait", "120"], client=make_client(rec)) == code, status
         assert len(rec.requests) == 2
         printed = json.loads(capsys.readouterr().out)
-        # CC-1: whatever case the server sends, the SDK gives the job's status in the lower case.
-        assert printed["job"]["status"] == status.lower() and printed["dataset_version_id"] == "v2"
+        assert printed["job"]["status"] == status and printed["dataset_version_id"] == "v2"
 
 
 # -- local fetch, site crawls, content options -------------------------------------------------------
@@ -380,7 +379,7 @@ def test_site_crawl_starts_and_optionally_waits_with_its_exit_codes(capsys, monk
         rec = Recorder(httpx.Response(202, json=started), httpx.Response(200, json={**SITE_CRAWL, "status": status,
                                                                                     "done": done}))
         assert cli_main(["site-crawl", PAGE, "--wait", "120"], client=make_client(rec)) == code, status
-        assert json.loads(capsys.readouterr().out)["status"] == status.lower()
+        assert json.loads(capsys.readouterr().out)["status"] == status          # as the server sent it
     rec = Recorder(httpx.Response(200, json={**SITE_CRAWL, "status": "running", "done": False}))
     assert cli_main(["site-crawl-status", "c1"], client=make_client(rec)) == 4
     assert rec.requests[0].url.path == "/v1/site-crawls/c1"
@@ -794,7 +793,7 @@ def test_cli_assets_exit_codes(capsys) -> None:
     assert cli_main(["assets", PAGE], client=make_client(Recorder(egress), max_retries=0)) == 5
     capsys.readouterr()
     with pytest.raises(SystemExit) as usage:
-        cli_main(["assets", PAGE, "--class", "archives"])
+        cli_main(["assets", PAGE, "--class", "fonts"])
     assert usage.value.code == 2
 
 
@@ -978,3 +977,16 @@ def test_json_output_escapes_c1_controls_and_error_lines_are_stripped(capsys) ->
     assert cli_main(["jobs"], client=make_client(rec, max_retries=0)) == 5
     err = capsys.readouterr().err
     assert not re.search(r"[\x00-\x08\x0b-\x1f\x7f-\x9f]", err.rstrip("\n")), repr(err)
+
+
+def test_local_fetch_file_must_be_a_regular_file_within_the_size_limit(tmp_path, capsys) -> None:
+    rec = Recorder()
+    big = tmp_path / "big.html"
+    big.write_bytes(b"x" * 2048)
+    assert cli_main(["local-fetch", PAGE, "--file", str(big), "--max-bytes", "1024"], client=make_client(rec)) == 2
+    assert cli_main(["local-fetch", PAGE, "--file", str(tmp_path)], client=make_client(rec)) == 2   # a directory
+    empty = tmp_path / "empty.html"
+    empty.write_bytes(b"")
+    assert cli_main(["local-fetch", PAGE, "--file", str(empty)], client=make_client(rec)) == 2
+    assert rec.requests == []                                              # nothing was sent
+    capsys.readouterr()

@@ -645,7 +645,7 @@ test("waitForJob follows a job until it leaves PENDING or RUNNING", async () => 
   const job = (status) => ({ body: { job_id: "c1", command: "crawl", args: [], status, engine_id: "e",
     artifacts_url: "", result_url: "" } });
   const { client, fetch } = makeClient([job("PENDING"), job("RUNNING"), job("COMPLETED")]);
-  assert.equal((await client.waitForJob("c1")).status, "completed");    // CC-1: the one spelling, the lower case
+  assert.equal((await client.waitForJob("c1")).status, "COMPLETED");
   assert.equal(fetch.calls.length, 3);
   for (const call of fetch.calls) {
     assert.equal(call.url.pathname, "/v1/jobs/c1");
@@ -653,11 +653,11 @@ test("waitForJob follows a job until it leaves PENDING or RUNNING", async () => 
   }
   for (const status of ["FAILED", "CANCELLED", "ORPHANED"]) {
     const settled = makeClient([job(status), job("COMPLETED")]);
-    assert.equal((await settled.client.waitForJob("c1")).status, status.toLowerCase());
+    assert.equal((await settled.client.waitForJob("c1")).status, status);
     assert.equal(settled.fetch.calls.length, 1);
   }
   const slow = makeClient([job("RUNNING")]);
-  assert.equal((await slow.client.waitForJob("c1", { timeoutMs: 0 })).status, "running");
+  assert.equal((await slow.client.waitForJob("c1", { timeoutMs: 0 })).status, "RUNNING");
   assert.equal(slow.fetch.calls.length, 1);
 });
 

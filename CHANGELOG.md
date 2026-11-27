@@ -23,6 +23,9 @@ Built against contract digest
 - Local fetch: `local_fetch` / `localFetch` fetches a page from your own machine, then has Scrawl render it, so
   Scrawl itself fetches nothing.
   - robots.txt is honoured by default, and redirects and size are bounded.
+  - The robots.txt request gets the page's redirect checks, and at most 500 KiB of it is read.
+  - Every request is bounded by the client's timeout. A site that cannot be reached is a `ScrawlError`
+    (`fetch_failed` or `fetch_timeout`). An empty page is refused before anything is sent (`empty_body`).
   - The fetch never uses the client that carries your Scrawl key.
   - `scrape_local` / `scrapeLocal` sends a page you already have.
   - The result says `origin: client_fetched` and `url_verified: false`: the URL, status and type are your claims.
@@ -36,11 +39,14 @@ Built against contract digest
   extraction and crawl results, and types for site crawls and curations.
 
 ### Changed
-- A job's status has one spelling, the lower case (`pending`, `running`, `completed`, `failed`, `cancelled`,
-  `orphaned`), on every job, crawl, cancel and dataset-version response; current servers send it that way. The SDK
-  also reads the upper case older servers sent and gives it to you in the lower case. This release and the next
-  minor release still read the upper case. The TypeScript `JobStatus` type is now the lower-case union, and a status
-  filter (`list_jobs`, `list_versions`) accepts either case.
+- A job's status: current servers send the lower case (`pending`, `running`, `completed`, `failed`, `cancelled`,
+  `orphaned`); servers before them sent the upper case. The SDKs pass it through as sent, as 0.1.4 did, and their
+  waits and the CLI's exit codes read either spelling. The TypeScript `JobStatus` type now has both spellings; the
+  upper-case members are deprecated, so compare with the lower case. A later minor release may drop the upper case.
+  Nothing that compiled or ran with 0.1.4 changes.
+
+### Fixed
+- `scrawl assets --class` and the TypeScript `AssetClass` include `archives`, the opt-in class the API offers.
 
 ## Python 0.1.4 and TypeScript 0.1.4 (2026-11-16)
 

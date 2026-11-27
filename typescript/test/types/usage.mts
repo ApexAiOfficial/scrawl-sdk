@@ -48,17 +48,23 @@ export async function usage(): Promise<void> {
   console.log(rows.records[0]?.record_id, rows.records[0]?.provenance);
   const job = await client.getJob("j");
   const firstArg: string | undefined = job.args[0];
-  const jobStatus: JobStatus = job.status;
+  // A status is passed through as the server sent it: 0.1.4 code comparing with the upper case still compiles, and
+  // the lower case (the API's spelling today) is accepted everywhere a JobStatus is.
+  const lowerCase: JobStatus = "completed";
+  const upperCase: JobStatus = "COMPLETED";                            // deprecated, still a JobStatus
+  const jobStatus: string = job.status;
   const crawlStatus: JobStatus = (await client.crawl("target")).status;
-  const cancelStatus: JobStatus = (await client.cancelJob("j")).status;
-  const versionStatus: JobStatus | undefined = (await client.getDataset("d")).versions[0]?.status;
-  const extractStatus: JobStatus = (await client.extractDataset("d", { instruction: "titles" })).status;
+  const cancelled: boolean = (await client.cancelJob("j")).status === "cancelled";
+  const versionDone = (await client.getDataset("d")).versions[0]?.status === "COMPLETED";
+  const extracting = (await client.extractDataset("d", { instruction: "titles" })).status === "pending";
+  const siteDone: boolean = (await client.siteCrawlStatus("c")).status === "completed";
   await client.listJobs({ status: "COMPLETED" });                     // either case filters
-  console.log(jobStatus, crawlStatus, cancelStatus, versionStatus, extractStatus);
+  await client.listJobs({ status: "running" });
+  console.log(lowerCase, upperCase, jobStatus, crawlStatus, cancelled, versionDone, extracting, siteDone);
   const jobWarnings: string[] = job.warnings;
   const launch = await client.crawl("target", { exportFormat: "csv" });
   const finished = await client.waitForJob(launch.job_id, { timeoutMs: 1000 });
-  console.log(finished.status === "completed", launch.dataset_version_id);
+  console.log(finished.status === "COMPLETED", finished.status === "completed", launch.dataset_version_id);
   for await (const version of client.paginate(client.listVersions, "d", { limit: 2 })) console.log(version);
   const versions = await client.listVersions("d");
   console.log(versions.versions.map((v) => v.version_id));
@@ -122,7 +128,7 @@ export async function usage(): Promise<void> {
   // @ts-expect-error - export formats are an enum
   await client.crawl("t", { exportFormat: "jsonlines-gz" });
   // @ts-expect-error - not an asset class
-  await client.extractAssets("https://e.example/page", { classes: ["archives"] });
+  await client.extractAssets("https://e.example/page", { classes: ["fonts"] });
   // @ts-expect-error - a quote starts nothing, so it takes no idempotency key
   await client.quoteAssets("https://e.example/page", { idempotencyKey: "k" });
   // @ts-expect-error - views are an enum
@@ -140,7 +146,5 @@ export async function usage(): Promise<void> {
   }
   // @ts-expect-error - poll_after_seconds is a number
   const later: string | null | undefined = page.poll_after_seconds;
-  // @ts-expect-error - a job's status has one spelling, the lower case
-  const shouted: "COMPLETED" = (await client.getJob("j")).status;
-  console.log(code, unknownCode, shouted, later);
+  console.log(code, unknownCode, later);
 }

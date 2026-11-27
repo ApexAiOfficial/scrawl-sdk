@@ -53,7 +53,7 @@ _ENV_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]{0,127}")
 _PROXY_USERINFO = re.compile(r"\b((?:https?|socks5h?)://)[^/\s]*@", re.I)
 _BARE_USERINFO = re.compile(r"(?<![/\w@.*-])[^\s/@\"':*]+:[^\s/\"']*@(?=[A-Za-z0-9.\[\]-]+:\d)")
 MAX_JSON_FILE_BYTES = 64 * 1024
-ASSET_CLASSES = ("images", "video", "audio", "documents", "data", "web_assets")
+ASSET_CLASSES = ("images", "video", "audio", "documents", "data", "web_assets", "archives")
 FORMATS = ("markdown", "links", "html", "json")
 FILTER_OPS = ("eq", "ne", "lt", "lte", "gt", "gte", "contains", "in", "exists")
 DEFAULT_AI_KEY_ENV = "SCRAWL_AI_API_KEY"
@@ -207,7 +207,7 @@ def _cmd_local_fetch(client: Scrawl, args: argparse.Namespace) -> int:
     options = dict(formats=formats, schema=_schema(args.schema), instruction=args.instruction, profile=args.profile,
                    wait_seconds=min(args.wait, 60), **_content_options(args))
     if args.file:
-        result = client.scrape_local(args.url, Path(args.file).read_bytes(), http_status=args.status,
+        result = client.scrape_local(args.url, _page_file(args.file, args.max_bytes), http_status=args.status,
                                      content_type=args.content_type or "", **options)
     else:
         if args.content_type is not None or args.status != 200:
@@ -216,6 +216,23 @@ def _cmd_local_fetch(client: Scrawl, args: argparse.Namespace) -> int:
                   if value is not None}
         result = client.local_fetch(args.url, respect_robots=not args.ignore_robots, **limits, **options)
     return _scrape_report(client, result, args, formats, None)
+
+
+def _page_file(name: str, max_bytes: int | None) -> bytes:
+    """A saved page for ``local-fetch --file``: a regular file, not empty, within the size limit (``--max-bytes``,
+    else the limit Scrawl accepts). Only send a page you fetched: whatever the file holds goes to Scrawl."""
+    from ._local_fetch import DEFAULT_MAX_BYTES
+
+    path, limit = Path(name), max_bytes or DEFAULT_MAX_BYTES
+    if not path.is_file():
+        raise ValueError(f"--file must be a regular file (a page you saved): {name}")
+    with path.open("rb") as handle:
+        data = handle.read(limit + 1)
+    if len(data) > limit:
+        raise ValueError(f"--file is larger than {limit} bytes (--max-bytes): nothing sent")
+    if not data:
+        raise ValueError("--file is empty: nothing to render, nothing sent")
+    return data
 
 
 def _scrape_report(client: Scrawl, result: Any, args: argparse.Namespace, formats: list[str],
@@ -965,7 +982,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--ignore-robots", action="store_true",
                    help="fetch even where robots.txt disallows it (your responsibility)")
     p.add_argument("--max-redirects", type=int, help="redirects to follow when fetching (default 5)")
-    p.add_argument("--max-bytes", type=int, help="the most bytes to read when fetching")
+    p.add_argument("--max-bytes", type=int, help="the most bytes to read when fetching, or to send with --file")
     p.add_argument("--format", action="append", choices=FORMATS)
     p.add_argument("--wait", type=int, default=60, help="seconds to wait for the result (default 60)")
     content_options(p)

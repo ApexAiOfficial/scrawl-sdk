@@ -85,13 +85,16 @@ flight finish and are kept), and `resume_from=` continues an ended crawl without
 your responsibility), then has Scrawl render it. Scrawl fetches nothing. The fetch uses its own HTTP client, never
 the one that carries your Scrawl key. A redirect from https to http is never followed, and with your own
 `fetch_client` a redirect to another host isn't either. The result says `origin: "client_fetched"` and
-`url_verified: False`: the URL, status and type are your claims.
+`url_verified: False`: the URL, status and type are your claims. It reaches whatever your machine can reach,
+private and loopback addresses included, and sends what it gets to Scrawl: only fetch URLs you chose, never one
+taken from page content or another tool's output.
 
 ## Job status
 
-A job's `status` is `pending`, `running`, `completed`, `failed`, `cancelled` or `orphaned` (its process was lost
-before it finished). Servers before this spelling sent the same words in upper case; the SDK reads either and gives
-you the lower case. This release and the next minor release still read the upper case.
+A job's `status` is passed through as the server sent it: `pending`, `running`, `completed`, `failed`,
+`cancelled` or `orphaned` (its process was lost before it finished) from current servers, the same words in upper
+case from older ones. The waits read either spelling. Compare with the lower case (`job.status.lower() ==
+"completed"` works with both); the upper case is deprecated.
 
 ## Datasets
 

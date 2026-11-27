@@ -40,7 +40,7 @@ def test_crawl_site_sends_only_what_is_set_with_an_idempotency_key() -> None:
                                           "engine": "browser", "wait_for_ms": 500, "only_main_content": False,
                                           "include_tags": ["main"], "exclude_tags": ["nav"], "resume_from": "c0"}
     assert second.headers["Idempotency-Key"] == "k-1"
-    assert started.status == "running"                   # a job status reads lower case whatever the server wrote
+    assert started.status == "RUNNING"                   # a job status reaches you as the server sent it
 
 
 def test_site_crawl_status_pages_and_waits() -> None:
@@ -55,7 +55,7 @@ def test_wait_for_site_crawl_returns_once_the_version_is_final() -> None:
     rec = Recorder(httpx.Response(200, json=CRAWL), httpx.Response(200, json={**CRAWL, "status": "COMPLETED",
                                                                               "done": True}))
     done = _client(rec).wait_for_site_crawl("c1", timeout=120)
-    assert done.done is True and done.status == "completed" and len(rec.requests) == 2
+    assert done.done is True and done.status == "COMPLETED" and len(rec.requests) == 2
 
 
 def test_curation_methods_send_the_operation_and_page_the_list() -> None:
